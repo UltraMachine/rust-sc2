@@ -1,4 +1,5 @@
 use crate::{geometry::Point2, unit::Unit};
+use itertools::Itertools;
 use std::{collections::HashMap, iter::FromIterator, ops::Index};
 
 #[derive(Default, Clone)]
@@ -150,6 +151,23 @@ impl Units {
 			.max_by(|u1, u2| f(u1).partial_cmp(&f(u2)).unwrap())
 			.unwrap()
 			.clone()
+	}
+	pub fn sort<B, F>(&self, f: F) -> Self
+	where
+		B: Ord,
+		F: for<'r> FnMut(&'r &Unit) -> B,
+	{
+		self.iter().sorted_by_key(f).cloned().collect()
+	}
+	pub fn partial_sort<B, F>(&self, mut f: F) -> Self
+	where
+		B: PartialOrd,
+		F: for<'r> FnMut(&'r &Unit) -> B,
+	{
+		self.iter()
+			.sorted_by(|u1, u2| f(u1).partial_cmp(&f(u2)).unwrap())
+			.cloned()
+			.collect()
 	}
 }
 impl FromIterator<Unit> for Units {
