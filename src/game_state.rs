@@ -2,7 +2,7 @@ use crate::{
 	action::{Action, ActionError},
 	geometry::Point2,
 	ids::{AbilityId, EffectId, UpgradeId},
-	pixel_map::{ByteMap, PixelMap},
+	pixel_map::{PixelMap, VisibilityMap},
 	unit::Unit,
 	units::Units,
 	FromProto, FromProtoGameData, FromProtoPlayer, PlayerBox,
@@ -105,7 +105,7 @@ pub struct RawData {
 	pub camera: Point2,
 	pub units: Units,
 	pub upgrades: Vec<UpgradeId>,
-	pub visibility: ByteMap, // 0=Hidden, 1=Fogged, 2=Visible, 3=FullHidden
+	pub visibility: VisibilityMap,
 	pub creep: PixelMap,
 	pub dead_units: Vec<u64>,
 	pub effects: Vec<Effect>,
@@ -132,7 +132,7 @@ impl FromProtoPlayer<ObservationRaw> for RawData {
 				.iter()
 				.map(|u| UpgradeId::from_u32(*u).unwrap())
 				.collect(),
-			visibility: ByteMap::from_proto(map_state.get_visibility().clone()),
+			visibility: VisibilityMap::from_proto(map_state.get_visibility().clone()),
 			creep: PixelMap::from_proto(map_state.get_creep().clone()),
 			dead_units: raw.get_event().get_dead_units().to_vec(),
 			effects: raw

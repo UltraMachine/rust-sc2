@@ -11,7 +11,7 @@ pub mod game_state;
 pub mod geometry;
 pub mod ids;
 mod paths;
-mod pixel_map;
+pub mod pixel_map;
 pub mod player;
 pub mod unit;
 pub mod units;
