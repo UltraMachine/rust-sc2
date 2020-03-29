@@ -1,0 +1,8 @@
+[package]
+name = "sc2-macro"
+version = "0.1.0"
+authors = ["Armageddon <lunyx1337@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+sc2-proc-macro = { path = "macro" }
