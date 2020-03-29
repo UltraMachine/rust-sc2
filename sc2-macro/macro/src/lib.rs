@@ -39,7 +39,7 @@ pub fn bot(_attr: TokenStream, item: TokenStream) -> TokenStream {
 		struct #name {
 			#fields
 			player_id: u32,
-			opponent_id: u32,
+			opponent_id: String,
 			actions: Vec<Action>,
 			commands: HashMap<(AbilityId, Target, bool), Vec<u64>>,
 			game_step: u32,
@@ -115,7 +115,7 @@ pub fn bot_impl_player(attr: TokenStream, item: TokenStream) -> TokenStream {
 			fn set_player_id(&mut self, player_id: u32) {
 				self.player_id = player_id;
 			}
-			fn set_opponent_id(&mut self, opponent_id: u32) {
+			fn set_opponent_id(&mut self, opponent_id: String) {
 				self.opponent_id = opponent_id;
 			}
 			fn set_game_info(&mut self, game_info: GameInfo) {

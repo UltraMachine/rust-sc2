@@ -54,7 +54,9 @@ impl Player for WorkerRushAI {
 		}
 
 		let ground_attackers = self.grouped_units.enemy_units.filter(|u| {
-			!u.is_flying.as_bool() && u.can_attack_ground() && u.distance_pos_squared(self.enemy_start) < 2025.0
+			!u.is_flying.as_bool()
+				&& u.can_attack_ground()
+				&& u.distance_pos_squared(self.enemy_start) < 2025.0
 		});
 		if !ground_attackers.is_empty() {
 			self.grouped_units.workers.clone().iter().for_each(|u| {
@@ -158,6 +160,7 @@ async fn main() {
 				.expect("StartPort must be specified")
 				.parse()
 				.expect("Can't parse StartPort"),
+			app.value_of("opponent_id"),
 		)
 		.await
 		.unwrap();

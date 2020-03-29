@@ -79,7 +79,7 @@ pub trait Player: PlayerClone {
 		1
 	}
 	fn set_player_id(&mut self, _player_id: u32) {}
-	fn set_opponent_id(&mut self, _opponent_id: u32) {}
+	fn set_opponent_id(&mut self, _opponent_id: String) {}
 	fn set_game_info(&mut self, _game_info: GameInfo) {}
 	fn set_game_data(&mut self, _game_data: GameData) {}
 	fn set_state(&mut self, _state: GameState) {}

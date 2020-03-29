@@ -143,6 +143,7 @@ pub async fn run_ladder_game(
 	host: String,
 	port: String,
 	player_port: i32,
+	opponent_id: Option<&str>,
 ) -> TResult<()> {
 	println!("Starting ladder game.");
 
@@ -158,6 +159,10 @@ pub async fn run_ladder_game(
 
 	print!("Sending JoinGame request... ");
 	flush();
+
+	if let Some(id) = opponent_id {
+		player.set_opponent_id(id.to_string());
+	}
 
 	join_game(
 		&mut player,
