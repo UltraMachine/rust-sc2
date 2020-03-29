@@ -176,6 +176,40 @@ pub async fn run_ladder_game(
 	.await?;
 	println!("Done");
 
+	print!("Requesting GameInfo... ");
+	flush();
+	let mut req = Request::new();
+	req.mut_game_info();
+	let res = send(&mut ws, req).await?;
+	player.set_game_info(GameInfo::from_proto(res.get_game_info().clone()));
+	println!("Done");
+
+	print!("Requesting GameData... ");
+	flush();
+	let mut req = Request::new();
+	let req_game_data = req.mut_data();
+	req_game_data.set_ability_id(true);
+	req_game_data.set_unit_type_id(true);
+	req_game_data.set_upgrade_id(true);
+	req_game_data.set_buff_id(true);
+	req_game_data.set_effect_id(true);
+
+	let res = send(&mut ws, req).await?;
+	player.set_game_data(GameData::from_proto(res.get_data().clone()));
+	println!("Done");
+
+	print!("Entered main loop... ");
+	flush();
+	// Main loop
+	let mut iteration = 0;
+	loop {
+		if !play_step(&mut ws, &mut player, iteration, false, false).await? {
+			break;
+		}
+		iteration += 1;
+	}
+	println!("Finished");
+
 	Ok(())
 }
 
