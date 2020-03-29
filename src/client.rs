@@ -603,7 +603,13 @@ async fn launch_pvp(
 		print!("Requesting GameData... ");
 		flush();
 		let mut req = Request::new();
-		req.mut_data();
+		let req_game_data = req.mut_data();
+		req_game_data.set_ability_id(true);
+		req_game_data.set_unit_type_id(true);
+		req_game_data.set_upgrade_id(true);
+		req_game_data.set_buff_id(true);
+		req_game_data.set_effect_id(true);
+
 		player1.set_game_data(GameData::from_proto(
 			send(&mut ws_host, req.clone()).await?.get_data().clone(),
 		));
