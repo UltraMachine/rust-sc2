@@ -57,6 +57,11 @@ impl Units {
 		self.units.is_empty()
 	}
 
+	#[inline]
+	pub fn len(&self) -> usize {
+		self.units.len()
+	}
+
 	// Units methods
 	pub fn find_tag(&self, tag: u64) -> Option<Unit> {
 		self.units.get(&tag).cloned()
@@ -64,22 +69,49 @@ impl Units {
 	pub fn find_tags<T: Iterator<Item = u64>>(&self, tags: T) -> Self {
 		tags.filter_map(|tag| self.units.get(&tag).cloned()).collect()
 	}
+	pub fn center(&self) -> Point2 {
+		self.iter().map(|u| u.position).sum::<Point2>() / (self.len() as f32)
+	}
+	// Get closest | furthest
 	pub fn closest(&self, other: &Unit) -> Unit {
-		self.iter()
-			.min_by(|u1, u2| u1.distance(other).partial_cmp(&u2.distance(other)).unwrap())
-			.unwrap()
-			.clone()
+		self.partial_min(|u| u.distance_squared(other))
 	}
 	pub fn closest_pos(&self, other: Point2) -> Unit {
-		self.iter()
-			.min_by(|u1, u2| {
-				u1.distance_pos(other)
-					.partial_cmp(&u2.distance_pos(other))
-					.unwrap()
-			})
-			.unwrap()
-			.clone()
+		self.partial_min(|u| u.distance_pos_squared(other))
 	}
+	pub fn furthest(&self, other: &Unit) -> Unit {
+		self.partial_max(|u| u.distance_squared(other))
+	}
+	pub fn furthest_pos(&self, other: Point2) -> Unit {
+		self.partial_max(|u| u.distance_pos_squared(other))
+	}
+	// Get closest | furthest distance
+	pub fn closest_distance(&self, other: &Unit) -> f32 {
+		self.partial_min_value(|u| u.distance_squared(other)).sqrt()
+	}
+	pub fn closest_distance_pos(&self, other: Point2) -> f32 {
+		self.partial_min_value(|u| u.distance_pos_squared(other)).sqrt()
+	}
+	pub fn furthest_distance(&self, other: &Unit) -> f32 {
+		self.partial_max_value(|u| u.distance_squared(other)).sqrt()
+	}
+	pub fn furthest_distance_pos(&self, other: Point2) -> f32 {
+		self.partial_max_value(|u| u.distance_pos_squared(other)).sqrt()
+	}
+	// Squared
+	pub fn closest_distance_squared(&self, other: &Unit) -> f32 {
+		self.partial_min_value(|u| u.distance_squared(other))
+	}
+	pub fn closest_distance_pos_squared(&self, other: Point2) -> f32 {
+		self.partial_min_value(|u| u.distance_pos_squared(other))
+	}
+	pub fn furthest_distance_squared(&self, other: &Unit) -> f32 {
+		self.partial_max_value(|u| u.distance_squared(other))
+	}
+	pub fn furthest_distance_pos_squared(&self, other: Point2) -> f32 {
+		self.partial_max_value(|u| u.distance_pos_squared(other))
+	}
+	// Filter closer | further than distance
 	pub fn closer_pos(&self, distance: f32, pos: Point2) -> Units {
 		self.filter(|u| u.distance_pos_squared(pos) < distance * distance)
 	}
@@ -92,6 +124,7 @@ impl Units {
 	pub fn further(&self, distance: f32, unit: &Unit) -> Units {
 		self.filter(|u| u.distance_squared(unit) > distance * distance)
 	}
+
 	pub fn filter<F>(&self, f: F) -> Self
 	where
 		F: for<'r> FnMut(&'r Unit) -> bool,
@@ -118,6 +151,9 @@ impl Units {
 	pub fn in_range(&self, unit: &Unit, gap: f32) -> Self {
 		self.filter(|u| u.in_range(unit, gap))
 	}
+	pub fn visible(&self) -> Self {
+		self.filter(|u| u.is_visible())
+	}
 	pub fn min<B, F>(&self, f: F) -> Unit
 	where
 		B: Ord,
@@ -135,6 +171,23 @@ impl Units {
 			.unwrap()
 			.clone()
 	}
+	pub fn min_value<B, F>(&self, mut f: F) -> B
+	where
+		B: Ord,
+		F: for<'r> FnMut(&'r &Unit) -> B,
+	{
+		self.iter().map(|u| f(&u)).min().unwrap()
+	}
+	pub fn partial_min_value<B, F>(&self, mut f: F) -> B
+	where
+		B: PartialOrd,
+		F: for<'r> FnMut(&'r &Unit) -> B,
+	{
+		self.iter()
+			.map(|u| f(&u))
+			.min_by(|b1, b2| b1.partial_cmp(&b2).unwrap())
+			.unwrap()
+	}
 	pub fn max<B, F>(&self, f: F) -> Unit
 	where
 		B: Ord,
@@ -151,6 +204,23 @@ impl Units {
 			.max_by(|u1, u2| f(u1).partial_cmp(&f(u2)).unwrap())
 			.unwrap()
 			.clone()
+	}
+	pub fn max_value<B, F>(&self, mut f: F) -> B
+	where
+		B: Ord,
+		F: for<'r> FnMut(&'r &Unit) -> B,
+	{
+		self.iter().map(|u| f(&u)).max().unwrap()
+	}
+	pub fn partial_max_value<B, F>(&self, mut f: F) -> B
+	where
+		B: PartialOrd,
+		F: for<'r> FnMut(&'r &Unit) -> B,
+	{
+		self.iter()
+			.map(|u| f(&u))
+			.max_by(|b1, b2| b1.partial_cmp(&b2).unwrap())
+			.unwrap()
 	}
 	pub fn sort<B, F>(&self, f: F) -> Self
 	where

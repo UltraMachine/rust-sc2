@@ -73,6 +73,9 @@ impl Unit {
 	fn type_data(&self) -> Option<UnitTypeData> {
 		self.game_data.units.get(&self.type_id).cloned()
 	}
+	pub fn is_worker(&self) -> bool {
+		[UnitTypeId::SCV, UnitTypeId::Drone, UnitTypeId::Probe].contains(&self.type_id)
+	}
 	pub fn is_visible(&self) -> bool {
 		self.display_type == DisplayType::Visible
 	}
@@ -97,6 +100,12 @@ impl Unit {
 	pub fn is_ally(&self) -> bool {
 		self.alliance == Alliance::Ally
 	}
+	pub fn food_cost(&self) -> f32 {
+		match self.type_data() {
+			Some(data) => data.food_required,
+			None => 0.0,
+		}
+	}
 	pub fn hits(&self) -> Option<f32> {
 		match (self.health, self.shield) {
 			(Some(health), Some(shield)) => Some(health + shield),
@@ -111,6 +120,12 @@ impl Unit {
 			(Some(health), None) => Some(health),
 			(None, Some(shield)) => Some(shield),
 			(None, None) => None,
+		}
+	}
+	pub fn speed(&self) -> f32 {
+		match self.type_data() {
+			Some(data) => data.movement_speed,
+			None => 0.0,
 		}
 	}
 	pub fn has_attribute(&self, attribute: Attribute) -> bool {

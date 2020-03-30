@@ -2,13 +2,18 @@ use crate::{
 	game_data::GameData,
 	game_info::GameInfo,
 	game_state::GameState,
+	ids::AbilityId,
 	paths::{get_base_version, get_latest_base_version, get_path_to_sc2},
 	player::PlayerType,
 	FromProto, FromProtoPlayer, IntoProto, PlayerBox,
 };
 use futures_util::{SinkExt, StreamExt};
+use num_traits::FromPrimitive;
 use protobuf::Message;
-use sc2_proto::sc2api::{PlayerSetup, PortSet, Request, RequestCreateGame, Response, Status};
+use sc2_proto::{
+	query::RequestQueryAvailableAbilities,
+	sc2api::{PlayerSetup, PortSet, Request, RequestCreateGame, Response, Status},
+};
 use std::{
 	io::Write,
 	net::TcpListener,
@@ -307,7 +312,36 @@ async fn play_step(
 			return Ok(false);
 		}
 
-		player.set_state(GameState::from_proto_player(&player, res.get_observation()));
+		let state = GameState::from_proto_player(&player, res.get_observation());
+
+		let mut req = Request::new();
+		let req_query_abilities = req.mut_query().mut_abilities();
+		state.observation.raw.units.iter().for_each(|u| {
+			if u.is_mine() {
+				let mut req_unit = RequestQueryAvailableAbilities::new();
+				req_unit.set_unit_tag(u.tag);
+				req_query_abilities.push(req_unit);
+			}
+		});
+
+		let res = send(ws, req).await?;
+		player.set_avaliable_abilities(
+			res.get_query()
+				.get_abilities()
+				.iter()
+				.map(|a| {
+					(
+						a.get_unit_tag(),
+						a.get_abilities()
+							.iter()
+							.filter_map(|ab| AbilityId::from_i32(ab.get_ability_id()))
+							.collect(),
+					)
+				})
+				.collect(),
+		);
+
+		player.set_state(state);
 		player.group_units();
 
 		player.on_step(iteration);

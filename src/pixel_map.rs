@@ -1,11 +1,20 @@
-use crate::FromProto;
+use crate::{geometry::Point2, FromProto};
 use ndarray::Array2;
 use num_traits::FromPrimitive;
 use sc2_proto::common::ImageData;
+use std::ops::Index;
 
 pub type PixelMap = Array2<Pixel>;
 pub type ByteMap = Array2<u8>;
 pub type VisibilityMap = Array2<Visibility>;
+
+impl<T> Index<Point2> for Array2<T> {
+	type Output = T;
+
+	fn index(&self, pos: Point2) -> &Self::Output {
+		&self[(pos.x as usize, pos.y as usize)]
+	}
+}
 
 fn to_binary(n: u8) -> Vec<Pixel> {
 	match n {
@@ -64,7 +73,7 @@ impl FromProto<ImageData> for VisibilityMap {
 	}
 }
 
-#[derive(FromPrimitive, Copy, Clone)]
+#[derive(FromPrimitive, Copy, Clone, PartialEq, Eq)]
 pub enum Pixel {
 	Empty,
 	Set,
@@ -83,7 +92,7 @@ impl std::fmt::Debug for Pixel {
 	}
 }
 
-#[derive(Debug, FromPrimitive, Copy, Clone)]
+#[derive(Debug, FromPrimitive, Copy, Clone, PartialEq, Eq)]
 pub enum Visibility {
 	Hidden,
 	Fogged,

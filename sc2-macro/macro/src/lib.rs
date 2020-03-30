@@ -48,6 +48,7 @@ pub fn bot(_attr: TokenStream, item: TokenStream) -> TokenStream {
 			game_data: Rc<GameData>,
 			state: GameState,
 			grouped_units: GroupedUnits,
+			abilities_units: HashMap<u64, Vec<AbilityId>>,
 		}
 	})
 }
@@ -80,6 +81,7 @@ pub fn bot_new(_attr: TokenStream, item: TokenStream) -> TokenStream {
 						game_data: Default::default(),
 						state: Default::default(),
 						grouped_units: Default::default(),
+						abilities_units: HashMap::new(),
 						#rest
 					}
 				}
@@ -128,6 +130,9 @@ pub fn bot_impl_player(attr: TokenStream, item: TokenStream) -> TokenStream {
 			}
 			fn set_state(&mut self, state: GameState) {
 				self.state = state;
+			}
+			fn set_avaliable_abilities(&mut self, abilities_units: HashMap<u64, Vec<AbilityId>>) {
+				self.abilities_units = abilities_units;
 			}
 			fn get_game_data(&self) -> Rc<GameData> {
 				Rc::clone(&self.game_data)

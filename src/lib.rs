@@ -21,9 +21,10 @@ pub use client::{run_game, run_ladder_game};
 use game_data::GameData;
 use game_info::GameInfo;
 use game_state::GameState;
+use ids::AbilityId;
 use player::{AIBuild, Difficulty, PlayerType, Race};
 pub use sc2_macro::{bot, bot_impl_player, bot_new};
-use std::rc::Rc;
+use std::{collections::HashMap, rc::Rc};
 
 pub type PlayerBox = Box<dyn Player>;
 
@@ -84,6 +85,7 @@ pub trait Player: PlayerClone {
 	fn set_game_data(&mut self, _game_data: GameData) {}
 	fn set_state(&mut self, _state: GameState) {}
 	fn group_units(&mut self) {}
+	fn set_avaliable_abilities(&mut self, _abilities_units: HashMap<u64, Vec<AbilityId>>) {}
 	fn get_game_data(&self) -> Rc<GameData> {
 		unimplemented!()
 	}
