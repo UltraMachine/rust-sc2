@@ -25,7 +25,7 @@ use player::{AIBuild, Difficulty, PlayerType, Race};
 pub use sc2_macro::{bot, bot_impl_player, bot_new};
 use std::rc::Rc;
 
-type PlayerBox = Box<dyn Player>;
+pub type PlayerBox = Box<dyn Player>;
 
 pub struct PlayerSettings {
 	player_type: PlayerType,

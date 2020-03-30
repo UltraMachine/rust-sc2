@@ -14,6 +14,7 @@ pub fn bot(_attr: TokenStream, item: TokenStream) -> TokenStream {
 	let item = parse_macro_input!(item as ItemStruct);
 
 	let name = item.ident;
+	let vis = item.vis;
 	let attrs = item.attrs;
 	let fields = match item.fields {
 		Fields::Named(named_fields) => {
@@ -36,7 +37,7 @@ pub fn bot(_attr: TokenStream, item: TokenStream) -> TokenStream {
 		use std::{collections::HashMap, rc::Rc};
 		#(#attrs)*
 		#[derive(Clone)]
-		struct #name {
+		#vis struct #name {
 			#fields
 			player_id: u32,
 			opponent_id: String,
@@ -56,6 +57,7 @@ pub fn bot_new(_attr: TokenStream, item: TokenStream) -> TokenStream {
 	// let attr = parse_macro_input!(attr as AttributeArgs);
 	let item = parse_macro_input!(item as ItemFn);
 
+	let vis = item.vis;
 	let signature = item.sig;
 	let blocks = item.block.stmts.iter().map(|s| match s {
 		Stmt::Expr(expr) => match expr {
@@ -88,7 +90,7 @@ pub fn bot_new(_attr: TokenStream, item: TokenStream) -> TokenStream {
 	});
 
 	TokenStream::from(quote! {
-		#signature {
+		#vis #signature {
 			#(#blocks)*
 		}
 	})
