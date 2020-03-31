@@ -50,7 +50,7 @@ impl Point2 {
 		dx * dx + dy * dy
 	}
 	pub fn towards(self, other: Self, offset: f32) -> Self {
-		self * (offset / self.distance(other))
+		self + (other - self) / self.distance(other) * offset
 	}
 }
 impl PartialEq for Point2 {
