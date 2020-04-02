@@ -339,6 +339,13 @@ impl Unit {
 	pub fn in_range_of(&self, threat: &Unit, gap: f32) -> bool {
 		threat.in_range(self, gap)
 	}
+	pub fn target(&self) -> Target {
+		if self.is_idle() {
+			Target::None
+		} else {
+			 self.orders[0].target
+		}
+	}
 	pub fn is_idle(&self) -> bool {
 		self.orders.is_empty()
 	}

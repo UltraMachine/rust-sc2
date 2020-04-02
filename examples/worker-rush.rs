@@ -22,10 +22,10 @@ struct WorkerRushAI {
 
 impl WorkerRushAI {
 	#[bot_new]
-	fn new(race: Race, game_step: u32) -> Self {
+	fn new(game_step: u32) -> Self {
 		Self {
 			game_step,
-			race,
+			race: Race::Protoss,
 			mineral_forward: Default::default(),
 			mineral_back: Default::default(),
 		}
@@ -141,7 +141,7 @@ async fn main() {
 		None => unreachable!(),
 	};
 
-	let bot = Box::new(WorkerRushAI::new(Race::Protoss, game_step));
+	let bot = Box::new(WorkerRushAI::new(game_step));
 
 	if app.is_present("ladder_server") {
 		run_ladder_game(

@@ -50,6 +50,11 @@ impl Units {
 	}
 
 	#[inline]
+	pub fn remove(&mut self, u: u64) -> Option<Unit> {
+		self.units.remove(&u)
+	}
+
+	#[inline]
 	pub fn iter(&self) -> Values<u64, Unit> {
 		self.units.values()
 	}
