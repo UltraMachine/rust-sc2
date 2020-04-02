@@ -192,6 +192,9 @@ pub fn bot_impl_player(attr: TokenStream, item: TokenStream) -> TokenStream {
 					self.commands.entry(order).or_default().push(tag);
 				}
 			}
+			fn chat_send(&mut self, message: String, team_only: bool) {
+				self.actions.push(Action::Chat(message, team_only));
+			}
 			fn prepare_first_step(&mut self) {
 				self.group_units();
 				self.start_location = self.grouped_units.townhalls[0].position;

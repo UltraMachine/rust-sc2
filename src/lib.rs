@@ -121,6 +121,7 @@ pub trait Player: PlayerClone {
 	fn on_start(&mut self) {}
 	fn on_step(&mut self, _iteration: usize) {}
 	fn command(&mut self, _cmd: Option<Command>) {}
+	fn chat_send(&mut self, _message: String, _team_only: bool) {}
 	fn group_units(&mut self) {}
 	fn get_unit_cost(&self, _unit: UnitTypeId) -> Cost {
 		unimplemented!()
