@@ -107,7 +107,7 @@ impl FromProto<ProtoAction> for Option<Action> {
 	}
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct ActionError {
 	unit: u64,
 	ability: AbilityId,
@@ -123,7 +123,7 @@ impl FromProto<ProtoActionError> for ActionError {
 	}
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 enum ActionResult {
 	Success,
 	NotSupported,

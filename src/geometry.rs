@@ -52,18 +52,25 @@ impl Point2 {
 	pub fn towards(self, other: Self, offset: f32) -> Self {
 		self + (other - self) / self.distance(other) * offset
 	}
+	pub fn to3(self, z: f32) -> Point3 {
+		Point3 {
+			x: self.x,
+			y: self.y,
+			z,
+		}
+	}
 }
 impl PartialEq for Point2 {
 	fn eq(&self, other: &Self) -> bool {
-		// (self.x as u32) == (other.x as u32) && (self.y as u32) == (other.y as u32)
+		// (self.x + 0.5 as u32) == (other.x + 0.5 as u32) && (self.y + 0.5 as u32) == (other.y + 0.5 as u32)
 		self.x == other.x && self.y == other.y
 	}
 }
 impl Eq for Point2 {}
 impl Hash for Point2 {
 	fn hash<H: Hasher>(&self, state: &mut H) {
-		(self.x as u32).hash(state);
-		(self.y as u32).hash(state);
+		((self.x + 0.5) as u32).hash(state);
+		((self.y + 0.5) as u32).hash(state);
 	}
 }
 impl Add for Point2 {
@@ -73,26 +80,6 @@ impl Add for Point2 {
 		Self {
 			x: self.x + other.x,
 			y: self.y + other.y,
-		}
-	}
-}
-impl Div for Point2 {
-	type Output = Self;
-
-	fn div(self, other: Self) -> Self {
-		Self {
-			x: self.x / other.x,
-			y: self.y / other.y,
-		}
-	}
-}
-impl Mul for Point2 {
-	type Output = Self;
-
-	fn mul(self, other: Self) -> Self {
-		Self {
-			x: self.x * other.x,
-			y: self.y * other.y,
 		}
 	}
 }
@@ -106,6 +93,26 @@ impl Sub for Point2 {
 		}
 	}
 }
+impl Mul for Point2 {
+	type Output = Self;
+
+	fn mul(self, other: Self) -> Self {
+		Self {
+			x: self.x * other.x,
+			y: self.y * other.y,
+		}
+	}
+}
+impl Div for Point2 {
+	type Output = Self;
+
+	fn div(self, other: Self) -> Self {
+		Self {
+			x: self.x / other.x,
+			y: self.y / other.y,
+		}
+	}
+}
 impl Add<f32> for Point2 {
 	type Output = Self;
 
@@ -116,13 +123,13 @@ impl Add<f32> for Point2 {
 		}
 	}
 }
-impl Div<f32> for Point2 {
+impl Sub<f32> for Point2 {
 	type Output = Self;
 
-	fn div(self, other: f32) -> Self {
+	fn sub(self, other: f32) -> Self {
 		Self {
-			x: self.x / other,
-			y: self.y / other,
+			x: self.x - other,
+			y: self.y - other,
 		}
 	}
 }
@@ -136,13 +143,13 @@ impl Mul<f32> for Point2 {
 		}
 	}
 }
-impl Sub<f32> for Point2 {
+impl Div<f32> for Point2 {
 	type Output = Self;
 
-	fn sub(self, other: f32) -> Self {
+	fn div(self, other: f32) -> Self {
 		Self {
-			x: self.x - other,
-			y: self.y - other,
+			x: self.x / other,
+			y: self.y / other,
 		}
 	}
 }
@@ -185,6 +192,102 @@ pub struct Point3 {
 impl Point3 {
 	pub fn new(x: f32, y: f32, z: f32) -> Self {
 		Self { x, y, z }
+	}
+	pub fn to2(self) -> Point2 {
+		Point2 { x: self.x, y: self.y }
+	}
+}
+impl Add for Point3 {
+	type Output = Self;
+
+	fn add(self, other: Self) -> Self {
+		Self {
+			x: self.x + other.x,
+			y: self.y + other.y,
+			z: self.z + other.z,
+		}
+	}
+}
+impl Sub for Point3 {
+	type Output = Self;
+
+	fn sub(self, other: Self) -> Self {
+		Self {
+			x: self.x - other.x,
+			y: self.y - other.y,
+			z: self.z - other.z,
+		}
+	}
+}
+impl Mul for Point3 {
+	type Output = Self;
+
+	fn mul(self, other: Self) -> Self {
+		Self {
+			x: self.x * other.x,
+			y: self.y * other.y,
+			z: self.z * other.z,
+		}
+	}
+}
+impl Div for Point3 {
+	type Output = Self;
+
+	fn div(self, other: Self) -> Self {
+		Self {
+			x: self.x / other.x,
+			y: self.y / other.y,
+			z: self.z / other.z,
+		}
+	}
+}
+impl Add<f32> for Point3 {
+	type Output = Self;
+
+	fn add(self, other: f32) -> Self {
+		Self {
+			x: self.x + other,
+			y: self.y + other,
+			z: self.z + other,
+		}
+	}
+}
+impl Sub<f32> for Point3 {
+	type Output = Self;
+
+	fn sub(self, other: f32) -> Self {
+		Self {
+			x: self.x - other,
+			y: self.y - other,
+			z: self.z - other,
+		}
+	}
+}
+impl Mul<f32> for Point3 {
+	type Output = Self;
+
+	fn mul(self, other: f32) -> Self {
+		Self {
+			x: self.x * other,
+			y: self.y * other,
+			z: self.z * other,
+		}
+	}
+}
+impl Div<f32> for Point3 {
+	type Output = Self;
+
+	fn div(self, other: f32) -> Self {
+		Self {
+			x: self.x / other,
+			y: self.y / other,
+			z: self.z / other,
+		}
+	}
+}
+impl Sum for Point3 {
+	fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+		iter.fold(Default::default(), Add::add)
 	}
 }
 impl FromProto<Point> for Point3 {

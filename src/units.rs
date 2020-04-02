@@ -1,6 +1,13 @@
-use crate::{geometry::Point2, unit::Unit};
+use crate::{geometry::Point2, ids::UnitTypeId, unit::Unit};
 use itertools::Itertools;
-use std::{collections::HashMap, iter::FromIterator, ops::Index};
+use std::{
+	collections::{
+		hash_map::{IntoIter, Iter, IterMut, Values, ValuesMut},
+		HashMap,
+	},
+	iter::FromIterator,
+	ops::Index,
+};
 
 #[derive(Default, Clone)]
 pub struct GroupedUnits {
@@ -43,13 +50,23 @@ impl Units {
 	}
 
 	#[inline]
-	pub fn iter(&self) -> std::collections::hash_map::Values<u64, Unit> {
+	pub fn iter(&self) -> Values<u64, Unit> {
 		self.units.values()
 	}
 
 	#[inline]
-	pub fn iter_mut(&mut self) -> std::collections::hash_map::ValuesMut<u64, Unit> {
+	pub fn iter_mut(&mut self) -> ValuesMut<u64, Unit> {
 		self.units.values_mut()
+	}
+
+	#[inline]
+	pub fn pairs(&self) -> Iter<u64, Unit> {
+		self.units.iter()
+	}
+
+	#[inline]
+	pub fn pairs_mut(&mut self) -> IterMut<u64, Unit> {
+		self.units.iter_mut()
 	}
 
 	#[inline]
@@ -68,6 +85,12 @@ impl Units {
 	}
 	pub fn find_tags<T: Iterator<Item = u64>>(&self, tags: T) -> Self {
 		tags.filter_map(|tag| self.units.get(&tag).cloned()).collect()
+	}
+	pub fn of_type(&self, u_type: UnitTypeId) -> Self {
+		self.filter(|u| u.type_id == u_type)
+	}
+	pub fn of_types<T: Iterator<Item = UnitTypeId>>(&self, mut types: T) -> Self {
+		self.filter(|u| types.any(|u_type| u.type_id == u_type))
 	}
 	pub fn center(&self) -> Point2 {
 		self.iter().map(|u| u.position).sum::<Point2>() / (self.len() as f32)
@@ -249,7 +272,7 @@ impl FromIterator<Unit> for Units {
 }
 impl IntoIterator for Units {
 	type Item = (u64, Unit);
-	type IntoIter = std::collections::hash_map::IntoIter<u64, Unit>;
+	type IntoIter = IntoIter<u64, Unit>;
 
 	fn into_iter(self) -> Self::IntoIter {
 		self.units.into_iter()

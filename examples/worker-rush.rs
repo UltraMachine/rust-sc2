@@ -16,8 +16,6 @@ use rust_sc2::{
 #[bot]
 struct WorkerRushAI {
 	race: Race,
-	start_location: Point2,
-	enemy_start: Point2,
 	mineral_forward: u64,
 	mineral_back: u64,
 }
@@ -28,8 +26,6 @@ impl WorkerRushAI {
 		Self {
 			game_step,
 			race,
-			start_location: Default::default(),
-			enemy_start: Default::default(),
 			mineral_forward: Default::default(),
 			mineral_back: Default::default(),
 		}
@@ -38,21 +34,18 @@ impl WorkerRushAI {
 
 #[bot_impl_player]
 impl Player for WorkerRushAI {
+	fn on_start(&mut self) {
+		self.command(self.grouped_units.townhalls[0].train(UnitTypeId::Probe, false));
+
+		self.mineral_forward = self.grouped_units.mineral_field.closest_pos(self.enemy_start).tag;
+		self.mineral_back = self
+			.grouped_units
+			.mineral_field
+			.closest_pos(self.start_location)
+			.tag;
+	}
+
 	fn on_step(&mut self, iteration: usize) {
-		if iteration == 0 {
-			let townhall = self.grouped_units.townhalls[0].clone();
-			self.command(townhall.train(UnitTypeId::Probe, false));
-
-			self.start_location = townhall.position;
-			self.enemy_start = self.game_info.start_locations[0];
-			self.mineral_forward = self.grouped_units.mineral_field.closest_pos(self.enemy_start).tag;
-			self.mineral_back = self
-				.grouped_units
-				.mineral_field
-				.closest_pos(self.start_location)
-				.tag;
-		}
-
 		let ground_attackers = self.grouped_units.enemy_units.filter(|u| {
 			!u.is_flying.as_bool()
 				&& u.can_attack_ground()
@@ -85,6 +78,7 @@ impl Player for WorkerRushAI {
 			}
 		}
 	}
+
 	fn get_player_settings(&self) -> PlayerSettings {
 		PlayerSettings::new(self.race, Some("RustyWorkers".to_string()))
 	}

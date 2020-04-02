@@ -5,6 +5,7 @@ pub extern crate sc2_macro;
 
 pub mod action;
 mod client;
+pub mod debug;
 pub mod game_data;
 pub mod game_info;
 pub mod game_state;
@@ -18,13 +19,27 @@ pub mod units;
 
 use action::{Action, Command};
 pub use client::{run_game, run_ladder_game};
-use game_data::GameData;
+use debug::DebugCommand;
+use game_data::{Cost, GameData};
 use game_info::GameInfo;
 use game_state::GameState;
-use ids::AbilityId;
+use ids::{AbilityId, UnitTypeId /*, UpgradeId */};
 use player::{AIBuild, Difficulty, PlayerType, Race};
 pub use sc2_macro::{bot, bot_impl_player, bot_new};
 use std::{collections::HashMap, rc::Rc};
+
+const WORKER_IDS: [UnitTypeId; 3] = [UnitTypeId::SCV, UnitTypeId::Drone, UnitTypeId::Probe];
+const TOWNHALL_IDS: [UnitTypeId; 9] = [
+	UnitTypeId::CommandCenter,
+	UnitTypeId::OrbitalCommand,
+	UnitTypeId::PlanetaryFortress,
+	UnitTypeId::CommandCenterFlying,
+	UnitTypeId::OrbitalCommandFlying,
+	UnitTypeId::Hatchery,
+	UnitTypeId::Lair,
+	UnitTypeId::Hive,
+	UnitTypeId::Nexus,
+];
 
 pub type PlayerBox = Box<dyn Player>;
 
@@ -73,6 +88,11 @@ impl<T: 'static + Player + Clone> PlayerClone for T {
 		Box::new(self.clone())
 	}
 }
+impl Clone for PlayerBox {
+	fn clone(&self) -> Self {
+		self.clone_player()
+	}
+}
 
 pub trait Player: PlayerClone {
 	fn get_player_settings(&self) -> PlayerSettings;
@@ -84,7 +104,6 @@ pub trait Player: PlayerClone {
 	fn set_game_info(&mut self, _game_info: GameInfo) {}
 	fn set_game_data(&mut self, _game_data: GameData) {}
 	fn set_state(&mut self, _state: GameState) {}
-	fn group_units(&mut self) {}
 	fn set_avaliable_abilities(&mut self, _abilities_units: HashMap<u64, Vec<AbilityId>>) {}
 	fn get_game_data(&self) -> Rc<GameData> {
 		unimplemented!()
@@ -93,14 +112,30 @@ pub trait Player: PlayerClone {
 		Vec::new()
 	}
 	fn clear_actions(&mut self) {}
+	fn get_debug_commands(&self) -> Vec<DebugCommand> {
+		Vec::new()
+	}
+	fn clear_debug_commands(&mut self) {}
+	fn prepare_first_step(&mut self) {}
+	fn prepare_step(&mut self) {}
+	fn on_start(&mut self) {}
 	fn on_step(&mut self, _iteration: usize) {}
 	fn command(&mut self, _cmd: Option<Command>) {}
-}
-
-impl Clone for PlayerBox {
-	fn clone(&self) -> Self {
-		self.clone_player()
+	fn group_units(&mut self) {}
+	fn get_unit_cost(&self, _unit: UnitTypeId) -> Cost {
+		unimplemented!()
 	}
+	fn can_afford(&self, _unit: UnitTypeId, _check_supply: bool) -> bool {
+		unimplemented!()
+	}
+	/*
+	fn can_afford_upgrade(&self, _upgrade: UpgradeId) -> bool {
+		unimplemented!()
+	}
+	fn can_afford_ability(&self, _ability: AbilityId) -> bool {
+		unimplemented!()
+	}
+	*/
 }
 
 trait FromProto<T>

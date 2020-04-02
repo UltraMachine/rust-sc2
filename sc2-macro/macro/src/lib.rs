@@ -1,6 +1,5 @@
 #[macro_use]
 extern crate quote;
-extern crate proc_macro;
 
 use proc_macro::TokenStream;
 use syn::{
@@ -16,6 +15,7 @@ pub fn bot(_attr: TokenStream, item: TokenStream) -> TokenStream {
 	let name = item.ident;
 	let vis = item.vis;
 	let attrs = item.attrs;
+	let generics = item.generics;
 	let fields = match item.fields {
 		Fields::Named(named_fields) => {
 			let named = named_fields.named;
@@ -28,27 +28,41 @@ pub fn bot(_attr: TokenStream, item: TokenStream) -> TokenStream {
 	TokenStream::from(quote! {
 		use rust_sc2::{
 			action::{Action, Command, Target},
-			game_data::GameData,
+			debug::{Debugger, DebugCommand},
+			game_data::{GameData, Cost},
 			game_info::GameInfo,
 			game_state::{Alliance, GameState},
-			ids::{AbilityId, UnitTypeId},
+			ids::{AbilityId, UnitTypeId /*, UpgradeId*/},
 			units::{GroupedUnits, Units},
 		};
 		use std::{collections::HashMap, rc::Rc};
 		#(#attrs)*
 		#[derive(Clone)]
-		#vis struct #name {
+		#vis struct #name#generics {
 			#fields
 			player_id: u32,
 			opponent_id: String,
 			actions: Vec<Action>,
 			commands: HashMap<(AbilityId, Target, bool), Vec<u64>>,
+			debug: Debugger,
 			game_step: u32,
 			game_info: GameInfo,
 			game_data: Rc<GameData>,
 			state: GameState,
 			grouped_units: GroupedUnits,
 			abilities_units: HashMap<u64, Vec<AbilityId>>,
+			orders: HashMap<AbilityId, usize>,
+			current_units: HashMap<UnitTypeId, usize>,
+			time: f32,
+			minerals: u32,
+			vespene: u32,
+			supply_army: u32,
+			supply_workers: u32,
+			supply_cap: u32,
+			supply_used: u32,
+			supply_left: u32,
+			start_location: Point2,
+			enemy_start: Point2,
 		}
 	})
 }
@@ -77,11 +91,24 @@ pub fn bot_new(_attr: TokenStream, item: TokenStream) -> TokenStream {
 						opponent_id: Default::default(),
 						actions: Vec::new(),
 						commands: HashMap::new(),
+						debug: Debugger::new(),
 						game_info: Default::default(),
 						game_data: Default::default(),
 						state: Default::default(),
 						grouped_units: Default::default(),
 						abilities_units: HashMap::new(),
+						orders: HashMap::new(),
+						current_units: HashMap::new(),
+						time: Default::default(),
+						minerals: Default::default(),
+						vespene: Default::default(),
+						supply_army: Default::default(),
+						supply_workers: Default::default(),
+						supply_cap: Default::default(),
+						supply_used: Default::default(),
+						supply_left: Default::default(),
+						start_location: Default::default(),
+						enemy_start: Default::default(),
 						#rest
 					}
 				}
@@ -154,10 +181,52 @@ pub fn bot_impl_player(attr: TokenStream, item: TokenStream) -> TokenStream {
 				self.actions.clear();
 				self.commands.clear();
 			}
+			fn get_debug_commands(&self) -> Vec<DebugCommand> {
+				self.debug.get_commands()
+			}
+			fn clear_debug_commands(&mut self) {
+				self.debug.clear_commands();
+			}
 			fn command(&mut self, cmd: Option<Command>) {
 				if let Some((tag, order)) = cmd {
 					self.commands.entry(order).or_default().push(tag);
 				}
+			}
+			fn prepare_first_step(&mut self) {
+				self.group_units();
+				self.start_location = self.grouped_units.townhalls[0].position;
+				self.enemy_start = self.game_info.start_locations[0];
+			}
+			fn prepare_step(&mut self) {
+				self.group_units();
+				let observation = &self.state.observation;
+				self.time = (observation.game_loop as f32) / 22.4;
+				let common = &observation.common;
+				self.minerals = common.minerals;
+				self.vespene = common.vespene;
+				self.supply_army = common.food_army;
+				self.supply_workers = common.food_workers;
+				self.supply_cap = common.food_cap;
+				self.supply_used = common.food_used;
+				self.supply_left = self.supply_cap - self.supply_used;
+
+				// Counting units and orders
+				self.grouped_units.owned.clone().iter().for_each(|u| {
+					u.orders
+						.iter()
+						.for_each(|order| *self.orders.entry(order.ability).or_default() += 1);
+					if !u.is_ready() {
+						if u.race() != Race::Terran || !u.is_structure() {
+							if let Some(data) = self.game_data.units.get(&u.type_id) {
+								if let Some(ability) = data.ability {
+									*self.orders.entry(ability).or_default() += 1
+								}
+							}
+						}
+					} else {
+						*self.current_units.entry(u.type_id).or_default() += 1
+					}
+				});
 			}
 			fn group_units(&mut self) {
 				let mut owned = Units::new();
@@ -303,6 +372,30 @@ pub fn bot_impl_player(attr: TokenStream, item: TokenStream) -> TokenStream {
 					larva,
 				}
 			}
+			fn get_unit_cost(&self, unit: UnitTypeId) -> Cost {
+				match self.game_data.units.get(&unit) {
+					Some(data) => data.cost(),
+					None => Default::default(),
+				}
+			}
+			fn can_afford(&self, unit: UnitTypeId, check_supply: bool) -> bool {
+				let cost = self.get_unit_cost(unit);
+				if self.minerals < cost.minerals || self.vespene < cost.vespene {
+					return false;
+				}
+				if check_supply && (self.supply_left as f32) < cost.supply {
+					return false;
+				}
+				true
+			}
+			/*
+			fn can_afford_upgrade(&self, upgrade: UpgradeId) -> bool {
+				unimplemented!()
+			}
+			fn can_afford_ability(&self, ability: AbilityId) -> bool {
+				unimplemented!()
+			}
+			*/
 		}
 	})
 }

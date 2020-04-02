@@ -4,7 +4,8 @@ use crate::{
 	game_state::Alliance,
 	geometry::{Point2, Point3},
 	ids::{AbilityId, BuffId, UnitTypeId},
-	FromProto, FromProtoGameData,
+	player::Race,
+	FromProto, FromProtoGameData, TOWNHALL_IDS, WORKER_IDS,
 };
 use num_traits::FromPrimitive;
 use sc2_proto::raw::{
@@ -74,7 +75,19 @@ impl Unit {
 		self.game_data.units.get(&self.type_id).cloned()
 	}
 	pub fn is_worker(&self) -> bool {
-		[UnitTypeId::SCV, UnitTypeId::Drone, UnitTypeId::Probe].contains(&self.type_id)
+		WORKER_IDS.contains(&self.type_id)
+	}
+	pub fn is_townhall(&self) -> bool {
+		TOWNHALL_IDS.contains(&self.type_id)
+	}
+	pub fn is_ready(&self) -> bool {
+		(self.build_progress - 1.0).abs() < std::f32::EPSILON
+	}
+	pub fn race(&self) -> Race {
+		match self.type_data() {
+			Some(data) => data.race,
+			None => Race::Random,
+		}
 	}
 	pub fn is_visible(&self) -> bool {
 		self.display_type == DisplayType::Visible
@@ -100,7 +113,7 @@ impl Unit {
 	pub fn is_ally(&self) -> bool {
 		self.alliance == Alliance::Ally
 	}
-	pub fn food_cost(&self) -> f32 {
+	pub fn supply_cost(&self) -> f32 {
 		match self.type_data() {
 			Some(data) => data.food_required,
 			None => 0.0,
@@ -166,6 +179,36 @@ impl Unit {
 	}
 	pub fn is_summoned(&self) -> bool {
 		self.has_attribute(Attribute::Summoned)
+	}
+	pub fn has_buff(&self, buff: BuffId) -> bool {
+		self.buffs.contains(&buff)
+	}
+	pub fn has_any_buff<B: Iterator<Item = BuffId>>(&self, mut buffs: B) -> bool {
+		buffs.any(|b| self.buffs.contains(&b))
+	}
+	pub fn is_carrying_minerals(&self) -> bool {
+		self.has_any_buff(
+			[
+				BuffId::CarryMineralFieldMinerals,
+				BuffId::CarryHighYieldMineralFieldMinerals,
+			]
+			.iter()
+			.copied(),
+		)
+	}
+	pub fn is_carrying_vespene(&self) -> bool {
+		self.has_any_buff(
+			[
+				BuffId::CarryHarvestableVespeneGeyserGas,
+				BuffId::CarryHarvestableVespeneGeyserGasProtoss,
+				BuffId::CarryHarvestableVespeneGeyserGasZerg,
+			]
+			.iter()
+			.copied(),
+		)
+	}
+	pub fn is_carrying_resource(&self) -> bool {
+		self.is_carrying_minerals() || self.is_carrying_vespene()
 	}
 	pub fn distance(&self, other: &Unit) -> f32 {
 		let dx = self.position.x - other.position.x;
@@ -300,7 +343,38 @@ impl Unit {
 		self.orders.is_empty()
 	}
 	pub fn is_almost_idle(&self) -> bool {
-		self.orders.is_empty() || self.orders[0].progress >= 0.95
+		self.is_idle() || self.orders[0].progress >= 0.95
+	}
+	pub fn is_using(&self, ability: AbilityId) -> bool {
+		!self.is_idle() && self.orders[0].ability == ability
+	}
+	pub fn is_using_any<A: Iterator<Item = AbilityId>>(&self, mut abilities: A) -> bool {
+		!self.is_idle() && abilities.any(|a| self.orders[0].ability == a)
+	}
+	pub fn is_attacking(&self) -> bool {
+		self.is_using(AbilityId::Attack)
+	}
+	pub fn is_moving(&self) -> bool {
+		self.is_using(AbilityId::MoveMove)
+	}
+	pub fn is_patrolling(&self) -> bool {
+		self.is_using(AbilityId::Patrol)
+	}
+	pub fn is_repairing(&self) -> bool {
+		self.is_using(AbilityId::EffectRepair)
+	}
+	pub fn is_gathering(&self) -> bool {
+		self.is_using(AbilityId::HarvestGather)
+	}
+	pub fn is_returning(&self) -> bool {
+		self.is_using(AbilityId::HarvestReturn)
+	}
+	pub fn is_collecting(&self) -> bool {
+		self.is_using_any(
+			[AbilityId::HarvestGather, AbilityId::HarvestReturn]
+				.iter()
+				.copied(),
+		)
 	}
 	// Actions
 	pub fn command(&self, ability: AbilityId, target: Target, queue: bool) -> Option<Command> {
@@ -655,25 +729,25 @@ impl FromProto<ProtoCloakState> for CloakState {
 
 #[derive(Clone)]
 pub struct UnitOrder {
-	ability: AbilityId,
-	target: Target,
-	progress: f32, // Progress of train abilities. Range 0..1
+	pub ability: AbilityId,
+	pub target: Target,
+	pub progress: f32, // Progress of train abilities. Range 0..1
 }
 
 #[derive(Clone)]
 pub struct PassengerUnit {
-	tag: u64,
-	health: f32,
-	health_max: f32,
-	shield: f32,
-	shield_max: f32,
-	energy: f32,
-	energy_max: f32,
-	type_id: UnitTypeId,
+	pub tag: u64,
+	pub health: f32,
+	pub health_max: f32,
+	pub shield: f32,
+	pub shield_max: f32,
+	pub energy: f32,
+	pub energy_max: f32,
+	pub type_id: UnitTypeId,
 }
 
 #[derive(Clone)]
 pub struct RallyTarget {
-	point: Point2,    // Will always be filled.
-	tag: Option<u64>, // Only if it's targeting a unit.
+	pub point: Point2,    // Will always be filled.
+	pub tag: Option<u64>, // Only if it's targeting a unit.
 }

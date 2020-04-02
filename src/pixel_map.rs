@@ -12,7 +12,7 @@ impl<T> Index<Point2> for Array2<T> {
 	type Output = T;
 
 	fn index(&self, pos: Point2) -> &Self::Output {
-		&self[(pos.x as usize, pos.y as usize)]
+		&self[((pos.x + 0.5) as usize, (pos.y + 0.5) as usize)]
 	}
 }
 
@@ -77,6 +77,14 @@ impl FromProto<ImageData> for VisibilityMap {
 pub enum Pixel {
 	Empty,
 	Set,
+}
+impl Pixel {
+	pub fn is_empty(self) -> bool {
+		matches!(self, Pixel::Empty)
+	}
+	pub fn is_set(self) -> bool {
+		matches!(self, Pixel::Set)
+	}
 }
 impl Default for Pixel {
 	fn default() -> Self {

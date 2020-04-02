@@ -207,6 +207,7 @@ pub async fn run_ladder_game(
 	flush();
 	// Main loop
 	let mut iteration = 0;
+	play_first_step(&mut ws, &mut player, false, false).await?;
 	loop {
 		if !play_step(&mut ws, &mut player, iteration, false, false).await? {
 			break;
@@ -295,6 +296,39 @@ async fn join_game(p: &mut PlayerBox, ws: &mut WS, ports: Option<Ports>) -> TRes
 	Ok(())
 }
 
+async fn play_first_step(ws: &mut WS, player: &mut PlayerBox, realtime: bool, human: bool) -> TResult<()> {
+	if !human {
+		let mut req = Request::new();
+		req.mut_observation();
+
+		let res = send(ws, req).await?;
+
+		let state = GameState::from_proto_player(&player, res.get_observation());
+
+		player.set_state(state);
+		player.prepare_first_step();
+
+		player.on_start();
+
+		let player_actions = player.get_actions();
+		if !player_actions.is_empty() {
+			let mut req = Request::new();
+			let actions = req.mut_action().mut_actions();
+			player_actions
+				.into_iter()
+				.for_each(|a| actions.push(a.into_proto()));
+			player.clear_actions();
+			send_request(ws, req).await?;
+		}
+	}
+	if !realtime {
+		let mut req = Request::new();
+		req.mut_step().set_count(player.get_step_size());
+		send_request(ws, req).await?;
+	}
+	Ok(())
+}
+
 async fn play_step(
 	ws: &mut WS,
 	player: &mut PlayerBox,
@@ -342,7 +376,7 @@ async fn play_step(
 		);
 
 		player.set_state(state);
-		player.group_units();
+		player.prepare_step();
 
 		player.on_step(iteration);
 
@@ -363,6 +397,17 @@ async fn play_step(
 				println!("action_results: {:?}", results);
 			}
 			*/
+		}
+
+		let player_debug_commands = player.get_debug_commands();
+		if !player_debug_commands.is_empty() {
+			let mut req = Request::new();
+			let debug_commands = req.mut_debug().mut_debug();
+			player_debug_commands
+				.into_iter()
+				.for_each(|cmd| debug_commands.push(cmd.into_proto()));
+			player.clear_debug_commands();
+			send_request(ws, req).await?;
 		}
 	}
 	if !realtime {
@@ -497,6 +542,7 @@ async fn launch_vs_computer(
 		flush();
 		let is_human = player.get_player_settings().player_type == PlayerType::Human;
 		// Main loop
+		play_first_step(&mut ws, player, realtime, is_human).await?;
 		let mut iteration = 0;
 		loop {
 			if !play_step(&mut ws, player, iteration, realtime, is_human).await? {
@@ -656,6 +702,8 @@ async fn launch_pvp(
 		flush();
 		let is_human1 = player1.get_player_settings().player_type == PlayerType::Human;
 		let is_human2 = player2.get_player_settings().player_type == PlayerType::Human;
+		play_first_step(&mut ws_host, player1, realtime, is_human1).await?;
+		play_first_step(&mut ws_client, player2, realtime, is_human2).await?;
 		let mut iteration = 0;
 		loop {
 			if !play_step(&mut ws_host, player1, iteration, realtime, is_human1).await?

@@ -79,6 +79,14 @@ impl FromProto<ResponseData> for GameData {
 	}
 }
 
+#[derive(Default)]
+pub struct Cost {
+	pub minerals: u32,
+	pub vespene: u32,
+	pub supply: f32,
+	pub time: f32,
+}
+
 #[derive(Clone)]
 pub enum AbilityTarget {
 	None,
@@ -270,6 +278,16 @@ pub struct UnitTypeData {
 	pub movement_speed: f32,
 	pub armor: f32,
 	pub weapons: Vec<Weapon>,
+}
+impl UnitTypeData {
+	pub fn cost(&self) -> Cost {
+		Cost {
+			minerals: self.mineral_cost,
+			vespene: self.vespene_cost,
+			supply: self.food_required,
+			time: self.build_time,
+		}
+	}
 }
 impl TryFromProto<ProtoUnitTypeData> for UnitTypeData {
 	fn try_from_proto(u: ProtoUnitTypeData) -> Option<Self> {
