@@ -229,7 +229,13 @@ impl TryFromProto<ProtoAbilityData> for AbilityData {
 					None
 				}
 			},
-			remaps_to_ability_id: AbilityId::from_u32(a.get_remaps_to_ability_id()),
+			remaps_to_ability_id: {
+				if a.has_remaps_to_ability_id() {
+					AbilityId::from_u32(a.get_remaps_to_ability_id())
+				} else {
+					None
+				}
+			},
 			available: a.get_available(),
 			target: AbilityTarget::from_proto(a.get_target()),
 			allow_minimap: a.get_allow_minimap(),
@@ -303,7 +309,13 @@ impl TryFromProto<ProtoUnitTypeData> for UnitTypeData {
 			vespene_cost: u.get_vespene_cost(),
 			food_required: u.get_food_required(),
 			food_provided: u.get_food_provided(),
-			ability: AbilityId::from_u32(u.get_ability_id()),
+			ability: {
+				if u.has_ability_id() {
+					AbilityId::from_u32(u.get_ability_id())
+				} else {
+					None
+				}
+			},
 			race: Race::from_proto(u.get_race()),
 			build_time: u.get_build_time(),
 			has_vespene: u.get_has_vespene(),
@@ -314,8 +326,20 @@ impl TryFromProto<ProtoUnitTypeData> for UnitTypeData {
 				.iter()
 				.filter_map(|a| UnitTypeId::from_u32(*a))
 				.collect(),
-			unit_alias: UnitTypeId::from_u32(u.get_unit_alias()),
-			tech_requirement: UnitTypeId::from_u32(u.get_tech_requirement()),
+			unit_alias: {
+				if u.has_unit_alias() {
+					UnitTypeId::from_u32(u.get_unit_alias())
+				} else {
+					None
+				}
+			},
+			tech_requirement: {
+				if u.has_tech_requirement() {
+					UnitTypeId::from_u32(u.get_tech_requirement())
+				} else {
+					None
+				}
+			},
 			require_attached: u.get_require_attached(),
 			attributes: u
 				.get_attributes()
