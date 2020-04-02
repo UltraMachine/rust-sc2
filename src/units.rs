@@ -2,7 +2,7 @@ use crate::{geometry::Point2, ids::UnitTypeId, unit::Unit};
 use itertools::Itertools;
 use std::{
 	collections::{
-		hash_map::{IntoIter, Iter, IterMut, Values, ValuesMut},
+		hash_map::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut},
 		HashMap,
 	},
 	iter::FromIterator,
@@ -72,6 +72,11 @@ impl Units {
 	#[inline]
 	pub fn pairs_mut(&mut self) -> IterMut<u64, Unit> {
 		self.units.iter_mut()
+	}
+
+	#[inline]
+	pub fn tags(&self) -> Keys<u64, Unit> {
+		self.units.keys()
 	}
 
 	#[inline]
