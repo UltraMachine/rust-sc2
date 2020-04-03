@@ -5,7 +5,7 @@ use std::{
 		hash_map::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut},
 		HashMap,
 	},
-	iter::FromIterator,
+	iter::{FromIterator, Sum},
 	ops::Index,
 };
 
@@ -187,85 +187,92 @@ impl Units {
 	pub fn visible(&self) -> Self {
 		self.filter(|u| u.is_visible())
 	}
-	pub fn min<B, F>(&self, f: F) -> Unit
+	pub fn sum<T, F>(&self, f: F) -> T
 	where
-		B: Ord,
-		F: for<'r> FnMut(&'r &Unit) -> B,
+		T: Sum,
+		F: FnMut(&Unit) -> T,
+	{
+		self.iter().map(f).sum::<T>()
+	}
+	pub fn min<T, F>(&self, f: F) -> Unit
+	where
+		T: Ord,
+		F: for<'r> FnMut(&'r &Unit) -> T,
 	{
 		self.iter().min_by_key(f).unwrap().clone()
 	}
-	pub fn partial_min<B, F>(&self, mut f: F) -> Unit
+	pub fn partial_min<T, F>(&self, mut f: F) -> Unit
 	where
-		B: PartialOrd,
-		F: for<'r> FnMut(&'r &Unit) -> B,
+		T: PartialOrd,
+		F: for<'r> FnMut(&'r &Unit) -> T,
 	{
 		self.iter()
 			.min_by(|u1, u2| f(u1).partial_cmp(&f(u2)).unwrap())
 			.unwrap()
 			.clone()
 	}
-	pub fn min_value<B, F>(&self, mut f: F) -> B
+	pub fn min_value<T, F>(&self, f: F) -> T
 	where
-		B: Ord,
-		F: for<'r> FnMut(&'r &Unit) -> B,
+		T: Ord,
+		F: FnMut(&Unit) -> T,
 	{
-		self.iter().map(|u| f(&u)).min().unwrap()
+		self.iter().map(f).min().unwrap()
 	}
-	pub fn partial_min_value<B, F>(&self, mut f: F) -> B
+	pub fn partial_min_value<T, F>(&self, f: F) -> T
 	where
-		B: PartialOrd,
-		F: for<'r> FnMut(&'r &Unit) -> B,
+		T: PartialOrd,
+		F: FnMut(&Unit) -> T,
 	{
 		self.iter()
-			.map(|u| f(&u))
-			.min_by(|b1, b2| b1.partial_cmp(&b2).unwrap())
+			.map(f)
+			.min_by(|a, b| a.partial_cmp(&b).unwrap())
 			.unwrap()
 	}
-	pub fn max<B, F>(&self, f: F) -> Unit
+	pub fn max<T, F>(&self, f: F) -> Unit
 	where
-		B: Ord,
-		F: for<'r> FnMut(&'r &Unit) -> B,
+		T: Ord,
+		F: for<'r> FnMut(&'r &Unit) -> T,
 	{
 		self.iter().max_by_key(f).unwrap().clone()
 	}
-	pub fn partial_max<B, F>(&self, mut f: F) -> Unit
+	pub fn partial_max<T, F>(&self, mut f: F) -> Unit
 	where
-		B: PartialOrd,
-		F: for<'r> FnMut(&'r &Unit) -> B,
+		T: PartialOrd,
+		F: for<'r> FnMut(&'r &Unit) -> T,
 	{
 		self.iter()
 			.max_by(|u1, u2| f(u1).partial_cmp(&f(u2)).unwrap())
 			.unwrap()
 			.clone()
 	}
-	pub fn max_value<B, F>(&self, mut f: F) -> B
+	pub fn max_value<T, F>(&self, f: F) -> T
 	where
-		B: Ord,
-		F: for<'r> FnMut(&'r &Unit) -> B,
+		T: Ord,
+		F: FnMut(&Unit) -> T,
 	{
-		self.iter().map(|u| f(&u)).max().unwrap()
+		self.iter().map(f).max().unwrap()
 	}
-	pub fn partial_max_value<B, F>(&self, mut f: F) -> B
+	pub fn partial_max_value<T, F>(&self, f: F) -> T
 	where
-		B: PartialOrd,
-		F: for<'r> FnMut(&'r &Unit) -> B,
+		T: PartialOrd,
+		F: FnMut(&Unit) -> T,
 	{
 		self.iter()
-			.map(|u| f(&u))
-			.max_by(|b1, b2| b1.partial_cmp(&b2).unwrap())
+			.map(f)
+			.max_by(|a, b| a.partial_cmp(&b).unwrap())
 			.unwrap()
 	}
-	pub fn sort<B, F>(&self, f: F) -> Self
+	pub fn sort<T, F>(&self, f: F) -> Self
 	where
-		B: Ord,
-		F: for<'r> FnMut(&'r &Unit) -> B,
+		T: Ord,
+		F: for<'r> FnMut(&'r &Unit) -> T,
 	{
 		self.iter().sorted_by_key(f).cloned().collect()
 	}
-	pub fn partial_sort<B, F>(&self, mut f: F) -> Self
+	pub fn partial_sort<T, F>(&self, mut f: F) -> Self
 	where
-		B: PartialOrd,
-		F: for<'r> FnMut(&'r &Unit) -> B,
+		T: PartialOrd,
+		F: for<'r> FnMut(&'r &Unit) -> T,
 	{
 		self.iter()
 			.sorted_by(|u1, u2| f(u1).partial_cmp(&f(u2)).unwrap())
