@@ -14,6 +14,9 @@ use sc2_proto::raw::{
 };
 use std::rc::Rc;
 
+const TARGET_GROUND: [TargetType; 2] = [TargetType::Ground, TargetType::Any];
+const TARGET_AIR: [TargetType; 2] = [TargetType::Air, TargetType::Any];
+
 #[derive(Clone)]
 pub struct Unit {
 	game_data: Rc<GameData>,
@@ -271,7 +274,7 @@ impl Unit {
 				!weapons.is_empty()
 					&& weapons
 						.iter()
-						.any(|w| [TargetType::Ground, TargetType::Any].contains(&w.target))
+						.any(|w| TARGET_GROUND.contains(&w.target))
 			}
 			None => false,
 		}
@@ -282,7 +285,7 @@ impl Unit {
 				!weapons.is_empty()
 					&& weapons
 						.iter()
-						.any(|w| [TargetType::Air, TargetType::Any].contains(&w.target))
+						.any(|w| TARGET_AIR.contains(&w.target))
 			}
 			None => false,
 		}
@@ -297,7 +300,7 @@ impl Unit {
 		match self.weapons() {
 			Some(weapons) => {
 				for w in weapons {
-					if w.target == TargetType::Ground {
+					if TARGET_GROUND.contains(&w.target) {
 						return w.range;
 					}
 				}
@@ -310,7 +313,7 @@ impl Unit {
 		match self.weapons() {
 			Some(weapons) => {
 				for w in weapons {
-					if w.target == TargetType::Air {
+					if TARGET_AIR.contains(&w.target) {
 						return w.range;
 					}
 				}
@@ -323,7 +326,7 @@ impl Unit {
 		match self.weapons() {
 			Some(weapons) => {
 				for w in weapons {
-					if w.target == TargetType::Ground {
+					if TARGET_GROUND.contains(&w.target) {
 						return w.damage * (w.attacks as f32) / w.speed;
 					}
 				}
@@ -336,7 +339,7 @@ impl Unit {
 		match self.weapons() {
 			Some(weapons) => {
 				for w in weapons {
-					if w.target == TargetType::Air {
+					if TARGET_AIR.contains(&w.target) {
 						return w.damage * (w.attacks as f32) / w.speed;
 					}
 				}
