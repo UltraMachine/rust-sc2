@@ -295,3 +295,8 @@ impl Index<usize> for Units {
 		&self.units.values().nth(i).expect("Units index out of bounds")
 	}
 }
+impl Extend<Unit> for Units {
+	fn extend<T: IntoIterator<Item = Unit>>(&mut self, iter: T) {
+		iter.into_iter().for_each(|u| self.push(u));
+	}
+}
