@@ -319,6 +319,32 @@ impl Unit {
 			None => 0.0,
 		}
 	}
+	pub fn ground_dps(&self) -> f32 {
+		match self.weapons() {
+			Some(weapons) => {
+				for w in weapons {
+					if w.target == TargetType::Ground {
+						return w.damage * (w.attacks as f32) / w.speed;
+					}
+				}
+				0.0
+			}
+			None => 0.0,
+		}
+	}
+	pub fn air_dps(&self) -> f32 {
+		match self.weapons() {
+			Some(weapons) => {
+				for w in weapons {
+					if w.target == TargetType::Air {
+						return w.damage * (w.attacks as f32) / w.speed;
+					}
+				}
+				0.0
+			}
+			None => 0.0,
+		}
+	}
 	pub fn in_range(&self, target: &Unit, gap: f32) -> bool {
 		let range = {
 			if !target.is_flying.as_bool() {
@@ -343,7 +369,7 @@ impl Unit {
 		if self.is_idle() {
 			Target::None
 		} else {
-			 self.orders[0].target
+			self.orders[0].target
 		}
 	}
 	pub fn is_idle(&self) -> bool {
@@ -681,18 +707,10 @@ impl OptionBool {
 		}
 	}
 	pub fn as_bool(&self) -> bool {
-		match self {
-			OptionBool::False => false,
-			OptionBool::True => true,
-			OptionBool::Unknown => false,
-		}
+		matches!(self, OptionBool::True)
 	}
 	pub fn as_bool_maybe(&self) -> bool {
-		match self {
-			OptionBool::False => false,
-			OptionBool::True => true,
-			OptionBool::Unknown => true,
-		}
+		matches!(self, OptionBool::True | OptionBool::Unknown)
 	}
 }
 
