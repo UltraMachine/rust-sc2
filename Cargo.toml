@@ -24,3 +24,6 @@ clap = "^2.33.0"
 
 [[example]]
 name = "worker-rush"
+
+[[example]]
+name = "reaper-rush"
