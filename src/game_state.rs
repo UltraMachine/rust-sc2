@@ -5,7 +5,7 @@ use crate::{
 	pixel_map::{PixelMap, VisibilityMap},
 	unit::Unit,
 	units::Units,
-	FromProto, FromProtoGameData, FromProtoPlayer, PlayerBox,
+	FromProto, FromProtoData, FromProtoPlayer, PlayerBox,
 };
 use num_traits::FromPrimitive;
 use sc2_proto::{
@@ -23,7 +23,7 @@ pub struct GameState {
 	pub chat: Vec<ChatMessage>,
 }
 impl FromProtoPlayer<&ResponseObservation> for GameState {
-	fn from_proto_player(player: &PlayerBox, response_observation: &ResponseObservation) -> Self {
+	fn from_proto_player(player: Rc<PlayerBox>, response_observation: &ResponseObservation) -> Self {
 		// let player_result = response_observation.get_player_result();
 		Self {
 			actions: response_observation
@@ -68,7 +68,7 @@ pub struct Observation {
 	pub raw: RawData,
 }
 impl FromProtoPlayer<ProtoObservation> for Observation {
-	fn from_proto_player(player: &PlayerBox, obs: ProtoObservation) -> Self {
+	fn from_proto_player(player: Rc<PlayerBox>, obs: ProtoObservation) -> Self {
 		let common = obs.get_player_common();
 		Self {
 			game_loop: obs.get_game_loop(),
@@ -112,7 +112,7 @@ pub struct RawData {
 	pub radars: Vec<Radar>,
 }
 impl FromProtoPlayer<ObservationRaw> for RawData {
-	fn from_proto_player(player: &PlayerBox, raw: ObservationRaw) -> Self {
+	fn from_proto_player(player: Rc<PlayerBox>, raw: ObservationRaw) -> Self {
 		let raw_player = raw.get_player();
 		let map_state = raw.get_map_state();
 		Self {
@@ -125,7 +125,7 @@ impl FromProtoPlayer<ObservationRaw> for RawData {
 			units: raw
 				.get_units()
 				.iter()
-				.map(|u| Unit::from_proto_game_data(Rc::clone(&player.get_game_data()), u.clone()))
+				.map(|u| Unit::from_proto_data(player.get_data_for_unit(), u.clone()))
 				.collect(),
 			upgrades: raw_player
 				.get_upgrade_ids()

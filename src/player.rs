@@ -5,7 +5,7 @@ use sc2_proto::{
 	sc2api::{AIBuild as ProtoAIBuild, Difficulty as ProtoDifficulty, PlayerType as ProtoPlayerType},
 };
 
-#[derive(Copy, Clone, PartialEq, Eq, FromStr)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, FromStr)]
 pub enum Race {
 	Terran,
 	Zerg,

@@ -1,11 +1,14 @@
 use crate::{
 	action::{Command, Target},
+	constants::{
+		RaceValues, ADDON_IDS, CONSTRUCTING_IDS, TARGET_AIR, TARGET_GROUND, TOWNHALL_IDS, WORKER_IDS,
+	},
 	game_data::{Attribute, GameData, TargetType, UnitTypeData, Weapon},
 	game_state::Alliance,
 	geometry::{Point2, Point3},
 	ids::{AbilityId, BuffId, UnitTypeId},
 	player::Race,
-	FromProto, FromProtoGameData, TOWNHALL_IDS, WORKER_IDS,
+	FromProto, FromProtoData,
 };
 use num_traits::FromPrimitive;
 use sc2_proto::raw::{
@@ -14,12 +17,17 @@ use sc2_proto::raw::{
 };
 use std::rc::Rc;
 
-const TARGET_GROUND: [TargetType; 2] = [TargetType::Ground, TargetType::Any];
-const TARGET_AIR: [TargetType; 2] = [TargetType::Air, TargetType::Any];
+#[derive(Default, Clone)]
+pub struct DataForUnit {
+	pub game_data: Rc<GameData>,
+	pub techlab_tags: Rc<Vec<u64>>,
+	pub reactor_tags: Rc<Vec<u64>>,
+	pub race_values: Rc<RaceValues>,
+}
 
 #[derive(Clone)]
 pub struct Unit {
-	game_data: Rc<GameData>,
+	data: Rc<DataForUnit>,
 
 	// Fields are populated based on type/alliance
 	pub display_type: DisplayType,
@@ -55,9 +63,9 @@ pub struct Unit {
 	pub energy_max: Option<f32>,
 	pub mineral_contents: Option<u32>,
 	pub vespene_contents: Option<u32>,
-	pub is_flying: OptionBool,
-	pub is_burrowed: OptionBool,
-	pub is_hallucination: OptionBool,
+	pub is_flying: bool,
+	pub is_burrowed: bool,
+	pub is_hallucination: bool,
 
 	// Not populated for enemies
 	pub orders: Vec<UnitOrder>,
@@ -74,8 +82,8 @@ pub struct Unit {
 	pub rally_targets: Vec<RallyTarget>,
 }
 impl Unit {
-	fn type_data(&self) -> Option<UnitTypeData> {
-		self.game_data.units.get(&self.type_id).cloned()
+	fn type_data(&self) -> Option<&UnitTypeData> {
+		self.data.game_data.units.get(&self.type_id)
 	}
 	pub fn is_worker(&self) -> bool {
 		WORKER_IDS.contains(&self.type_id)
@@ -83,14 +91,48 @@ impl Unit {
 	pub fn is_townhall(&self) -> bool {
 		TOWNHALL_IDS.contains(&self.type_id)
 	}
+	pub fn is_addon(&self) -> bool {
+		ADDON_IDS.contains(&self.type_id)
+	}
 	pub fn is_ready(&self) -> bool {
 		(self.build_progress - 1.0).abs() < std::f32::EPSILON
+	}
+	pub fn has_add_on(&self) -> bool {
+		matches!(self.add_on_tag, Some(_))
+	}
+	pub fn has_techlab(&self) -> bool {
+		match self.add_on_tag {
+			Some(tag) => self.data.techlab_tags.contains(&tag),
+			None => false,
+		}
+	}
+	pub fn has_reactor(&self) -> bool {
+		match self.add_on_tag {
+			Some(tag) => self.data.reactor_tags.contains(&tag),
+			None => false,
+		}
 	}
 	pub fn race(&self) -> Race {
 		match self.type_data() {
 			Some(data) => data.race,
 			None => Race::Random,
 		}
+	}
+	pub fn footprint_radius(&self) -> Option<f32> {
+		if let Some(data) = self.type_data() {
+			if let Some(ability) = data.ability {
+				if let Some(ability_data) = self.data.game_data.abilities.get(&ability) {
+					return ability_data.footprint_radius;
+				}
+			}
+		}
+		None
+	}
+	pub fn building_size(&self) -> Option<usize> {
+		if let Some(radius) = self.footprint_radius() {
+			return Some((radius * 2.0) as usize);
+		}
+		None
 	}
 	pub fn is_visible(&self) -> bool {
 		self.display_type == DisplayType::Visible
@@ -235,7 +277,7 @@ impl Unit {
 	}
 	fn weapons(&self) -> Option<Vec<Weapon>> {
 		if let Some(data) = self.type_data() {
-			return Some(data.weapons);
+			return Some(data.weapons.clone());
 		}
 		None
 	}
@@ -270,23 +312,13 @@ impl Unit {
 	}
 	pub fn can_attack_ground(&self) -> bool {
 		match self.weapons() {
-			Some(weapons) => {
-				!weapons.is_empty()
-					&& weapons
-						.iter()
-						.any(|w| TARGET_GROUND.contains(&w.target))
-			}
+			Some(weapons) => !weapons.is_empty() && weapons.iter().any(|w| TARGET_GROUND.contains(&w.target)),
 			None => false,
 		}
 	}
 	pub fn can_attack_air(&self) -> bool {
 		match self.weapons() {
-			Some(weapons) => {
-				!weapons.is_empty()
-					&& weapons
-						.iter()
-						.any(|w| TARGET_AIR.contains(&w.target))
-			}
+			Some(weapons) => !weapons.is_empty() && weapons.iter().any(|w| TARGET_AIR.contains(&w.target)),
 			None => false,
 		}
 	}
@@ -350,7 +382,7 @@ impl Unit {
 	}
 	pub fn in_range(&self, target: &Unit, gap: f32) -> bool {
 		let range = {
-			if !target.is_flying.as_bool() {
+			if !target.is_flying {
 				if self.can_attack_ground() {
 					self.ground_range()
 				} else {
@@ -375,11 +407,44 @@ impl Unit {
 			self.orders[0].target
 		}
 	}
+	pub fn target_pos(&self) -> Option<Point2> {
+		if let Target::Pos(pos) = self.target() {
+			return Some(pos);
+		}
+		None
+	}
+	pub fn target_tag(&self) -> Option<u64> {
+		if let Target::Tag(tag) = self.target() {
+			return Some(tag);
+		}
+		None
+	}
+	pub fn ordered_ability(&self) -> Option<AbilityId> {
+		if self.is_idle() {
+			None
+		} else {
+			Some(self.orders[0].ability)
+		}
+	}
 	pub fn is_idle(&self) -> bool {
 		self.orders.is_empty()
 	}
 	pub fn is_almost_idle(&self) -> bool {
 		self.is_idle() || self.orders[0].progress >= 0.95
+	}
+	pub fn is_unused(&self) -> bool {
+		if self.has_reactor() {
+			self.orders.len() < 2
+		} else {
+			self.is_idle()
+		}
+	}
+	pub fn is_almost_unused(&self) -> bool {
+		if self.has_reactor() {
+			self.orders.len() < 2 || self.orders.iter().any(|order| order.progress >= 0.95)
+		} else {
+			self.is_idle() || self.orders[0].progress >= 0.95
+		}
 	}
 	pub fn is_using(&self, ability: AbilityId) -> bool {
 		!self.is_idle() && self.orders[0].ability == ability
@@ -412,6 +477,9 @@ impl Unit {
 				.copied(),
 		)
 	}
+	pub fn is_constructing(&self) -> bool {
+		self.is_using_any(CONSTRUCTING_IDS.iter().copied())
+	}
 	// Actions
 	pub fn command(&self, ability: AbilityId, target: Target, queue: bool) -> Option<Command> {
 		if !self.is_idle() {
@@ -421,6 +489,9 @@ impl Unit {
 			}
 		}
 		Some((self.tag, (ability, target, queue)))
+	}
+	pub fn use_ability(&self, ability: AbilityId, queue: bool) -> Option<Command> {
+		self.command(ability, Target::None, queue)
 	}
 	pub fn smart(&self, target: Target, queue: bool) -> Option<Command> {
 		self.command(AbilityId::Smart, target, queue)
@@ -434,8 +505,8 @@ impl Unit {
 	pub fn hold_position(&self, queue: bool) -> Option<Command> {
 		self.command(AbilityId::HoldPosition, Target::None, queue)
 	}
-	pub fn gather(&self, target: Target, queue: bool) -> Option<Command> {
-		self.command(AbilityId::HarvestGather, target, queue)
+	pub fn gather(&self, target: u64, queue: bool) -> Option<Command> {
+		self.command(AbilityId::HarvestGather, Target::Tag(target), queue)
 	}
 	pub fn return_resource(&self, queue: bool) -> Option<Command> {
 		self.command(AbilityId::HarvestReturn, Target::None, queue)
@@ -449,16 +520,31 @@ impl Unit {
 	pub fn repair(&self, target: Target, queue: bool) -> Option<Command> {
 		self.command(AbilityId::EffectRepair, target, queue)
 	}
-	pub fn build(&self, unit: UnitTypeId, target: Target, queue: bool) -> Option<Command> {
-		if let Some(type_data) = self.game_data.units.get(&unit) {
+	pub fn cancel_building(&self, queue: bool) -> Option<Command> {
+		self.command(AbilityId::CancelBuildInProgress, Target::None, queue)
+	}
+	pub fn cancel_queue(&self, queue: bool) -> Option<Command> {
+		self.command(AbilityId::CancelQueue5, Target::None, queue)
+	}
+	pub fn build_gas(&self, target: u64, queue: bool) -> Option<Command> {
+		self.command(
+			self.data.game_data.units[&self.data.race_values.gas_building]
+				.ability
+				.unwrap(),
+			Target::Tag(target),
+			queue,
+		)
+	}
+	pub fn build(&self, unit: UnitTypeId, target: Point2, queue: bool) -> Option<Command> {
+		if let Some(type_data) = self.data.game_data.units.get(&unit) {
 			if let Some(ability) = type_data.ability {
-				return self.command(ability, target, queue);
+				return self.command(ability, Target::Pos(target), queue);
 			}
 		}
 		None
 	}
 	pub fn train(&self, unit: UnitTypeId, queue: bool) -> Option<Command> {
-		if let Some(type_data) = self.game_data.units.get(&unit) {
+		if let Some(type_data) = self.data.game_data.units.get(&unit) {
 			if let Some(ability) = type_data.ability {
 				return self.command(ability, Target::None, queue);
 			}
@@ -466,11 +552,11 @@ impl Unit {
 		None
 	}
 }
-impl FromProtoGameData<ProtoUnit> for Unit {
-	fn from_proto_game_data(game_data: Rc<GameData>, u: ProtoUnit) -> Self {
+impl FromProtoData<ProtoUnit> for Unit {
+	fn from_proto_data(data: Rc<DataForUnit>, u: ProtoUnit) -> Self {
 		let pos = u.get_pos();
 		Self {
-			game_data,
+			data,
 			display_type: DisplayType::from_proto(u.get_display_type()),
 			alliance: Alliance::from_proto(u.get_alliance()),
 			tag: u.get_tag(),
@@ -554,27 +640,9 @@ impl FromProtoGameData<ProtoUnit> for Unit {
 					None
 				}
 			},
-			is_flying: {
-				if u.has_is_flying() {
-					OptionBool::from_bool(u.get_is_flying())
-				} else {
-					OptionBool::Unknown
-				}
-			},
-			is_burrowed: {
-				if u.has_is_burrowed() {
-					OptionBool::from_bool(u.get_is_burrowed())
-				} else {
-					OptionBool::Unknown
-				}
-			},
-			is_hallucination: {
-				if u.has_is_hallucination() {
-					OptionBool::from_bool(u.get_is_hallucination())
-				} else {
-					OptionBool::Unknown
-				}
-			},
+			is_flying: u.get_is_flying(),
+			is_burrowed: u.get_is_burrowed(),
+			is_hallucination: u.get_is_hallucination(),
 			// Not populated for enemies
 			orders: u
 				.get_orders()
@@ -683,37 +751,6 @@ impl FromProtoGameData<ProtoUnit> for Unit {
 				})
 				.collect(),
 		}
-	}
-}
-
-#[derive(Clone)]
-pub enum OptionBool {
-	False,
-	True,
-	Unknown,
-}
-impl OptionBool {
-	/*
-	pub fn from_option(opt: Option<bool>) -> Self {
-		match opt {
-			Some(false) => OptionBool::False,
-			Some(true) => OptionBool::True,
-			None => OptionBool::Unknown,
-		}
-	}
-	*/
-	pub fn from_bool(b: bool) -> Self {
-		if b {
-			OptionBool::True
-		} else {
-			OptionBool::False
-		}
-	}
-	pub fn as_bool(&self) -> bool {
-		matches!(self, OptionBool::True)
-	}
-	pub fn as_bool_maybe(&self) -> bool {
-		matches!(self, OptionBool::True | OptionBool::Unknown)
 	}
 }
 

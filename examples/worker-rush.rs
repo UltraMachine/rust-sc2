@@ -8,14 +8,12 @@ use rust_sc2::{
 	player::{
 		Difficulty,
 		Players::{Computer, Human},
-		Race,
 	},
 	run_game, run_ladder_game, Player, PlayerSettings,
 };
 
 #[bot]
 struct WorkerRushAI {
-	race: Race,
 	mineral_forward: u64,
 	mineral_back: u64,
 }
@@ -25,7 +23,6 @@ impl WorkerRushAI {
 	fn new(game_step: u32) -> Self {
 		Self {
 			game_step,
-			race: Race::Protoss,
 			mineral_forward: Default::default(),
 			mineral_back: Default::default(),
 		}
@@ -34,22 +31,24 @@ impl WorkerRushAI {
 
 #[bot_impl_player]
 impl Player for WorkerRushAI {
-	fn on_start(&mut self) {
+	fn on_start(&mut self, _ws: &mut WS) {
 		self.command(self.grouped_units.townhalls[0].train(UnitTypeId::Probe, false));
 
-		self.mineral_forward = self.grouped_units.mineral_field.closest_pos(self.enemy_start).tag;
+		self.mineral_forward = self
+			.grouped_units
+			.mineral_fields
+			.closest_pos(self.enemy_start)
+			.tag;
 		self.mineral_back = self
 			.grouped_units
-			.mineral_field
+			.mineral_fields
 			.closest_pos(self.start_location)
 			.tag;
 	}
 
-	fn on_step(&mut self, iteration: usize) {
+	fn on_step(&mut self, _ws: &mut WS, _iteration: usize) {
 		let ground_attackers = self.grouped_units.enemy_units.filter(|u| {
-			!u.is_flying.as_bool()
-				&& u.can_attack_ground()
-				&& u.distance_pos_squared(self.enemy_start) < 2025.0
+			!u.is_flying && u.can_attack_ground() && u.distance_pos_squared(self.enemy_start) < 2025.0
 		});
 		if !ground_attackers.is_empty() {
 			self.grouped_units.workers.clone().iter().for_each(|u| {
@@ -57,35 +56,34 @@ impl Player for WorkerRushAI {
 				if u.shield > Some(0.0) {
 					self.command(u.attack(Target::Tag(closest.tag), false));
 				} else if u.in_range_of(&closest, 2.0) {
-					self.command(u.gather(Target::Tag(self.mineral_back), false));
+					self.command(u.gather(self.mineral_back, false));
 				} else {
-					self.command(u.gather(Target::Tag(self.mineral_forward), false));
+					self.command(u.gather(self.mineral_forward, false));
 				}
 			})
 		} else {
 			let ground_structures = self
 				.grouped_units
 				.enemy_structures
-				.filter(|u| !u.is_flying.as_bool() && u.distance_pos_squared(self.enemy_start) < 2025.0);
+				.filter(|u| !u.is_flying && u.distance_pos_squared(self.enemy_start) < 2025.0);
 			if !ground_structures.is_empty() {
 				self.grouped_units.workers.clone().iter().for_each(|u| {
 					self.command(u.attack(Target::Tag(ground_structures.closest(&u).tag), false));
 				})
 			} else {
 				self.grouped_units.workers.clone().iter().for_each(|u| {
-					self.command(u.gather(Target::Tag(self.mineral_forward), false));
+					self.command(u.gather(self.mineral_forward, false));
 				})
 			}
 		}
 	}
 
 	fn get_player_settings(&self) -> PlayerSettings {
-		PlayerSettings::new(self.race, Some("RustyWorkers".to_string()))
+		PlayerSettings::new(Race::Protoss, Some("RustyWorkers".to_string()))
 	}
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
 	let app = clap_app!(RustyWorkers =>
 		(version: crate_version!())
 		(author: crate_authors!())
@@ -156,7 +154,6 @@ async fn main() {
 				.expect("Can't parse StartPort"),
 			app.value_of("opponent_id"),
 		)
-		.await
 		.unwrap();
 	} else {
 		let mut rng = thread_rng();
@@ -240,7 +237,6 @@ async fn main() {
 			realtime,
 			None,
 		)
-		.await
 		.unwrap();
 	}
 }

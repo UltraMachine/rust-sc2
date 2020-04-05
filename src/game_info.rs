@@ -5,13 +5,14 @@ use crate::{
 	FromProto,
 };
 use sc2_proto::sc2api::ResponseGameInfo;
+use std::collections::HashMap;
 
 #[derive(Default, Clone)]
 pub struct GameInfo {
 	pub map_name: String,
 	pub mod_names: Vec<String>,
 	pub local_map_path: String,
-	pub players: Vec<PlayerInfo>,
+	pub players: HashMap<u32, PlayerInfo>,
 	pub map_size: Size,
 	pub pathing_grid: PixelMap,
 	pub terrain_height: ByteMap,
@@ -64,56 +65,44 @@ impl FromProto<ResponseGameInfo> for GameInfo {
 			players: game_info
 				.get_player_info()
 				.iter()
-				.map(|i| PlayerInfo {
-					id: {
-						if i.has_player_id() {
-							Some(i.get_player_id())
-						} else {
-							None
-						}
-					},
-					player_type: {
-						if i.has_field_type() {
-							Some(PlayerType::from_proto(i.get_field_type()))
-						} else {
-							None
-						}
-					},
-					race_requested: {
-						if i.has_race_requested() {
-							Some(Race::from_proto(i.get_race_requested()))
-						} else {
-							None
-						}
-					},
-					race_actual: {
-						if i.has_race_actual() {
-							Some(Race::from_proto(i.get_race_actual()))
-						} else {
-							None
-						}
-					},
-					difficulty: {
-						if i.has_difficulty() {
-							Some(Difficulty::from_proto(i.get_difficulty()))
-						} else {
-							None
-						}
-					},
-					ai_build: {
-						if i.has_ai_build() {
-							Some(AIBuild::from_proto(i.get_ai_build()))
-						} else {
-							None
-						}
-					},
-					player_name: {
-						if i.has_player_name() {
-							Some(i.get_player_name().to_string())
-						} else {
-							None
-						}
-					},
+				.map(|i| {
+					let id = i.get_player_id();
+					(
+						id,
+						PlayerInfo {
+							id,
+							player_type: PlayerType::from_proto(i.get_field_type()),
+							race_requested: Race::from_proto(i.get_race_requested()),
+							race_actual: {
+								if i.has_race_actual() {
+									Some(Race::from_proto(i.get_race_actual()))
+								} else {
+									None
+								}
+							},
+							difficulty: {
+								if i.has_difficulty() {
+									Some(Difficulty::from_proto(i.get_difficulty()))
+								} else {
+									None
+								}
+							},
+							ai_build: {
+								if i.has_ai_build() {
+									Some(AIBuild::from_proto(i.get_ai_build()))
+								} else {
+									None
+								}
+							},
+							player_name: {
+								if i.has_player_name() {
+									Some(i.get_player_name().to_string())
+								} else {
+									None
+								}
+							},
+						},
+					)
 				})
 				.collect(),
 			map_size: Size::new(map_size.get_x() as usize, map_size.get_y() as usize),
@@ -141,9 +130,9 @@ impl FromProto<ResponseGameInfo> for GameInfo {
 
 #[derive(Clone)]
 pub struct PlayerInfo {
-	pub id: Option<u32>,
-	pub player_type: Option<PlayerType>,
-	pub race_requested: Option<Race>,
+	pub id: u32,
+	pub player_type: PlayerType,
+	pub race_requested: Race,
 	pub race_actual: Option<Race>,
 	pub difficulty: Option<Difficulty>,
 	pub ai_build: Option<AIBuild>,

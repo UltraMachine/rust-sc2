@@ -107,11 +107,11 @@ impl FromProto<ProtoAction> for Option<Action> {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ActionError {
-	unit: u64,
-	ability: AbilityId,
-	result: ActionResult,
+	pub unit: u64,
+	pub ability: AbilityId,
+	pub result: ActionResult,
 }
 impl FromProto<ProtoActionError> for ActionError {
 	fn from_proto(e: ProtoActionError) -> Self {
@@ -123,8 +123,8 @@ impl FromProto<ProtoActionError> for ActionError {
 	}
 }
 
-#[derive(Debug, Clone)]
-enum ActionResult {
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum ActionResult {
 	Success,
 	NotSupported,
 	Error,

@@ -7,7 +7,6 @@ use crate::{
 	player::PlayerType,
 	FromProto, FromProtoPlayer, IntoProto, PlayerBox,
 };
-use futures_util::{SinkExt, StreamExt};
 use num_traits::FromPrimitive;
 use protobuf::Message;
 use sc2_proto::{
@@ -18,13 +17,12 @@ use std::{
 	io::Write,
 	net::TcpListener,
 	process::{Child, Command},
+	rc::Rc,
 };
-use tokio::net::TcpStream;
-use tokio_tungstenite::{connect_async, WebSocketStream};
-use tungstenite::{Message::Binary, Result as TResult};
+use tungstenite::{client::AutoStream, connect, Message::Binary, Result as TResult, WebSocket};
 use url::Url;
 
-type WS = WebSocketStream<TcpStream>;
+pub type WS = WebSocket<AutoStream>;
 
 #[derive(Clone)]
 struct Ports {
@@ -54,20 +52,19 @@ fn get_unused_ports(n: usize) -> Vec<i32> {
 	ports
 }
 
-#[allow(unused_must_use)]
-async fn send_request(ws: &mut WS, req: Request) -> TResult<()> {
-	ws.send(Binary(req.write_to_bytes().unwrap())).await?;
-	ws.next().await.unwrap();
+fn send_request(ws: &mut WS, req: Request) -> TResult<()> {
+	ws.write_message(Binary(req.write_to_bytes().unwrap()))?;
+	ws.read_message()?;
 	Ok(())
 }
 
-async fn send(ws: &mut WS, req: Request) -> TResult<Response> {
-	ws.send(Binary(req.write_to_bytes().unwrap())).await?;
+pub fn send(ws: &mut WS, req: Request) -> TResult<Response> {
+	ws.write_message(Binary(req.write_to_bytes().unwrap()))?;
 
-	let msg = ws.next().await.unwrap();
+	let msg = ws.read_message()?;
 
 	let mut res = Response::new();
-	res.merge_from_bytes(msg?.into_data().as_slice()).unwrap();
+	res.merge_from_bytes(msg.into_data().as_slice()).unwrap();
 	Ok(res)
 }
 
@@ -75,20 +72,20 @@ fn flush() {
 	std::io::stdout().flush().unwrap();
 }
 
-async fn terminate(process: &mut Child, ws: &mut WS) -> TResult<()> {
+fn terminate(process: &mut Child, ws: &mut WS) -> TResult<()> {
 	print!("Sending QuitGame request and terminating SC2 process... ");
 	flush();
 
 	let mut req = Request::new();
 	req.mut_quit();
-	send_request(ws, req).await?;
+	send_request(ws, req)?;
 
 	process.kill()?;
 	println!("Done");
 	Ok(())
 }
 
-async fn terminate_both(
+fn terminate_both(
 	process_host: &mut Child,
 	ws_host: &mut WS,
 	process_client: &mut Child,
@@ -99,13 +96,13 @@ async fn terminate_both(
 
 	let mut req = Request::new();
 	req.mut_leave_game();
-	send_request(ws_host, req.clone()).await?;
-	send_request(ws_client, req).await?;
+	send_request(ws_host, req.clone())?;
+	send_request(ws_client, req)?;
 
 	let mut req = Request::new();
 	req.mut_quit();
-	send_request(ws_host, req.clone()).await?;
-	send_request(ws_client, req).await?;
+	send_request(ws_host, req.clone())?;
+	send_request(ws_client, req)?;
 
 	process_host.kill()?;
 	process_client.kill()?;
@@ -113,7 +110,7 @@ async fn terminate_both(
 	Ok(())
 }
 
-pub async fn run_game(
+pub fn run_game(
 	map_name: String,
 	players: Vec<PlayerBox>,
 	realtime: bool,
@@ -124,16 +121,16 @@ pub async fn run_game(
 	match player1.get_player_settings().player_type {
 		PlayerType::Participant | PlayerType::Human => match player2.get_player_settings().player_type {
 			PlayerType::Participant | PlayerType::Human => {
-				launch_pvp(&mut player1, &mut player2, map_name, realtime, sc2_version).await?
+				launch_pvp(&mut player1, &mut player2, map_name, realtime, sc2_version)?
 			}
 			PlayerType::Computer => {
-				launch_vs_computer(&mut player1, player2, map_name, realtime, sc2_version).await?
+				launch_vs_computer(&mut player1, player2, map_name, realtime, sc2_version)?
 			}
 			PlayerType::Observer => unimplemented!("Observer is not supported"),
 		},
 		PlayerType::Computer => match player2.get_player_settings().player_type {
 			PlayerType::Participant | PlayerType::Human => {
-				launch_vs_computer(&mut player2, player1, map_name, realtime, sc2_version).await?
+				launch_vs_computer(&mut player2, player1, map_name, realtime, sc2_version)?
 			}
 			PlayerType::Computer => panic!("Match between two Computers is not allowed"),
 			PlayerType::Observer => unimplemented!("Observer is not supported"),
@@ -143,7 +140,7 @@ pub async fn run_game(
 	Ok(())
 }
 
-pub async fn run_ladder_game(
+pub fn run_ladder_game(
 	mut player: PlayerBox,
 	host: String,
 	port: String,
@@ -156,7 +153,7 @@ pub async fn run_ladder_game(
 	flush();
 	let url = Url::parse(format!("ws://{}:{}/sc2api", host, port).as_str()).unwrap();
 	let (mut ws, _rs) = loop {
-		if let Ok(result) = connect_async(url.clone()).await {
+		if let Ok(result) = connect(url.clone()) {
 			break result;
 		}
 	};
@@ -177,15 +174,14 @@ pub async fn run_ladder_game(
 			server: [player_port + 2, player_port + 3],
 			client: vec![[player_port + 4, player_port + 5]],
 		}),
-	)
-	.await?;
+	)?;
 	println!("Done");
 
 	print!("Requesting GameInfo... ");
 	flush();
 	let mut req = Request::new();
 	req.mut_game_info();
-	let res = send(&mut ws, req).await?;
+	let res = send(&mut ws, req)?;
 	player.set_game_info(GameInfo::from_proto(res.get_game_info().clone()));
 	println!("Done");
 
@@ -199,7 +195,7 @@ pub async fn run_ladder_game(
 	req_game_data.set_buff_id(true);
 	req_game_data.set_effect_id(true);
 
-	let res = send(&mut ws, req).await?;
+	let res = send(&mut ws, req)?;
 	player.set_game_data(GameData::from_proto(res.get_data().clone()));
 	println!("Done");
 
@@ -207,9 +203,9 @@ pub async fn run_ladder_game(
 	flush();
 	// Main loop
 	let mut iteration = 0;
-	play_first_step(&mut ws, &mut player, false, false).await?;
+	play_first_step(&mut ws, &mut player, false, false)?;
 	loop {
-		if !play_step(&mut ws, &mut player, iteration, false, false).await? {
+		if !play_step(&mut ws, &mut player, iteration, false, false)? {
 			break;
 		}
 		iteration += 1;
@@ -244,7 +240,7 @@ fn create_computer_setup(p: &PlayerBox, req_create_game: &mut RequestCreateGame)
 	req_create_game.mut_player_setup().push(setup);
 }
 
-async fn join_game(p: &mut PlayerBox, ws: &mut WS, ports: Option<Ports>) -> TResult<()> {
+fn join_game(p: &mut PlayerBox, ws: &mut WS, ports: Option<Ports>) -> TResult<()> {
 	let mut req = Request::new();
 	let req_join_game = req.mut_join_game();
 
@@ -283,7 +279,7 @@ async fn join_game(p: &mut PlayerBox, ws: &mut WS, ports: Option<Ports>) -> TRes
 		}
 	}
 
-	let res = send(ws, req).await?;
+	let res = send(ws, req)?;
 	let res_join_game = res.get_join_game();
 	p.set_player_id(res_join_game.get_player_id());
 	if res_join_game.has_error() {
@@ -296,19 +292,18 @@ async fn join_game(p: &mut PlayerBox, ws: &mut WS, ports: Option<Ports>) -> TRes
 	Ok(())
 }
 
-async fn play_first_step(ws: &mut WS, player: &mut PlayerBox, realtime: bool, human: bool) -> TResult<()> {
+fn play_first_step(ws: &mut WS, player: &mut PlayerBox, realtime: bool, human: bool) -> TResult<()> {
 	if !human {
 		let mut req = Request::new();
 		req.mut_observation();
 
-		let res = send(ws, req).await?;
+		let res = send(ws, req)?;
 
-		let state = GameState::from_proto_player(&player, res.get_observation());
+		player.init_data_for_unit();
+		player.set_state(GameState::from_proto_player(Rc::new(player.clone()), res.get_observation()));
+		player.prepare_start();
 
-		player.set_state(state);
-		player.prepare_first_step();
-
-		player.on_start();
+		player.on_start(ws);
 
 		let player_actions = player.get_actions();
 		if !player_actions.is_empty() {
@@ -318,18 +313,18 @@ async fn play_first_step(ws: &mut WS, player: &mut PlayerBox, realtime: bool, hu
 				.into_iter()
 				.for_each(|a| actions.push(a.into_proto()));
 			player.clear_actions();
-			send_request(ws, req).await?;
+			send_request(ws, req)?;
 		}
 	}
 	if !realtime {
 		let mut req = Request::new();
 		req.mut_step().set_count(player.get_step_size());
-		send_request(ws, req).await?;
+		send_request(ws, req)?;
 	}
 	Ok(())
 }
 
-async fn play_step(
+fn play_step(
 	ws: &mut WS,
 	player: &mut PlayerBox,
 	iteration: usize,
@@ -340,13 +335,13 @@ async fn play_step(
 		let mut req = Request::new();
 		req.mut_observation();
 
-		let res = send(ws, req).await?;
+		let res = send(ws, req)?;
 
 		if res.get_status() == Status::ended {
 			return Ok(false);
 		}
 
-		let state = GameState::from_proto_player(&player, res.get_observation());
+		let state = GameState::from_proto_player(Rc::new(player.clone()), res.get_observation());
 
 		let mut req = Request::new();
 		let req_query_abilities = req.mut_query().mut_abilities();
@@ -358,7 +353,7 @@ async fn play_step(
 			}
 		});
 
-		let res = send(ws, req).await?;
+		let res = send(ws, req)?;
 		player.set_avaliable_abilities(
 			res.get_query()
 				.get_abilities()
@@ -378,7 +373,7 @@ async fn play_step(
 		player.set_state(state);
 		player.prepare_step();
 
-		player.on_step(iteration);
+		player.on_step(ws, iteration);
 
 		let player_actions = player.get_actions();
 		if !player_actions.is_empty() {
@@ -389,9 +384,9 @@ async fn play_step(
 				.into_iter()
 				.for_each(|a| actions.push(a.into_proto()));
 			player.clear_actions();
-			send_request(ws, req).await?;
+			send_request(ws, req)?;
 			/*
-			let res = send(ws, req).await;
+			let res = send(ws, req);
 			let results = res.get_action().get_result();
 			if !results.is_empty() {
 				println!("action_results: {:?}", results);
@@ -407,18 +402,18 @@ async fn play_step(
 				.into_iter()
 				.for_each(|cmd| debug_commands.push(cmd.into_proto()));
 			player.clear_debug_commands();
-			send_request(ws, req).await?;
+			send_request(ws, req)?;
 		}
 	}
 	if !realtime {
 		let mut req = Request::new();
 		req.mut_step().set_count(player.get_step_size());
-		send_request(ws, req).await?;
+		send_request(ws, req)?;
 	}
 	Ok(true)
 }
 
-async fn launch_vs_computer(
+fn launch_vs_computer(
 	player: &mut PlayerBox,
 	computer: PlayerBox,
 	map_name: String,
@@ -473,7 +468,7 @@ async fn launch_vs_computer(
 	flush();
 	let url = Url::parse(format!("ws://{}:{}/sc2api", host, port).as_str()).unwrap();
 	let (mut ws, _rs) = loop {
-		if let Ok(result) = connect_async(url.clone()).await {
+		if let Ok(result) = connect(url.clone()) {
 			break result;
 		}
 	};
@@ -500,7 +495,7 @@ async fn launch_vs_computer(
 		// req_create_game.set_random_seed(u32);
 		req_create_game.set_realtime(realtime);
 
-		let res = send(&mut ws, req).await?;
+		let res = send(&mut ws, req)?;
 		let res_create_game = res.get_create_game();
 		if res_create_game.has_error() {
 			panic!(
@@ -513,14 +508,14 @@ async fn launch_vs_computer(
 
 		print!("Sending JoinGame request... ");
 		flush();
-		join_game(player, &mut ws, None).await?;
+		join_game(player, &mut ws, None)?;
 		println!("Done");
 
 		print!("Requesting GameInfo... ");
 		flush();
 		let mut req = Request::new();
 		req.mut_game_info();
-		let res = send(&mut ws, req).await?;
+		let res = send(&mut ws, req)?;
 		player.set_game_info(GameInfo::from_proto(res.get_game_info().clone()));
 		println!("Done");
 
@@ -534,7 +529,7 @@ async fn launch_vs_computer(
 		req_game_data.set_buff_id(true);
 		req_game_data.set_effect_id(true);
 
-		let res = send(&mut ws, req).await?;
+		let res = send(&mut ws, req)?;
 		player.set_game_data(GameData::from_proto(res.get_data().clone()));
 		println!("Done");
 
@@ -542,10 +537,10 @@ async fn launch_vs_computer(
 		flush();
 		let is_human = player.get_player_settings().player_type == PlayerType::Human;
 		// Main loop
-		play_first_step(&mut ws, player, realtime, is_human).await?;
+		play_first_step(&mut ws, player, realtime, is_human)?;
 		let mut iteration = 0;
 		loop {
-			if !play_step(&mut ws, player, iteration, realtime, is_human).await? {
+			if !play_step(&mut ws, player, iteration, realtime, is_human)? {
 				break;
 			}
 			iteration += 1;
@@ -553,15 +548,15 @@ async fn launch_vs_computer(
 		println!("Finished");
 		Ok(())
 	} {
-		Ok(()) => terminate(&mut process, &mut ws).await,
+		Ok(()) => terminate(&mut process, &mut ws),
 		Err(why) => {
-			terminate(&mut process, &mut ws).await?;
+			terminate(&mut process, &mut ws)?;
 			Err(why)
 		}
 	}
 }
 
-async fn launch_pvp(
+fn launch_pvp(
 	player1: &mut PlayerBox,
 	player2: &mut PlayerBox,
 	map_name: String,
@@ -620,13 +615,13 @@ async fn launch_pvp(
 	flush();
 	let url = Url::parse(format!("ws://{}:{}/sc2api", host, port_host).as_str()).unwrap();
 	let (mut ws_host, _rs) = loop {
-		if let Ok(result) = connect_async(url.clone()).await {
+		if let Ok(result) = connect(url.clone()) {
 			break result;
 		}
 	};
 	let url = Url::parse(format!("ws://{}:{}/sc2api", host, port_client).as_str()).unwrap();
 	let (mut ws_client, _rs) = loop {
-		if let Ok(result) = connect_async(url.clone()).await {
+		if let Ok(result) = connect(url.clone()) {
 			break result;
 		}
 	};
@@ -646,7 +641,7 @@ async fn launch_pvp(
 		// req_create_game.set_random_seed(u32);
 		req_create_game.set_realtime(realtime);
 
-		let res = send(&mut ws_host, req).await?;
+		let res = send(&mut ws_host, req)?;
 		let res_create_game = res.get_create_game();
 		if res_create_game.has_error() {
 			panic!(
@@ -664,8 +659,8 @@ async fn launch_pvp(
 			server: [ports[3], ports[4]],
 			client: vec![[ports[5], ports[6]], [ports[7], ports[8]]],
 		};
-		join_game(player1, &mut ws_host, Some(ports.clone())).await?;
-		join_game(player2, &mut ws_client, Some(ports)).await?;
+		join_game(player1, &mut ws_host, Some(ports.clone()))?;
+		join_game(player2, &mut ws_client, Some(ports))?;
 		println!("Done");
 
 		print!("Requesting GameInfo... ");
@@ -673,10 +668,10 @@ async fn launch_pvp(
 		let mut req = Request::new();
 		req.mut_game_info();
 		player1.set_game_info(GameInfo::from_proto(
-			send(&mut ws_host, req.clone()).await?.get_game_info().clone(),
+			send(&mut ws_host, req.clone())?.get_game_info().clone(),
 		));
 		player2.set_game_info(GameInfo::from_proto(
-			send(&mut ws_client, req).await?.get_game_info().clone(),
+			send(&mut ws_client, req)?.get_game_info().clone(),
 		));
 		println!("Done");
 
@@ -691,10 +686,10 @@ async fn launch_pvp(
 		req_game_data.set_effect_id(true);
 
 		player1.set_game_data(GameData::from_proto(
-			send(&mut ws_host, req.clone()).await?.get_data().clone(),
+			send(&mut ws_host, req.clone())?.get_data().clone(),
 		));
 		player2.set_game_data(GameData::from_proto(
-			send(&mut ws_client, req).await?.get_data().clone(),
+			send(&mut ws_client, req)?.get_data().clone(),
 		));
 		println!("Done");
 
@@ -702,12 +697,12 @@ async fn launch_pvp(
 		flush();
 		let is_human1 = player1.get_player_settings().player_type == PlayerType::Human;
 		let is_human2 = player2.get_player_settings().player_type == PlayerType::Human;
-		play_first_step(&mut ws_host, player1, realtime, is_human1).await?;
-		play_first_step(&mut ws_client, player2, realtime, is_human2).await?;
+		play_first_step(&mut ws_host, player1, realtime, is_human1)?;
+		play_first_step(&mut ws_client, player2, realtime, is_human2)?;
 		let mut iteration = 0;
 		loop {
-			if !play_step(&mut ws_host, player1, iteration, realtime, is_human1).await?
-				|| !play_step(&mut ws_client, player2, iteration, realtime, is_human2).await?
+			if !play_step(&mut ws_host, player1, iteration, realtime, is_human1)?
+				|| !play_step(&mut ws_client, player2, iteration, realtime, is_human2)?
 			{
 				break;
 			}
@@ -716,23 +711,19 @@ async fn launch_pvp(
 		println!("Finished");
 		Ok(())
 	} {
-		Ok(()) => {
-			terminate_both(
-				&mut process_host,
-				&mut ws_host,
-				&mut process_client,
-				&mut ws_client,
-			)
-			.await
-		}
+		Ok(()) => terminate_both(
+			&mut process_host,
+			&mut ws_host,
+			&mut process_client,
+			&mut ws_client,
+		),
 		Err(why) => {
 			terminate_both(
 				&mut process_host,
 				&mut ws_host,
 				&mut process_client,
 				&mut ws_client,
-			)
-			.await?;
+			)?;
 			Err(why)
 		}
 	}

@@ -52,6 +52,12 @@ impl Point2 {
 	pub fn towards(self, other: Self, offset: f32) -> Self {
 		self + (other - self) / self.distance(other) * offset
 	}
+	pub fn offset(self, x: f32, y: f32) -> Self {
+		Self {
+			x: self.x + x,
+			y: self.y + y,
+		}
+	}
 	pub fn to3(self, z: f32) -> Point3 {
 		Point3 {
 			x: self.x,
@@ -62,8 +68,8 @@ impl Point2 {
 }
 impl PartialEq for Point2 {
 	fn eq(&self, other: &Self) -> bool {
-		// (self.x + 0.5 as u32) == (other.x + 0.5 as u32) && (self.y + 0.5 as u32) == (other.y + 0.5 as u32)
-		self.x == other.x && self.y == other.y
+		// ((self.x + 0.5) as u32) == ((other.x + 0.5) as u32) && ((self.y + 0.5) as u32) == ((other.y + 0.5) as u32)
+		(self.x - other.x).abs() < std::f32::EPSILON && (self.y - other.y).abs() < std::f32::EPSILON
 	}
 }
 impl Eq for Point2 {}
@@ -192,6 +198,13 @@ pub struct Point3 {
 impl Point3 {
 	pub fn new(x: f32, y: f32, z: f32) -> Self {
 		Self { x, y, z }
+	}
+	pub fn offset(self, x: f32, y: f32, z: f32) -> Self {
+		Self {
+			x: self.x + x,
+			y: self.y + y,
+			z: self.z + z,
+		}
 	}
 	pub fn to2(self) -> Point2 {
 		Point2 { x: self.x, y: self.y }

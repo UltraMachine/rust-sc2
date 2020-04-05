@@ -21,8 +21,8 @@ pub struct GroupedUnits {
 	pub enemy_structures: Units,
 	pub enemy_townhalls: Units,
 	pub enemy_workers: Units,
-	pub mineral_field: Units,
-	pub vespene_geyser: Units,
+	pub mineral_fields: Units,
+	pub vespene_geysers: Units,
 	pub resources: Units,
 	pub destructables: Units,
 	pub watchtowers: Units,
@@ -45,8 +45,8 @@ impl Units {
 	}
 
 	#[inline]
-	pub fn push(&mut self, u: Unit) {
-		self.units.insert(u.tag, u);
+	pub fn push(&mut self, u: Unit) -> Option<Unit> {
+		self.units.insert(u.tag, u)
 	}
 
 	#[inline]
@@ -167,10 +167,16 @@ impl Units {
 		}
 	}
 	pub fn ground(&self) -> Self {
-		self.filter(|u| !u.is_flying.as_bool())
+		self.filter(|u| !u.is_flying)
 	}
 	pub fn flying(&self) -> Self {
-		self.filter(|u| u.is_flying.as_bool())
+		self.filter(|u| u.is_flying)
+	}
+	pub fn ready(&self) -> Self {
+		self.filter(|u| u.is_ready())
+	}
+	pub fn not_ready(&self) -> Self {
+		self.filter(|u| !u.is_ready())
 	}
 	pub fn idle(&self) -> Self {
 		self.filter(|u| u.is_idle())
@@ -304,6 +310,8 @@ impl Index<usize> for Units {
 }
 impl Extend<Unit> for Units {
 	fn extend<T: IntoIterator<Item = Unit>>(&mut self, iter: T) {
-		iter.into_iter().for_each(|u| self.push(u));
+		iter.into_iter().for_each(|u| {
+			self.push(u);
+		});
 	}
 }

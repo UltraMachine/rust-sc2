@@ -1,10 +1,15 @@
 #[macro_use]
 extern crate num_derive;
 #[macro_use]
-pub extern crate sc2_macro;
+extern crate lazy_static;
+#[macro_use]
+extern crate sc2_macro;
+#[macro_use]
+extern crate itertools;
 
 pub mod action;
 mod client;
+pub mod constants;
 pub mod debug;
 pub mod game_data;
 pub mod game_info;
@@ -14,32 +19,24 @@ pub mod ids;
 mod paths;
 pub mod pixel_map;
 pub mod player;
+pub mod query;
 pub mod unit;
 pub mod units;
 
 use action::{Action, Command};
-pub use client::{run_game, run_ladder_game};
 use debug::DebugCommand;
 use game_data::{Cost, GameData};
 use game_info::GameInfo;
 use game_state::GameState;
+use geometry::Point2;
 use ids::{AbilityId, UnitTypeId /*, UpgradeId */};
 use player::{AIBuild, Difficulty, PlayerType, Race};
-pub use sc2_macro::{bot, bot_impl_player, bot_new};
 use std::{collections::HashMap, rc::Rc};
+use unit::{DataForUnit, Unit};
 
-const WORKER_IDS: [UnitTypeId; 3] = [UnitTypeId::SCV, UnitTypeId::Drone, UnitTypeId::Probe];
-const TOWNHALL_IDS: [UnitTypeId; 9] = [
-	UnitTypeId::CommandCenter,
-	UnitTypeId::OrbitalCommand,
-	UnitTypeId::PlanetaryFortress,
-	UnitTypeId::CommandCenterFlying,
-	UnitTypeId::OrbitalCommandFlying,
-	UnitTypeId::Hatchery,
-	UnitTypeId::Lair,
-	UnitTypeId::Hive,
-	UnitTypeId::Nexus,
-];
+pub use client::{run_game, run_ladder_game, WS};
+pub use itertools::{iproduct, Itertools};
+pub use sc2_macro::{bot, bot_impl_player, bot_new};
 
 pub type PlayerBox = Box<dyn Player>;
 
@@ -105,9 +102,10 @@ pub trait Player: PlayerClone {
 	fn set_game_data(&mut self, _game_data: GameData) {}
 	fn set_state(&mut self, _state: GameState) {}
 	fn set_avaliable_abilities(&mut self, _abilities_units: HashMap<u64, Vec<AbilityId>>) {}
-	fn get_game_data(&self) -> Rc<GameData> {
+	fn get_data_for_unit(&self) -> Rc<DataForUnit> {
 		unimplemented!()
 	}
+	fn init_data_for_unit(&mut self) {}
 	fn get_actions(&self) -> Vec<Action> {
 		Vec::new()
 	}
@@ -116,13 +114,14 @@ pub trait Player: PlayerClone {
 		Vec::new()
 	}
 	fn clear_debug_commands(&mut self) {}
-	fn prepare_first_step(&mut self) {}
+	fn prepare_start(&mut self) {}
 	fn prepare_step(&mut self) {}
-	fn on_start(&mut self) {}
-	fn on_step(&mut self, _iteration: usize) {}
+	fn on_start(&mut self, _ws: &mut WS) {}
+	fn on_step(&mut self, _ws: &mut WS, _iteration: usize) {}
 	fn command(&mut self, _cmd: Option<Command>) {}
 	fn chat_send(&mut self, _message: String, _team_only: bool) {}
 	fn group_units(&mut self) {}
+	fn substract_resources(&mut self, _unit: UnitTypeId) {}
 	fn get_unit_cost(&self, _unit: UnitTypeId) -> Cost {
 		unimplemented!()
 	}
@@ -137,6 +136,22 @@ pub trait Player: PlayerClone {
 		unimplemented!()
 	}
 	*/
+	#[allow(clippy::too_many_arguments)]
+	fn find_placement(
+		&self,
+		_ws: &mut WS,
+		_building: UnitTypeId,
+		_near: Point2,
+		_max_distance: isize,
+		_placement_step: isize,
+		_random: bool,
+		_addon: bool,
+	) -> Option<Point2> {
+		unimplemented!()
+	}
+	fn find_gas_placement(&self, _ws: &mut WS, _base: Point2) -> Option<Unit> {
+		unimplemented!()
+	}
 }
 
 trait FromProto<T>
@@ -157,14 +172,14 @@ trait FromProtoPlayer<T>
 where
 	Self: Sized,
 {
-	fn from_proto_player(player: &PlayerBox, proto: T) -> Self;
+	fn from_proto_player(player: Rc<PlayerBox>, proto: T) -> Self;
 }
 
-trait FromProtoGameData<T>
+trait FromProtoData<T>
 where
 	Self: Sized,
 {
-	fn from_proto_game_data(game_data: Rc<GameData>, proto: T) -> Self;
+	fn from_proto_data(player: Rc<DataForUnit>, proto: T) -> Self;
 }
 
 trait IntoProto<T> {
