@@ -29,7 +29,7 @@ use game_data::{Cost, GameData};
 use game_info::GameInfo;
 use game_state::GameState;
 use geometry::Point2;
-use ids::{AbilityId, UnitTypeId /*, UpgradeId */};
+use ids::{AbilityId, UnitTypeId, UpgradeId};
 use player::{AIBuild, Difficulty, PlayerType, Race};
 use std::{collections::HashMap, rc::Rc};
 use unit::{DataForUnit, Unit};
@@ -122,16 +122,20 @@ pub trait Player: PlayerClone {
 	fn chat_send(&mut self, _message: String, _team_only: bool) {}
 	fn group_units(&mut self) {}
 	fn substract_resources(&mut self, _unit: UnitTypeId) {}
+	fn substract_upgrade_cost(&mut self, _upgrade: UpgradeId) {}
 	fn get_unit_cost(&self, _unit: UnitTypeId) -> Cost {
 		unimplemented!()
 	}
 	fn can_afford(&self, _unit: UnitTypeId, _check_supply: bool) -> bool {
 		unimplemented!()
 	}
-	/*
+	fn get_upgrade_cost(&self, _upgrade: UpgradeId) -> Cost {
+		unimplemented!()
+	}
 	fn can_afford_upgrade(&self, _upgrade: UpgradeId) -> bool {
 		unimplemented!()
 	}
+	/*
 	fn can_afford_ability(&self, _ability: AbilityId) -> bool {
 		unimplemented!()
 	}

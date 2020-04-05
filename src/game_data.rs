@@ -366,6 +366,16 @@ pub struct UpgradeData {
 	pub research_time: f32,
 	pub ability: AbilityId,
 }
+impl UpgradeData {
+	pub fn cost(&self) -> Cost {
+		Cost {
+			minerals: self.mineral_cost,
+			vespene: self.vespene_cost,
+			supply: 0.0,
+			time: self.research_time,
+		}
+	}
+}
 impl TryFromProto<ProtoUpgradeData> for UpgradeData {
 	fn try_from_proto(u: ProtoUpgradeData) -> Option<Self> {
 		Some(Self {

@@ -6,7 +6,7 @@ use crate::{
 	game_data::{Attribute, GameData, TargetType, UnitTypeData, Weapon},
 	game_state::Alliance,
 	geometry::{Point2, Point3},
-	ids::{AbilityId, BuffId, UnitTypeId},
+	ids::{AbilityId, BuffId, UnitTypeId, UpgradeId},
 	player::Race,
 	FromProto, FromProtoData,
 };
@@ -548,6 +548,12 @@ impl Unit {
 			if let Some(ability) = type_data.ability {
 				return self.command(ability, Target::None, queue);
 			}
+		}
+		None
+	}
+	pub fn research(&self, upgrade: UpgradeId, queue: bool) -> Option<Command> {
+		if let Some(type_data) = self.data.game_data.upgrades.get(&upgrade) {
+			return self.command(type_data.ability, Target::None, queue);
 		}
 		None
 	}

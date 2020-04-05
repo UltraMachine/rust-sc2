@@ -33,7 +33,7 @@ pub fn bot(_attr: TokenStream, item: TokenStream) -> TokenStream {
 			game_data::{Cost, GameData},
 			game_info::GameInfo,
 			game_state::{Alliance, GameState},
-			ids::{AbilityId, UnitTypeId /*, UpgradeId*/},
+			ids::{AbilityId, UnitTypeId, UpgradeId},
 			iproduct,
 			player::Race,
 			query::QueryMaster,
@@ -216,6 +216,11 @@ pub fn bot_impl_player(attr: TokenStream, item: TokenStream) -> TokenStream {
 				let supply_cost = cost.supply as u32;
 				self.supply_used += supply_cost;
 				self.supply_left = self.supply_left.saturating_sub(supply_cost);
+			}
+			fn substract_upgrade_cost(&mut self, upgrade: UpgradeId) {
+				let cost = self.game_data.upgrades[&upgrade].cost();
+				self.minerals = self.minerals.saturating_sub(cost.minerals);
+				self.vespene = self.vespene.saturating_sub(cost.vespene);
 			}
 			fn command(&mut self, cmd: Option<Command>) {
 				if let Some((tag, order)) = cmd {
@@ -533,10 +538,17 @@ pub fn bot_impl_player(attr: TokenStream, item: TokenStream) -> TokenStream {
 				}
 				true
 			}
-			/*
-			fn can_afford_upgrade(&self, upgrade: UpgradeId) -> bool {
-				unimplemented!()
+			fn get_upgrade_cost(&self, upgrade: UpgradeId) -> Cost {
+				match self.game_data.upgrades.get(&upgrade) {
+					Some(data) => data.cost(),
+					None => Default::default(),
+				}
 			}
+			fn can_afford_upgrade(&self, upgrade: UpgradeId) -> bool {
+				let cost = self.get_upgrade_cost(upgrade);
+				self.minerals >= cost.minerals && self.vespene >= cost.vespene
+			}
+			/*
 			fn can_afford_ability(&self, ability: AbilityId) -> bool {
 				unimplemented!()
 			}
