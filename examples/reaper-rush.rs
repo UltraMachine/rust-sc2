@@ -11,7 +11,7 @@ use rust_sc2::{
 	},
 	run_game, run_ladder_game, Player, PlayerSettings,
 };
-use std::{cmp::Ordering, collections::HashSet};
+use std::cmp::Ordering;
 
 #[bot]
 struct ReaperRushAI {
@@ -59,12 +59,11 @@ impl ReaperRushAI {
 
 					idle_workers.extend(
 						workers
-							.filter(|u| match u.target_tag() {
-								Some(target_tag) => {
+							.filter(|u| {
+								u.target_tag().map_or(false, |target_tag| {
 									local_minerals.contains(&target_tag)
 										|| (u.is_carrying_minerals() && target_tag == base.tag)
-								}
-								None => false,
+								})
 							})
 							.iter()
 							.take(
@@ -86,12 +85,11 @@ impl ReaperRushAI {
 				Ordering::Greater => {
 					idle_workers.extend(
 						workers
-							.filter(|u| match u.target_tag() {
-								Some(target_tag) => {
+							.filter(|u| {
+								u.target_tag().map_or(false, |target_tag| {
 									target_tag == gas.tag
 										|| (u.is_carrying_vespene() && target_tag == bases.closest(gas).tag)
-								}
-								None => false,
+								})
 							})
 							.iter()
 							.take((gas.assigned_harvesters.unwrap() - gas.ideal_harvesters.unwrap()) as usize)
@@ -129,7 +127,7 @@ impl ReaperRushAI {
 					u.gather(
 						mineral_fields
 							.closer(11.0, &closest)
-							.max(|m| m.mineral_contents.unwrap())
+							.max(|m| m.mineral_contents.unwrap_or(0))
 							.tag,
 						false,
 					),
@@ -145,11 +143,8 @@ impl ReaperRushAI {
 	fn get_builder(&self, pos: Point2, mineral_tags: &[u64]) -> Option<Unit> {
 		let workers = self.grouped_units.workers.filter(|u| {
 			!u.is_constructing()
-				&& (!u.is_gathering()
-					|| (match u.target_tag() {
-						Some(tag) => mineral_tags.contains(&tag),
-						None => false,
-					})) && !u.is_returning()
+				&& (!u.is_gathering() || u.target_tag().map_or(false, |tag| mineral_tags.contains(&tag)))
+				&& !u.is_returning()
 				&& !u.is_carrying_resource()
 		});
 		if workers.is_empty() {
@@ -167,21 +162,6 @@ impl ReaperRushAI {
 			.collect::<Vec<u64>>();
 		let main_base = self.start_location.towards(self.game_info.map_center, 8.0);
 
-		if self.supply_left < 3
-			&& self.supply_cap < 200
-			&& self.orders.get(&AbilityId::TerranBuildSupplyDepot).unwrap_or(&0) == &0
-		{
-			if let Some(location) =
-				self.find_placement(ws, UnitTypeId::SupplyDepot, main_base, 15, 2, false, false)
-			{
-				if let Some(builder) = self.get_builder(location, &mineral_tags) {
-					self.command(builder.build(UnitTypeId::SupplyDepot, location, false));
-					self.substract_resources(UnitTypeId::SupplyDepot);
-					return;
-				}
-			}
-		}
-
 		if self.current_units.get(&UnitTypeId::Refinery).unwrap_or(&0) < &2
 			&& self.orders.get(&AbilityId::TerranBuildRefinery).unwrap_or(&0) == &0
 			&& self.can_afford(UnitTypeId::Refinery, false)
@@ -190,6 +170,21 @@ impl ReaperRushAI {
 				if let Some(builder) = self.get_builder(geyser.position, &mineral_tags) {
 					self.command(builder.build_gas(geyser.tag, false));
 					self.substract_resources(UnitTypeId::Refinery);
+				}
+			}
+		}
+
+		if self.supply_left < 3
+			&& self.supply_cap < 200
+			&& self.orders.get(&AbilityId::TerranBuildSupplyDepot).unwrap_or(&0) == &0
+			&& self.can_afford(UnitTypeId::SupplyDepot, false)
+		{
+			if let Some(location) =
+				self.find_placement(ws, UnitTypeId::SupplyDepot, main_base, 15, 2, false, false)
+			{
+				if let Some(builder) = self.get_builder(location, &mineral_tags) {
+					self.command(builder.build(UnitTypeId::SupplyDepot, location, false));
+					self.substract_resources(UnitTypeId::SupplyDepot);
 					return;
 				}
 			}
@@ -370,7 +365,7 @@ impl ReaperRushAI {
 impl Player for ReaperRushAI {
 	fn on_start(&mut self, _ws: &mut WS) {
 		let townhall = self.grouped_units.townhalls[0].clone();
-		self.command(townhall.smart(Target::Tag(townhall.tag), false));
+		self.command(townhall.smart(Target::Pos(self.start_resource_center), false));
 		self.command(townhall.train(UnitTypeId::SCV, false));
 		self.substract_resources(UnitTypeId::SCV);
 

@@ -41,7 +41,10 @@ pub fn bot(_attr: TokenStream, item: TokenStream) -> TokenStream {
 			units::{GroupedUnits, Units},
 			Itertools, WS,
 		};
-		use std::{collections::HashMap, rc::Rc};
+		use std::{
+			collections::{HashMap, HashSet},
+			rc::Rc,
+		};
 		#(#attrs)*
 		#[derive(Clone)]
 		#vis struct #name#generics {
@@ -74,6 +77,8 @@ pub fn bot(_attr: TokenStream, item: TokenStream) -> TokenStream {
 			supply_left: u32,
 			start_location: Point2,
 			enemy_start: Point2,
+			start_resource_center: Point2,
+			enemy_start_resource_center: Point2,
 			techlab_tags: Rc<Vec<u64>>,
 			reactor_tags: Rc<Vec<u64>>,
 			expansions: Vec<(Point2, Point2)>,
@@ -128,6 +133,8 @@ pub fn bot_new(_attr: TokenStream, item: TokenStream) -> TokenStream {
 						supply_left: Default::default(),
 						start_location: Default::default(),
 						enemy_start: Default::default(),
+						start_resource_center: Default::default(),
+						enemy_start_resource_center: Default::default(),
 						techlab_tags: Default::default(),
 						reactor_tags: Default::default(),
 						expansions: Vec::new(),
@@ -253,6 +260,17 @@ pub fn bot_impl_player(attr: TokenStream, item: TokenStream) -> TokenStream {
 				self.start_location = self.grouped_units.townhalls[0].position;
 				self.enemy_start = self.game_info.start_locations[0];
 
+				self.start_resource_center = self
+					.grouped_units
+					.resources
+					.closer_pos(11.0, self.start_location)
+					.center();
+				self.enemy_start_resource_center = self
+					.grouped_units
+					.resources
+					.closer_pos(11.0, self.enemy_start)
+					.center();
+
 				// Calculating expansion locations
 				let geyser_tags = self
 					.grouped_units
@@ -260,32 +278,54 @@ pub fn bot_impl_player(attr: TokenStream, item: TokenStream) -> TokenStream {
 					.iter()
 					.map(|u| u.tag)
 					.collect::<Vec<u64>>();
-				let resource_groups = self
-					.grouped_units
-					.resources
-					.iter()
-					.filter_map(|u| {
-						if u.type_id != UnitTypeId::MineralField450 {
-							Some(vec![u])
-						} else {
-							None
-						}
-					})
-					.combinations(2)
-					.filter_map(|res| {
-						let res1 = &res[0];
-						let res2 = &res[1];
-						if iproduct!(res1, res2)
-							.any(|(r1, r2)| r1.distance_squared(r2) < 121.0)
-						{
-							let mut res = res1.clone();
-							res.extend(res2);
-							Some(res)
-						} else {
-							None
-						}
-					})
-					.collect::<Vec<Vec<&Unit>>>();
+
+				let mut resource_groups: Vec<HashSet<u64>> = Vec::new();
+				self.grouped_units.resources.iter().for_each(|u| {
+					if u.type_id != UnitTypeId::MineralField450
+						&& !resource_groups.iter_mut().any(|res| {
+							if res.iter().any(|r| {
+								self.grouped_units
+									.resources
+									.find_tag(*r)
+									.unwrap()
+									.distance_squared(u) < 72.25
+							}) {
+								res.insert(u.tag);
+								true
+							} else {
+								false
+							}
+						}) {
+						let mut set = HashSet::new();
+						set.insert(u.tag);
+						resource_groups.push(set);
+					}
+				});
+				loop {
+					let mut unioned = resource_groups
+						.clone()
+						.iter()
+						.enumerate()
+						.combinations(2)
+						.filter_map(|res| {
+							let res1 = &res[0];
+							let res2 = &res[1];
+							let r1 = res1.1;
+							let r2 = res2.1;
+							if !r1.is_disjoint(&r2) {
+								resource_groups.remove(res1.0);
+								resource_groups.remove(res2.0);
+								Some(r1.union(&r2).copied().collect())
+							} else {
+								None
+							}
+						})
+						.collect::<Vec<HashSet<u64>>>();
+					if unioned.is_empty() {
+						break;
+					}
+					resource_groups.append(&mut unioned);
+				}
 
 				let offsets = iproduct!(-7..=7, -7..=7)
 					.filter(|(x, y)| x * x + y * y <= 64)
@@ -294,7 +334,7 @@ pub fn bot_impl_player(attr: TokenStream, item: TokenStream) -> TokenStream {
 				self.expansions = resource_groups
 					.iter()
 					.map(|res| {
-						let res = res.iter().cloned().cloned().collect::<Units>();
+						let res = self.grouped_units.resources.find_tags(res.iter().copied());
 						let center = res.center() + 0.5;
 						let f = |pos: Point2| res.iter().map(|r| r.distance_pos_squared(pos)).sum::<f32>();
 						(
@@ -370,7 +410,7 @@ pub fn bot_impl_player(attr: TokenStream, item: TokenStream) -> TokenStream {
 				let mut watchtowers = Units::new();
 				let mut inhibitor_zones = Units::new();
 				let mut gas_buildings = Units::new();
-				let mut larva = Units::new();
+				let mut larvas = Units::new();
 				let mut techlab_tags = Vec::new();
 				let mut reactor_tags = Vec::new();
 
@@ -459,7 +499,7 @@ pub fn bot_impl_player(attr: TokenStream, item: TokenStream) -> TokenStream {
 										workers.push(u);
 									}
 									UnitTypeId::Larva => {
-										larva.push(u);
+										larvas.push(u);
 									}
 									_ => {}
 								}
@@ -513,7 +553,7 @@ pub fn bot_impl_player(attr: TokenStream, item: TokenStream) -> TokenStream {
 					watchtowers,
 					inhibitor_zones,
 					gas_buildings,
-					larva,
+					larvas,
 				};
 				self.techlab_tags = Rc::new(techlab_tags);
 				self.reactor_tags = Rc::new(reactor_tags);
@@ -697,6 +737,66 @@ pub fn bot_impl_player(attr: TokenStream, item: TokenStream) -> TokenStream {
 				} else {
 					Some(valid_geysers[0].clone())
 				}
+			}
+			fn get_expansion(&self, ws: &mut WS) -> Option<(Point2, Point2)> {
+				let expansions = self
+					.expansions
+					.iter()
+					.filter(|(loc, _)| {
+						self.grouped_units
+							.townhalls
+							.iter()
+							.all(|t| t.distance_pos_squared(*loc) > 225.0)
+					})
+					.copied()
+					.collect::<Vec<(Point2, Point2)>>();
+				let paths = self
+					.query
+					.pathing(
+						ws,
+						expansions
+							.iter()
+							.map(|(loc, _)| (Target::Pos(self.start_location), *loc))
+							.collect(),
+					)
+					.unwrap();
+
+				expansions
+					.iter()
+					.zip(paths.iter())
+					.filter_map(|(loc, path)| path.map(|path| (loc, path)))
+					.min_by(|(_, path1), (_, path2)| path1.partial_cmp(&path2).unwrap())
+					.map(|(loc, _path)| *loc)
+			}
+			fn get_enemy_expansion(&self, ws: &mut WS) -> Option<(Point2, Point2)> {
+				let expansions = self
+					.expansions
+					.iter()
+					.filter(|(loc, _)| {
+						self.grouped_units
+							.enemy_townhalls
+							.iter()
+							.all(|t| t.distance_pos_squared(*loc) > 225.0)
+					})
+					.copied()
+					.collect::<Vec<(Point2, Point2)>>();
+				let paths = self
+					.query
+					.pathing(
+						ws,
+						expansions
+							.iter()
+							.map(|(loc, _)| (Target::Pos(self.enemy_start), *loc))
+							.collect(),
+					)
+					.unwrap();
+
+				expansions
+					.iter()
+					.zip(paths.iter())
+					.filter_map(|(loc, path)| path.map(|path| (loc, path)))
+					.min_by(|(_, path1), (_, path2)| path1.partial_cmp(&path2).unwrap())
+					.map(|(loc, _path)| *loc)
 			}
 		}
 	})

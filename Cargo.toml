@@ -27,3 +27,6 @@ name = "worker-rush"
 
 [[example]]
 name = "reaper-rush"
+
+[[example]]
+name = "zerg-rush"

@@ -159,6 +159,12 @@ pub trait Player: PlayerClone {
 	fn find_gas_placement(&self, _ws: &mut WS, _base: Point2) -> Option<Unit> {
 		unimplemented!()
 	}
+	fn get_expansion(&self, _ws: &mut WS) -> Option<(Point2, Point2)> {
+		unimplemented!()
+	}
+	fn get_enemy_expansion(&self, _ws: &mut WS) -> Option<(Point2, Point2)> {
+		unimplemented!()
+	}
 }
 
 trait FromProto<T>

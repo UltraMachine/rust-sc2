@@ -28,7 +28,7 @@ pub struct GroupedUnits {
 	pub watchtowers: Units,
 	pub inhibitor_zones: Units,
 	pub gas_buildings: Units,
-	pub larva: Units,
+	pub larvas: Units,
 }
 
 #[derive(Default, Clone)]
@@ -47,6 +47,15 @@ impl Units {
 	#[inline]
 	pub fn push(&mut self, u: Unit) -> Option<Unit> {
 		self.units.insert(u.tag, u)
+	}
+
+	#[inline]
+	pub fn pop(&mut self) -> Option<Unit> {
+		self.units
+			.keys()
+			.next()
+			.copied()
+			.and_then(|u| self.units.remove(&u))
 	}
 
 	#[inline]
