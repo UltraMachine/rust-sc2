@@ -222,6 +222,9 @@ pub fn bot_impl_player(attr: TokenStream, item: TokenStream) -> TokenStream {
 				self.minerals = self.minerals.saturating_sub(cost.minerals);
 				self.vespene = self.vespene.saturating_sub(cost.vespene);
 			}
+			fn has_upgrade(&self, upgrade: UpgradeId) -> bool {
+				self.state.observation.raw.upgrades.contains(&upgrade)
+			}
 			fn command(&mut self, cmd: Option<Command>) {
 				if let Some((tag, order)) = cmd {
 					self.commands.entry(order).or_default().push(tag);

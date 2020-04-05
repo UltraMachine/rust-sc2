@@ -140,6 +140,9 @@ pub trait Player: PlayerClone {
 		unimplemented!()
 	}
 	*/
+	fn has_upgrade(&self, _upgrade: UpgradeId) -> bool {
+		unimplemented!()
+	}
 	#[allow(clippy::too_many_arguments)]
 	fn find_placement(
 		&self,
