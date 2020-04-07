@@ -58,6 +58,15 @@ impl Point2 {
 			y: self.y + y,
 		}
 	}
+	pub fn round(self) -> Self {
+		Self {
+			x: (self.x + 0.5) as u32 as f32,
+			y: (self.y + 0.5) as u32 as f32,
+		}
+	}
+	pub fn as_tuple(self) -> (f32, f32) {
+		(self.x, self.y)
+	}
 	pub fn to3(self, z: f32) -> Point3 {
 		Point3 {
 			x: self.x,
@@ -205,6 +214,16 @@ impl Point3 {
 			y: self.y + y,
 			z: self.z + z,
 		}
+	}
+	pub fn round(self) -> Self {
+		Self {
+			x: (self.x + 0.5) as u32 as f32,
+			y: (self.y + 0.5) as u32 as f32,
+			z: (self.z + 0.5) as u32 as f32,
+		}
+	}
+	pub fn as_tuple(self) -> (f32, f32, f32) {
+		(self.x, self.y, self.z)
 	}
 	pub fn to2(self) -> Point2 {
 		Point2 { x: self.x, y: self.y }

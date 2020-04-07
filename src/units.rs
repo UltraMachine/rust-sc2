@@ -45,6 +45,11 @@ impl Units {
 	}
 
 	#[inline]
+	pub fn get(&self, tag: u64) -> Unit {
+		self.units[&tag].clone()
+	}
+
+	#[inline]
 	pub fn push(&mut self, u: Unit) -> Option<Unit> {
 		self.units.insert(u.tag, u)
 	}

@@ -16,32 +16,49 @@ use std::cmp::Ordering;
 #[bot]
 struct ReaperRushAI {
 	reapers_retreat: HashSet<u64>,
+	last_loop_distributed: u32,
 }
 
 impl ReaperRushAI {
+	const DISTRIBUTION_DELAY: u32 = 16;
+
 	#[bot_new]
 	fn new(game_step: u32) -> Self {
 		Self {
 			game_step,
 			reapers_retreat: HashSet::new(),
+			last_loop_distributed: 0,
 		}
 	}
 	fn distribute_workers(&mut self) {
-		let mineral_fields = &self.grouped_units.mineral_fields;
-		if mineral_fields.is_empty() {
-			return;
-		}
 		let workers = &self.grouped_units.workers;
 		if workers.is_empty() {
+			return;
+		}
+		let mut idle_workers = workers.idle();
+
+		// Check distribution delay if there aren't any idle workers
+		let game_loop = self.state.observation.game_loop;
+		let last_loop = &mut self.last_loop_distributed;
+		if idle_workers.is_empty() && *last_loop + Self::DISTRIBUTION_DELAY > game_loop {
+			return;
+		}
+		*last_loop = game_loop;
+
+		// Distribute
+		let mineral_fields = &self.grouped_units.mineral_fields;
+		if mineral_fields.is_empty() {
 			return;
 		}
 		let bases = self.grouped_units.townhalls.ready();
 		if bases.is_empty() {
 			return;
 		}
-		let gas_buildings = self.grouped_units.gas_buildings.ready();
+		let gas_buildings = self
+			.grouped_units
+			.gas_buildings
+			.filter(|g| g.is_ready() && g.vespene_contents.map_or(false, |vespene| vespene > 0));
 
-		let mut idle_workers = workers.idle();
 		let mut deficit_minings = Units::new();
 		let mut deficit_geysers = Units::new();
 

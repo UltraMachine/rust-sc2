@@ -114,7 +114,7 @@ pub trait Player: PlayerClone {
 		Vec::new()
 	}
 	fn clear_debug_commands(&mut self) {}
-	fn prepare_start(&mut self) {}
+	fn prepare_start(&mut self, _ws: &mut WS) {}
 	fn prepare_step(&mut self) {}
 	fn on_start(&mut self, _ws: &mut WS) {}
 	fn on_step(&mut self, _ws: &mut WS, _iteration: usize) {}
@@ -123,6 +123,9 @@ pub trait Player: PlayerClone {
 	fn group_units(&mut self) {}
 	fn substract_resources(&mut self, _unit: UnitTypeId) {}
 	fn substract_upgrade_cost(&mut self, _upgrade: UpgradeId) {}
+	fn get_unit_api_cost(&self, _unit: UnitTypeId) -> Cost {
+		unimplemented!()
+	}
 	fn get_unit_cost(&self, _unit: UnitTypeId) -> Cost {
 		unimplemented!()
 	}

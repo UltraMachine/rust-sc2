@@ -301,7 +301,7 @@ fn play_first_step(ws: &mut WS, player: &mut PlayerBox, realtime: bool, human: b
 
 		player.init_data_for_unit();
 		player.set_state(GameState::from_proto_player(Rc::new(player.clone()), res.get_observation()));
-		player.prepare_start();
+		player.prepare_start(ws);
 
 		player.on_start(ws);
 

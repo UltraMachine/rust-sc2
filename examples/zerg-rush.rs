@@ -15,20 +15,38 @@ use rust_sc2::{
 use std::cmp::{min, Ordering};
 
 #[bot]
-struct ZergRushAI;
+struct ZergRushAI {
+	last_loop_distributed: u32,
+}
 
 impl ZergRushAI {
+	const DISTRIBUTION_DELAY: u32 = 16;
+
 	#[bot_new]
 	fn new(game_step: u32) -> Self {
-		Self { game_step }
+		Self {
+			game_step,
+			last_loop_distributed: 0,
+		}
 	}
 	fn distribute_workers(&mut self) {
-		let mineral_fields = &self.grouped_units.mineral_fields;
-		if mineral_fields.is_empty() {
-			return;
-		}
 		let workers = &self.grouped_units.workers;
 		if workers.is_empty() {
+			return;
+		}
+		let mut idle_workers = workers.idle();
+
+		// Check distribution delay if there aren't any idle workers
+		let game_loop = self.state.observation.game_loop;
+		let last_loop = &mut self.last_loop_distributed;
+		if idle_workers.is_empty() && *last_loop + Self::DISTRIBUTION_DELAY > game_loop {
+			return;
+		}
+		*last_loop = game_loop;
+
+		// Distribute
+		let mineral_fields = &self.grouped_units.mineral_fields;
+		if mineral_fields.is_empty() {
 			return;
 		}
 		let bases = self.grouped_units.townhalls.ready();
@@ -37,7 +55,6 @@ impl ZergRushAI {
 		}
 		let gas_buildings = self.grouped_units.gas_buildings.ready();
 
-		let mut idle_workers = workers.idle();
 		let mut deficit_minings = Units::new();
 		let mut deficit_geysers = Units::new();
 
@@ -208,7 +225,7 @@ impl ZergRushAI {
 				.get(&self.game_data.units[&drone].ability.unwrap())
 				.unwrap_or(&0)
 			< min(
-				128,
+				96,
 				self.current_units
 					.get(&UnitTypeId::Hatchery)
 					.map_or(0, |n| n * 16),
@@ -308,14 +325,10 @@ impl ZergRushAI {
 
 		let hatchery = UnitTypeId::Hatchery;
 		if self.can_afford(hatchery, false) {
-			if let Some((location, _)) = self.get_expansion(ws) {
+			if let Some((location, _resource_center)) = self.get_expansion(ws) {
 				if let Some(builder) = self.get_builder(location, &mineral_tags) {
-					if let Some(corrected_location) =
-						self.find_placement(ws, hatchery, location, 4, 1, false, false)
-					{
-						self.command(builder.build(hatchery, corrected_location, false));
-						self.substract_resources(hatchery);
-					}
+					self.command(builder.build(hatchery, location, false));
+					self.substract_resources(hatchery);
 				}
 			}
 		}
@@ -338,7 +351,6 @@ impl ZergRushAI {
 		}
 	}
 
-	#[allow(clippy::block_in_if_condition_stmt)]
 	fn execute_micro(&mut self) {
 		// Injecting Larva
 		let hatcheries = self.grouped_units.townhalls.clone();

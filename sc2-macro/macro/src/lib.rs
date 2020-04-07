@@ -248,7 +248,7 @@ pub fn bot_impl_player(attr: TokenStream, item: TokenStream) -> TokenStream {
 					race_values: Rc::clone(&self.race_values),
 				});
 			}
-			fn prepare_start(&mut self) {
+			fn prepare_start(&mut self, ws: &mut WS) {
 				self.race = self.game_info.players[&self.player_id].race_actual.unwrap();
 				if self.game_info.players.len() == 2 {
 					self.enemy_race = self.game_info.players[&(3 - self.player_id)].race_requested;
@@ -272,50 +272,51 @@ pub fn bot_impl_player(attr: TokenStream, item: TokenStream) -> TokenStream {
 					.center();
 
 				// Calculating expansion locations
-				let geyser_tags = self
+				let all_resources = self
 					.grouped_units
-					.vespene_geysers
-					.iter()
-					.map(|u| u.tag)
-					.collect::<Vec<u64>>();
+					.resources
+					.filter(|r| r.type_id != UnitTypeId::MineralField450);
 
 				let mut resource_groups: Vec<HashSet<u64>> = Vec::new();
-				self.grouped_units.resources.iter().for_each(|u| {
-					if u.type_id != UnitTypeId::MineralField450
-						&& !resource_groups.iter_mut().any(|res| {
-							if res.iter().any(|r| {
-								self.grouped_units
-									.resources
-									.find_tag(*r)
-									.unwrap()
-									.distance_squared(u) < 72.25
-							}) {
-								res.insert(u.tag);
-								true
-							} else {
-								false
-							}
+				all_resources.iter().for_each(|r| {
+					if !resource_groups.iter_mut().any(|res| {
+						if res.iter().any(|other_r| {
+							all_resources
+								.find_tag(*other_r)
+								.unwrap()
+								.distance_squared(r) < 72.25
 						}) {
+							res.insert(r.tag);
+							true
+						} else {
+							false
+						}
+					}) {
 						let mut set = HashSet::new();
-						set.insert(u.tag);
+						set.insert(r.tag);
 						resource_groups.push(set);
 					}
 				});
+
 				loop {
 					let mut unioned = resource_groups
 						.clone()
 						.iter()
-						.enumerate()
 						.combinations(2)
 						.filter_map(|res| {
-							let res1 = &res[0];
-							let res2 = &res[1];
-							let r1 = res1.1;
-							let r2 = res2.1;
-							if !r1.is_disjoint(&r2) {
-								resource_groups.remove(res1.0);
-								resource_groups.remove(res2.0);
-								Some(r1.union(&r2).copied().collect())
+							let res1 = res[0].clone();
+							let res2 = res[1].clone();
+							if !res1.is_disjoint(&res2)
+								|| iproduct!(res1.iter(), res2.iter()).any(|(r1, r2)| {
+									all_resources.get(*r1).distance_squared(&all_resources.get(*r2)) < 72.25
+								}) {
+								if let Some(i) = resource_groups.iter().position(|r| *r == res1) {
+									resource_groups.remove(i);
+								}
+								if let Some(i) = resource_groups.iter().position(|r| *r == res2) {
+									resource_groups.remove(i);
+								}
+								Some(res1.union(&res2).copied().collect())
 							} else {
 								None
 							}
@@ -327,37 +328,26 @@ pub fn bot_impl_player(attr: TokenStream, item: TokenStream) -> TokenStream {
 					resource_groups.append(&mut unioned);
 				}
 
-				let offsets = iproduct!(-7..=7, -7..=7)
-					.filter(|(x, y)| x * x + y * y <= 64)
-					.collect::<Vec<(isize, isize)>>();
-
 				self.expansions = resource_groups
 					.iter()
-					.map(|res| {
-						let res = self.grouped_units.resources.find_tags(res.iter().copied());
-						let center = res.center() + 0.5;
-						let f = |pos: Point2| res.iter().map(|r| r.distance_pos_squared(pos)).sum::<f32>();
-						(
-							offsets
-								.iter()
-								.map(|(x, y)| Point2::new(center.x + (*x as f32), center.y + (*y as f32)))
-								.filter(|pos| {
-									res.iter().all(|r| {
-										r.distance_pos_squared(*pos) > {
-											if geyser_tags.contains(&r.tag) {
-												49.0
-											} else {
-												36.0
-											}
-										}
-									})
-								})
-								.min_by(|pos1, pos2| f(*pos1).partial_cmp(&f(*pos2)).unwrap())
-								.unwrap(),
-							center,
-						)
+					.filter_map(|res| {
+						let center = all_resources.find_tags(res.iter().copied()).center();
+						if center.distance_squared(self.start_location) < 72.25 {
+							Some((self.start_location, center))
+						} else {
+							self.find_placement(
+								ws,
+								self.race_values.start_townhall,
+								center,
+								8,
+								1,
+								false,
+								false,
+							)
+							.map(|place| (place, center))
+						}
 					})
-					.collect::<Vec<(Point2, Point2)>>();
+					.collect();
 			}
 			fn prepare_step(&mut self) {
 				self.group_units();
@@ -565,9 +555,32 @@ pub fn bot_impl_player(attr: TokenStream, item: TokenStream) -> TokenStream {
 					race_values: Rc::clone(&self.race_values),
 				});
 			}
-			fn get_unit_cost(&self, unit: UnitTypeId) -> Cost {
+			fn get_unit_api_cost(&self, unit: UnitTypeId) -> Cost {
 				match self.game_data.units.get(&unit) {
 					Some(data) => data.cost(),
+					None => Default::default(),
+				}
+			}
+			fn get_unit_cost(&self, unit: UnitTypeId) -> Cost {
+				match self.game_data.units.get(&unit) {
+					Some(data) => {
+						let mut cost = data.cost();
+						match unit {
+							UnitTypeId::Reactor => {
+								cost.minerals = 50;
+								cost.vespene = 50;
+							}
+							UnitTypeId::TechLab => {
+								cost.minerals = 50;
+								cost.vespene = 25;
+							}
+							UnitTypeId::Zergling => {
+								cost.minerals *= 2;
+							}
+							_ => {}
+						}
+						cost
+					}
 					None => Default::default(),
 				}
 			}
