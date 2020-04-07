@@ -304,16 +304,16 @@ pub fn bot_impl_player(attr: TokenStream, item: TokenStream) -> TokenStream {
 						.iter()
 						.combinations(2)
 						.filter_map(|res| {
-							let res1 = res[0].clone();
-							let res2 = res[1].clone();
+							let res1 = res[0];
+							let res2 = res[1];
 							if !res1.is_disjoint(&res2)
-								|| iproduct!(res1.iter(), res2.iter()).any(|(r1, r2)| {
+								|| iproduct!(res1, res2).any(|(r1, r2)| {
 									all_resources.get(*r1).distance_squared(&all_resources.get(*r2)) < 72.25
 								}) {
-								if let Some(i) = resource_groups.iter().position(|r| *r == res1) {
+								if let Some(i) = resource_groups.iter().position(|r| r == res1) {
 									resource_groups.remove(i);
 								}
-								if let Some(i) = resource_groups.iter().position(|r| *r == res2) {
+								if let Some(i) = resource_groups.iter().position(|r| r == res2) {
 									resource_groups.remove(i);
 								}
 								Some(res1.union(&res2).copied().collect())
