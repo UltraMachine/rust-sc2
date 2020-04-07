@@ -5,11 +5,12 @@ use crate::{
 	FromProto,
 };
 use sc2_proto::sc2api::ResponseGameInfo;
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
 
 #[derive(Default, Clone)]
 pub struct GameInfo {
-	pub map_name: String,
+	pub map_name: String,      // Depends on sc2 localization
+	pub map_name_path: String, // Depends on file name
 	pub mod_names: Vec<String>,
 	pub local_map_path: String,
 	pub players: HashMap<u32, PlayerInfo>,
@@ -58,10 +59,17 @@ impl FromProto<ResponseGameInfo> for GameInfo {
 		let area_p0_y = area_p0.get_y();
 		let area_p1_x = area_p1.get_x();
 		let area_p1_y = area_p1.get_y();
+		let local_map_path = game_info.get_local_map_path().to_string();
 		Self {
 			map_name: game_info.get_map_name().to_string(),
 			mod_names: game_info.get_mod_names().to_vec(),
-			local_map_path: game_info.get_local_map_path().to_string(),
+			map_name_path: Path::new(&local_map_path)
+				.file_stem()
+				.unwrap()
+				.to_str()
+				.unwrap()
+				.to_string(),
+			local_map_path,
 			players: game_info
 				.get_player_info()
 				.iter()

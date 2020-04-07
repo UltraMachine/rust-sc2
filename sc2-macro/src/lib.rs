@@ -7,7 +7,7 @@ pub struct ParseEnumError;
 
 impl fmt::Display for ParseEnumError {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "failed to parse enum {}", stringify!(Self))
+		write!(f, "failed to parse enum")
 	}
 }
 
