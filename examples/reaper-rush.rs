@@ -138,7 +138,7 @@ impl ReaperRushAI {
 				deficit_geysers.remove(closest);
 				self.command(u.gather(closest, false));
 			} else if !deficit_minings.is_empty() {
-				let closest = deficit_minings.closest(u);
+				let closest = deficit_minings.closest(u).clone();
 				deficit_minings.remove(closest.tag);
 				self.command(
 					u.gather(
@@ -167,7 +167,7 @@ impl ReaperRushAI {
 		if workers.is_empty() {
 			None
 		} else {
-			Some(workers.closest_pos(pos))
+			Some(workers.closest_pos(pos).clone())
 		}
 	}
 	fn build(&mut self, ws: &mut WS) {
@@ -232,7 +232,7 @@ impl ReaperRushAI {
 			if !townhalls.is_empty() {
 				let ccs = townhalls.filter(|u| u.is_ready() && u.is_almost_idle());
 				if !ccs.is_empty() {
-					self.command(ccs[0].train(UnitTypeId::SCV, false));
+					self.command(ccs.first().train(UnitTypeId::SCV, false));
 					self.substract_resources(UnitTypeId::SCV);
 				}
 			}
@@ -244,7 +244,7 @@ impl ReaperRushAI {
 				let barracks = structures
 					.filter(|u| u.type_id == UnitTypeId::Barracks && u.is_ready() && u.is_almost_idle());
 				if !barracks.is_empty() {
-					self.command(barracks[0].train(UnitTypeId::Reaper, false));
+					self.command(barracks.first().train(UnitTypeId::Reaper, false));
 					self.substract_resources(UnitTypeId::Reaper);
 				}
 			}
@@ -381,7 +381,7 @@ impl ReaperRushAI {
 #[bot_impl_player]
 impl Player for ReaperRushAI {
 	fn on_start(&mut self, _ws: &mut WS) {
-		let townhall = self.grouped_units.townhalls[0].clone();
+		let townhall = self.grouped_units.townhalls.first().clone();
 		self.command(townhall.smart(Target::Pos(self.start_resource_center), false));
 		self.command(townhall.train(UnitTypeId::SCV, false));
 		self.substract_resources(UnitTypeId::SCV);

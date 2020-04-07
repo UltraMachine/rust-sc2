@@ -30,7 +30,7 @@ impl DebugAI {
 #[bot_impl_player]
 impl Player for DebugAI {
 	fn on_start(&mut self, _ws: &mut WS) {
-		self.debug_z = self.grouped_units.townhalls[0].position3d.z;
+		self.debug_z = self.grouped_units.townhalls.first().position3d.z;
 	}
 
 	fn on_step(&mut self, _ws: &mut WS, _iteration: usize) {

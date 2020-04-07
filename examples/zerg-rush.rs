@@ -179,7 +179,7 @@ impl ZergRushAI {
 				deficit_geysers.remove(closest);
 				self.command(u.gather(closest, false));
 			} else if !deficit_minings.is_empty() {
-				let closest = deficit_minings.closest(u);
+				let closest = deficit_minings.closest(u).clone();
 				deficit_minings.remove(closest.tag);
 				self.command(
 					u.gather(
@@ -248,7 +248,7 @@ impl ZergRushAI {
 		{
 			let townhalls = self.grouped_units.townhalls.clone();
 			if !townhalls.is_empty() {
-				self.command(townhalls[0].train(queen, false));
+				self.command(townhalls.first().train(queen, false));
 				self.substract_resources(queen);
 			}
 		}
@@ -272,7 +272,7 @@ impl ZergRushAI {
 		if workers.is_empty() {
 			None
 		} else {
-			Some(workers.closest_pos(pos))
+			Some(workers.closest_pos(pos).clone())
 		}
 	}
 	fn build(&mut self, ws: &mut WS) {
@@ -345,7 +345,7 @@ impl ZergRushAI {
 		{
 			let pool = self.grouped_units.structures.of_type(UnitTypeId::SpawningPool);
 			if !pool.is_empty() {
-				self.command(pool[0].research(speed_upgrade, false));
+				self.command(pool.first().research(speed_upgrade, false));
 				self.substract_upgrade_cost(speed_upgrade);
 			}
 		}
@@ -369,7 +369,7 @@ impl ZergRushAI {
 				});
 				hatcheries.iter().for_each(|h| {
 					if !queens.is_empty() {
-						let queen = queens.closest(h);
+						let queen = queens.closest(h).clone();
 						queens.remove(queen.tag);
 						self.command(queen.command(AbilityId::EffectInjectLarva, Target::Tag(h.tag), false));
 					}
@@ -448,14 +448,14 @@ impl ZergRushAI {
 #[bot_impl_player]
 impl Player for ZergRushAI {
 	fn on_start(&mut self, _ws: &mut WS) {
-		let townhall = self.grouped_units.townhalls[0].clone();
+		let townhall = self.grouped_units.townhalls.first().clone();
 
 		self.command(townhall.command(
 			AbilityId::RallyWorkers,
 			Target::Pos(self.start_resource_center),
 			false,
 		));
-		self.command(self.grouped_units.larvas[0].train(UnitTypeId::Drone, false));
+		self.command(self.grouped_units.larvas.first().train(UnitTypeId::Drone, false));
 		self.substract_resources(UnitTypeId::Drone);
 
 		let minerals_near_base = self.grouped_units.mineral_fields.closer(11.0, &townhall);

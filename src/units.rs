@@ -45,8 +45,13 @@ impl Units {
 	}
 
 	#[inline]
-	pub fn get(&self, tag: u64) -> Unit {
-		self.units[&tag].clone()
+	pub fn first(&self) -> &Unit {
+		self.units.values().next().expect("empty Units")
+	}
+
+	#[inline]
+	pub fn get(&self, tag: u64) -> &Unit {
+		&self.units[&tag]
 	}
 
 	#[inline]
@@ -104,8 +109,8 @@ impl Units {
 	}
 
 	// Units methods
-	pub fn find_tag(&self, tag: u64) -> Option<Unit> {
-		self.units.get(&tag).cloned()
+	pub fn find_tag(&self, tag: u64) -> Option<&Unit> {
+		self.units.get(&tag)
 	}
 	pub fn find_tags<T: Iterator<Item = u64>>(&self, tags: T) -> Self {
 		tags.filter_map(|tag| self.units.get(&tag).cloned()).collect()
@@ -120,16 +125,16 @@ impl Units {
 		self.iter().map(|u| u.position).sum::<Point2>() / (self.len() as f32)
 	}
 	// Get closest | furthest
-	pub fn closest(&self, other: &Unit) -> Unit {
+	pub fn closest(&self, other: &Unit) -> &Unit {
 		self.partial_min(|u| u.distance_squared(other))
 	}
-	pub fn closest_pos(&self, other: Point2) -> Unit {
+	pub fn closest_pos(&self, other: Point2) -> &Unit {
 		self.partial_min(|u| u.distance_pos_squared(other))
 	}
-	pub fn furthest(&self, other: &Unit) -> Unit {
+	pub fn furthest(&self, other: &Unit) -> &Unit {
 		self.partial_max(|u| u.distance_squared(other))
 	}
-	pub fn furthest_pos(&self, other: Point2) -> Unit {
+	pub fn furthest_pos(&self, other: Point2) -> &Unit {
 		self.partial_max(|u| u.distance_pos_squared(other))
 	}
 	// Get closest | furthest distance
@@ -214,14 +219,14 @@ impl Units {
 	{
 		self.iter().map(f).sum::<T>()
 	}
-	pub fn min<T, F>(&self, f: F) -> Unit
+	pub fn min<T, F>(&self, f: F) -> &Unit
 	where
 		T: Ord,
 		F: for<'r> FnMut(&'r &Unit) -> T,
 	{
-		self.iter().min_by_key(f).unwrap().clone()
+		self.iter().min_by_key(f).unwrap()
 	}
-	pub fn partial_min<T, F>(&self, mut f: F) -> Unit
+	pub fn partial_min<T, F>(&self, mut f: F) -> &Unit
 	where
 		T: PartialOrd,
 		F: for<'r> FnMut(&'r &Unit) -> T,
@@ -229,7 +234,6 @@ impl Units {
 		self.iter()
 			.min_by(|u1, u2| f(u1).partial_cmp(&f(u2)).unwrap())
 			.unwrap()
-			.clone()
 	}
 	pub fn min_value<T, F>(&self, f: F) -> T
 	where
@@ -248,14 +252,14 @@ impl Units {
 			.min_by(|a, b| a.partial_cmp(&b).unwrap())
 			.unwrap()
 	}
-	pub fn max<T, F>(&self, f: F) -> Unit
+	pub fn max<T, F>(&self, f: F) -> &Unit
 	where
 		T: Ord,
 		F: for<'r> FnMut(&'r &Unit) -> T,
 	{
-		self.iter().max_by_key(f).unwrap().clone()
+		self.iter().max_by_key(f).unwrap()
 	}
-	pub fn partial_max<T, F>(&self, mut f: F) -> Unit
+	pub fn partial_max<T, F>(&self, mut f: F) -> &Unit
 	where
 		T: PartialOrd,
 		F: for<'r> FnMut(&'r &Unit) -> T,
@@ -263,7 +267,6 @@ impl Units {
 		self.iter()
 			.max_by(|u1, u2| f(u1).partial_cmp(&f(u2)).unwrap())
 			.unwrap()
-			.clone()
 	}
 	pub fn max_value<T, F>(&self, f: F) -> T
 	where
@@ -301,6 +304,7 @@ impl Units {
 	}
 }
 impl FromIterator<Unit> for Units {
+	#[inline]
 	fn from_iter<I: IntoIterator<Item = Unit>>(iter: I) -> Self {
 		Units {
 			units: iter.into_iter().map(|u| (u.tag, u)).collect(),
@@ -311,6 +315,7 @@ impl IntoIterator for Units {
 	type Item = (u64, Unit);
 	type IntoIter = IntoIter<u64, Unit>;
 
+	#[inline]
 	fn into_iter(self) -> Self::IntoIter {
 		self.units.into_iter()
 	}
@@ -318,11 +323,13 @@ impl IntoIterator for Units {
 impl Index<usize> for Units {
 	type Output = Unit;
 
+	#[inline]
 	fn index(&self, i: usize) -> &Self::Output {
 		&self.units.values().nth(i).expect("Units index out of bounds")
 	}
 }
 impl Extend<Unit> for Units {
+	#[inline]
 	fn extend<T: IntoIterator<Item = Unit>>(&mut self, iter: T) {
 		iter.into_iter().for_each(|u| {
 			self.push(u);

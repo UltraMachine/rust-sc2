@@ -32,7 +32,7 @@ impl WorkerRushAI {
 #[bot_impl_player]
 impl Player for WorkerRushAI {
 	fn on_start(&mut self, _ws: &mut WS) {
-		self.command(self.grouped_units.townhalls[0].train(UnitTypeId::Probe, false));
+		self.command(self.grouped_units.townhalls.first().train(UnitTypeId::Probe, false));
 
 		self.mineral_forward = self
 			.grouped_units
