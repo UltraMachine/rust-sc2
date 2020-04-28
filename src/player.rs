@@ -1,4 +1,4 @@
-use crate::{FromProto, IntoProto, Player, PlayerSettings};
+use crate::{FromProto, IntoProto};
 use num_traits::FromPrimitive;
 use sc2_proto::{
 	common::Race as ProtoRace,
@@ -31,6 +31,11 @@ impl IntoProto<ProtoRace> for Race {
 			Race::Protoss => ProtoRace::Protoss,
 			Race::Random => ProtoRace::Random,
 		}
+	}
+}
+impl Default for Race {
+	fn default() -> Self {
+		Race::Random
 	}
 }
 
@@ -114,13 +119,17 @@ impl IntoProto<ProtoAIBuild> for AIBuild {
 		}
 	}
 }
+impl Default for AIBuild {
+	fn default() -> Self {
+		AIBuild::RandomBuild
+	}
+}
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum PlayerType {
 	Participant,
 	Computer,
 	Observer,
-	Human,
 }
 impl FromProto<ProtoPlayerType> for PlayerType {
 	fn from_proto(player_type: ProtoPlayerType) -> Self {
@@ -137,23 +146,21 @@ impl IntoProto<ProtoPlayerType> for PlayerType {
 			PlayerType::Participant => ProtoPlayerType::Participant,
 			PlayerType::Computer => ProtoPlayerType::Computer,
 			PlayerType::Observer => ProtoPlayerType::Observer,
-			PlayerType::Human => ProtoPlayerType::Participant,
 		}
 	}
 }
 
-#[derive(Clone)]
-pub enum Players {
-	Computer(Race, Difficulty, Option<AIBuild>),
-	Human(Race, Option<String>),
+pub struct Computer {
+	pub race: Race,
+	pub difficulty: Difficulty,
+	pub ai_build: Option<AIBuild>,
 }
-impl Player for Players {
-	fn get_player_settings(&self) -> PlayerSettings {
-		match self {
-			Players::Computer(race, difficulty, ai_build) => {
-				PlayerSettings::new_computer(*race, *difficulty, *ai_build)
-			}
-			Players::Human(race, name) => PlayerSettings::new_human(*race, name.clone()),
+impl Computer {
+	pub fn new(race: Race, difficulty: Difficulty, ai_build: Option<AIBuild>) -> Self {
+		Self {
+			race,
+			difficulty,
+			ai_build,
 		}
 	}
 }

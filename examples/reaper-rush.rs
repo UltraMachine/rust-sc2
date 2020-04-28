@@ -3,15 +3,17 @@ extern crate clap;
 
 use rand::prelude::{thread_rng, SliceRandom};
 use rust_sc2::{
-	bot, bot_impl_player, bot_new,
+	action::Target,
+	bot, bot_new,
 	geometry::Point2,
-	player::{
-		Difficulty,
-		Players::{Computer, Human},
-	},
-	run_game, run_ladder_game, Player, PlayerSettings,
+	ids::{AbilityId, UnitTypeId},
+	player::{Computer, Difficulty, Race},
+	run_ladder_game, run_vs_computer, run_vs_human,
+	unit::Unit,
+	units::Units,
+	Player, PlayerSettings, SC2Result, WS,
 };
-use std::cmp::Ordering;
+use std::{cmp::Ordering, collections::HashSet};
 
 #[bot]
 struct ReaperRushAI {
@@ -23,19 +25,17 @@ impl ReaperRushAI {
 	const DISTRIBUTION_DELAY: u32 = 16;
 
 	#[bot_new]
-	fn new(game_step: u32) -> Self {
+	fn new() -> Self {
 		Self {
-			game_step,
 			reapers_retreat: HashSet::new(),
 			last_loop_distributed: 0,
 		}
 	}
 	fn distribute_workers(&mut self) {
-		let workers = &self.grouped_units.workers;
-		if workers.is_empty() {
+		if self.grouped_units.workers.is_empty() {
 			return;
 		}
-		let mut idle_workers = workers.idle();
+		let mut idle_workers = self.grouped_units.workers.idle();
 
 		// Check distribution delay if there aren't any idle workers
 		let game_loop = self.state.observation.game_loop;
@@ -75,7 +75,8 @@ impl ReaperRushAI {
 						.collect::<Vec<u64>>();
 
 					idle_workers.extend(
-						workers
+						self.grouped_units
+							.workers
 							.filter(|u| {
 								u.target_tag().map_or(false, |target_tag| {
 									local_minerals.contains(&target_tag)
@@ -101,7 +102,8 @@ impl ReaperRushAI {
 				Ordering::Equal => {}
 				Ordering::Greater => {
 					idle_workers.extend(
-						workers
+						self.grouped_units
+							.workers
 							.filter(|u| {
 								u.target_tag().map_or(false, |target_tag| {
 									target_tag == gas.tag
@@ -136,22 +138,20 @@ impl ReaperRushAI {
 			if !deficit_geysers.is_empty() {
 				let closest = deficit_geysers.closest(u).tag;
 				deficit_geysers.remove(closest);
-				self.command(u.gather(closest, false));
+				u.gather(closest, false);
 			} else if !deficit_minings.is_empty() {
 				let closest = deficit_minings.closest(u).clone();
 				deficit_minings.remove(closest.tag);
-				self.command(
-					u.gather(
-						mineral_fields
-							.closer(11.0, &closest)
-							.max(|m| m.mineral_contents.unwrap_or(0))
-							.tag,
-						false,
-					),
+				u.gather(
+					mineral_fields
+						.closer(11.0, &closest)
+						.max(|m| m.mineral_contents.unwrap_or(0))
+						.tag,
+					false,
 				);
 			} else if u.is_idle() {
 				if let Some(minerals) = &minerals_near_base {
-					self.command(u.gather(minerals.closest(u).tag, false));
+					u.gather(minerals.closest(u).tag, false);
 				}
 			}
 		});
@@ -185,7 +185,7 @@ impl ReaperRushAI {
 		{
 			if let Some(geyser) = self.find_gas_placement(ws, self.start_location) {
 				if let Some(builder) = self.get_builder(geyser.position, &mineral_tags) {
-					self.command(builder.build_gas(geyser.tag, false));
+					builder.build_gas(geyser.tag, false);
 					self.substract_resources(UnitTypeId::Refinery);
 				}
 			}
@@ -200,7 +200,7 @@ impl ReaperRushAI {
 				self.find_placement(ws, UnitTypeId::SupplyDepot, main_base, 15, 2, false, false)
 			{
 				if let Some(builder) = self.get_builder(location, &mineral_tags) {
-					self.command(builder.build(UnitTypeId::SupplyDepot, location, false));
+					builder.build(UnitTypeId::SupplyDepot, location, false);
 					self.substract_resources(UnitTypeId::SupplyDepot);
 					return;
 				}
@@ -215,7 +215,7 @@ impl ReaperRushAI {
 				self.find_placement(ws, UnitTypeId::Barracks, main_base, 15, 4, false, false)
 			{
 				if let Some(builder) = self.get_builder(location, &mineral_tags) {
-					self.command(builder.build(UnitTypeId::Barracks, location, false));
+					builder.build(UnitTypeId::Barracks, location, false);
 					self.substract_resources(UnitTypeId::Barracks);
 				}
 			}
@@ -223,16 +223,12 @@ impl ReaperRushAI {
 	}
 
 	fn train(&mut self) {
-		// Maximum 20 workers instead of 22 beacause API can't see 2 workers inside refineries, so bot trains 2 extra workers.
-		if self.current_units.get(&UnitTypeId::SCV).unwrap_or(&0)
-			+ self.orders.get(&AbilityId::CommandCenterTrainSCV).unwrap_or(&0)
-			< 20 && self.can_afford(UnitTypeId::SCV, true)
-		{
+		if self.supply_workers < 20 && self.can_afford(UnitTypeId::SCV, true) {
 			let townhalls = &self.grouped_units.townhalls;
 			if !townhalls.is_empty() {
 				let ccs = townhalls.filter(|u| u.is_ready() && u.is_almost_idle());
 				if !ccs.is_empty() {
-					self.command(ccs.first().train(UnitTypeId::SCV, false));
+					ccs.first().train(UnitTypeId::SCV, false);
 					self.substract_resources(UnitTypeId::SCV);
 				}
 			}
@@ -244,7 +240,7 @@ impl ReaperRushAI {
 				let barracks = structures
 					.filter(|u| u.type_id == UnitTypeId::Barracks && u.is_ready() && u.is_almost_idle());
 				if !barracks.is_empty() {
-					self.command(barracks.first().train(UnitTypeId::Reaper, false));
+					barracks.first().train(UnitTypeId::Reaper, false);
 					self.substract_resources(UnitTypeId::Reaper);
 				}
 			}
@@ -264,11 +260,7 @@ impl ReaperRushAI {
 						.unwrap())
 					.powi(2)
 			{
-				self.command(reaper.command(
-					AbilityId::KD8ChargeKD8Charge,
-					Target::Pos(target.position),
-					false,
-				));
+				reaper.command(AbilityId::KD8ChargeKD8Charge, Target::Pos(target.position), false);
 				return true;
 			}
 		}
@@ -280,7 +272,7 @@ impl ReaperRushAI {
 			.structures
 			.filter(|s| s.type_id == UnitTypeId::SupplyDepot && s.is_ready())
 			.iter()
-			.for_each(|s| self.command(s.use_ability(AbilityId::MorphSupplyDepotLower, false)));
+			.for_each(|s| (s.use_ability(AbilityId::MorphSupplyDepotLower, false)));
 
 		// Reapers micro
 		let reapers = self.grouped_units.units.of_type(UnitTypeId::Reaper);
@@ -329,19 +321,28 @@ impl ReaperRushAI {
 							});
 							if !close_enemies.is_empty() {
 								let retreat_position = {
-									let pos =
-										u.position.towards(close_enemies.closest(u).position, -u.speed());
+									let closest = close_enemies.closest(u).position;
+									let pos = u.position.towards(closest, -u.speed());
 									if self.is_pathable(pos) {
 										pos
 									} else {
-										self.start_location
+										*u.position
+											.neighbors8()
+											.iter()
+											.filter(|p| self.is_pathable(**p))
+											.max_by(|p1, p2| {
+												p1.distance_squared(closest)
+													.partial_cmp(&p2.distance_squared(closest))
+													.unwrap()
+											})
+											.unwrap_or(&self.start_location)
 									}
 								};
-								self.command(u.move_to(Target::Pos(retreat_position), false));
+								u.move_to(Target::Pos(retreat_position), false);
 							} else {
 								let closest = targets.closest(u);
 								if !u.in_range(&closest, 0.0) {
-									self.command(u.move_to(
+									(u.move_to(
 										Target::Pos(if is_retreating {
 											u.position
 										} else {
@@ -354,17 +355,15 @@ impl ReaperRushAI {
 						} else {
 							let close_targets = targets.in_range_of(u, 0.0);
 							if !close_targets.is_empty() {
-								self.command(
-									u.attack(Target::Tag(close_targets.partial_min(|t| t.hits()).tag), false),
-								);
+								u.attack(Target::Tag(close_targets.partial_min(|t| t.hits()).tag), false);
 							} else {
-								self.command(u.move_to(Target::Pos(targets.closest(u).position), false));
+								u.move_to(Target::Pos(targets.closest(u).position), false);
 							}
 						}
 					}
 				}
 				None => {
-					self.command(u.move_to(
+					(u.move_to(
 						Target::Pos(if is_retreating {
 							u.position
 						} else {
@@ -378,25 +377,26 @@ impl ReaperRushAI {
 	}
 }
 
-#[bot_impl_player]
 impl Player for ReaperRushAI {
-	fn on_start(&mut self, _ws: &mut WS) {
+	fn on_start(&mut self, _ws: &mut WS) -> SC2Result<()> {
 		let townhall = self.grouped_units.townhalls.first().clone();
-		self.command(townhall.smart(Target::Pos(self.start_resource_center), false));
-		self.command(townhall.train(UnitTypeId::SCV, false));
+		townhall.smart(Target::Pos(self.start_resource_center), false);
+		townhall.train(UnitTypeId::SCV, false);
 		self.substract_resources(UnitTypeId::SCV);
 
 		let minerals_near_base = self.grouped_units.mineral_fields.closer(11.0, &townhall);
 		self.grouped_units.workers.clone().iter().for_each(|u| {
-			self.command(u.gather(minerals_near_base.closest(&u).tag, false));
+			u.gather(minerals_near_base.closest(&u).tag, false);
 		});
+		Ok(())
 	}
 
-	fn on_step(&mut self, ws: &mut WS, _iteration: usize) {
+	fn on_step(&mut self, ws: &mut WS, _iteration: usize) -> SC2Result<()> {
 		self.distribute_workers();
 		self.build(ws);
 		self.train();
 		self.execute_micro();
+		Ok(())
 	}
 
 	fn get_player_settings(&self) -> PlayerSettings {
@@ -404,7 +404,7 @@ impl Player for ReaperRushAI {
 	}
 }
 
-fn main() {
+fn main() -> SC2Result<()> {
 	let app = clap_app!(RustyReapers =>
 		(version: crate_version!())
 		(author: crate_authors!())
@@ -449,7 +449,6 @@ fn main() {
 				+takes_value
 				"Sets human name"
 			)
-			(@arg realtime: --realtime "Enables realtime mode")
 		)
 	)
 	.get_matches();
@@ -460,104 +459,81 @@ fn main() {
 		None => unreachable!(),
 	};
 
-	let bot = Box::new(ReaperRushAI::new(game_step));
+	let mut bot = ReaperRushAI::new();
+	bot.game_step = game_step;
 
 	if app.is_present("ladder_server") {
 		run_ladder_game(
-			bot,
-			app.value_of("ladder_server").unwrap_or("127.0.0.1").to_string(),
-			app.value_of("host_port")
-				.expect("GamePort must be specified")
-				.to_string(),
+			&mut bot,
+			app.value_of("ladder_server").unwrap_or("127.0.0.1"),
+			app.value_of("host_port").expect("GamePort must be specified"),
 			app.value_of("player_port")
 				.expect("StartPort must be specified")
 				.parse()
 				.expect("Can't parse StartPort"),
 			app.value_of("opponent_id"),
 		)
-		.unwrap();
 	} else {
 		let mut rng = thread_rng();
 
-		let map;
-		let realtime;
-		let players: Vec<Box<dyn Player>>;
-
 		match app.subcommand() {
-			("local", Some(sub)) => {
-				map = match sub.value_of("map") {
-					Some(map) => Some(map.to_string()),
-					None => None,
-				};
-				realtime = sub.is_present("realtime");
-				players = vec![
-					bot,
-					Box::new(Computer(
-						match sub.value_of("race") {
-							Some(race) => race.parse().expect("Can't parse computer race"),
-							None => Race::Random,
-						},
-						match sub.value_of("difficulty") {
-							Some(difficulty) => difficulty.parse().expect("Can't parse computer difficulty"),
-							None => Difficulty::VeryEasy,
-						},
-						match sub.value_of("ai_build") {
-							Some(ai_build) => Some(ai_build.parse().expect("Can't parse computer build")),
-							None => None,
-						},
-					)),
-				];
-			}
-			("human", Some(sub)) => {
-				map = match sub.value_of("map") {
-					Some(map) => Some(map.to_string()),
-					None => None,
-				};
-				realtime = sub.is_present("realtime");
-				players = vec![
-					Box::new(Human(
-						match sub.value_of("race") {
-							Some(race) => race.parse().expect("Can't parse human race"),
-							None => unreachable!("Human race must be set"),
-						},
-						match sub.value_of("name") {
-							Some(name) => Some(name.to_string()),
-							None => None,
-						},
-					)),
-					bot,
-				];
-			}
+			("local", Some(sub)) => run_vs_computer(
+				&mut bot,
+				Computer::new(
+					sub.value_of("race").map_or(Race::Random, |race| {
+						race.parse().expect("Can't parse computer race")
+					}),
+					sub.value_of("difficulty")
+						.map_or(Difficulty::VeryEasy, |difficulty| {
+							difficulty.parse().expect("Can't parse computer difficulty")
+						}),
+					sub.value_of("ai_build")
+						.map(|ai_build| ai_build.parse().expect("Can't parse computer build")),
+				),
+				sub.value_of("map").unwrap_or_else(|| {
+					[
+						"AcropolisLE",
+						"DiscoBloodbathLE",
+						"EphemeronLE",
+						"ThunderbirdLE",
+						"TritonLE",
+						"WintersGateLE",
+						"WorldofSleepersLE",
+					]
+					.choose(&mut rng)
+					.unwrap()
+				}),
+				None,
+				sub.is_present("realtime"),
+			),
+			("human", Some(sub)) => run_vs_human(
+				&mut bot,
+				PlayerSettings::new(
+					sub.value_of("race")
+						.unwrap()
+						.parse()
+						.expect("Can't parse human race"),
+					sub.value_of("name").map(|name| name.to_string()),
+				),
+				sub.value_of("map").unwrap_or_else(|| {
+					[
+						"AcropolisLE",
+						"DiscoBloodbathLE",
+						"EphemeronLE",
+						"ThunderbirdLE",
+						"TritonLE",
+						"WintersGateLE",
+						"WorldofSleepersLE",
+					]
+					.choose(&mut rng)
+					.unwrap()
+				}),
+				None,
+			),
 			_ => {
 				println!("Game mode is not specified! Use -h, --help to print help information.");
 				std::process::exit(0);
 			}
 		}
-
-		// Maps:
-		// - Ladder_2019_Season_3:
-		//   - AcropolisLE, DiscoBloodbathLE, EphemeronLE, ThunderbirdLE, TritonLE, WintersGateLE, WorldofSleepersLE
-		// - Melee: Empty128, Flat32, Flat48, Flat64, Flat96, Flat128, Simple64, Simple96, Simple128.
-
-		run_game(
-			map.unwrap_or_else(|| {
-				(*[
-					"AcropolisLE",
-					"DiscoBloodbathLE",
-					"EphemeronLE",
-					"ThunderbirdLE",
-					"TritonLE",
-					"WintersGateLE",
-					"WorldofSleepersLE",
-				]
-				.choose(&mut rng)
-				.unwrap())
-				.to_string()
-			}),
-			players,
-			realtime,
-			None,
-		)
-		.unwrap();
 	}
 }

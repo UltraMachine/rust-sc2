@@ -13,12 +13,6 @@ pub struct Debugger {
 	debug_drawings: Vec<DebugDraw>,
 }
 impl Debugger {
-	pub fn new() -> Self {
-		Self {
-			debug_commands: Vec::new(),
-			debug_drawings: Vec::new(),
-		}
-	}
 	pub fn get_commands(&self) -> Vec<DebugCommand> {
 		if !self.debug_drawings.is_empty() {
 			let mut commands = self.debug_commands.clone();

@@ -1,6 +1,6 @@
 use crate::{
 	action::{ActionResult, Target},
-	client::{send, WS},
+	client::{send, SC2Result, WS},
 	geometry::Point2,
 	ids::AbilityId,
 	FromProto, IntoProto,
@@ -11,13 +11,11 @@ use sc2_proto::{
 	sc2api::Request,
 };
 
-use tungstenite::Result as TResult;
-
-#[derive(Clone)]
+#[derive(Default, Clone)]
 pub struct QueryMaster;
 
 impl QueryMaster {
-	pub fn pathing(&self, ws: &mut WS, paths: Vec<(Target, Point2)>) -> TResult<Vec<Option<f32>>> {
+	pub fn pathing(&self, ws: &mut WS, paths: Vec<(Target, Point2)>) -> SC2Result<Vec<Option<f32>>> {
 		let mut req = Request::new();
 		let req_pathing = req.mut_query().mut_pathing();
 
@@ -37,13 +35,7 @@ impl QueryMaster {
 			.get_query()
 			.get_pathing()
 			.iter()
-			.map(|result| {
-				if result.has_distance() {
-					Some(result.get_distance())
-				} else {
-					None
-				}
-			})
+			.map(|result| result.distance)
 			.collect())
 	}
 	pub fn placement(
@@ -51,7 +43,7 @@ impl QueryMaster {
 		ws: &mut WS,
 		places: Vec<(AbilityId, Point2, Option<u64>)>,
 		check_resources: bool,
-	) -> TResult<Vec<ActionResult>> {
+	) -> SC2Result<Vec<ActionResult>> {
 		let mut req = Request::new();
 		let req_query = req.mut_query();
 		req_query.set_ignore_resource_requirements(!check_resources);

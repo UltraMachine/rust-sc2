@@ -9,8 +9,20 @@ use sc2_proto::{
 	raw::{ActionRawUnitCommand_oneof_target as ProtoTarget, ActionRaw_oneof_action as ProtoRawAction},
 	sc2api::{Action as ProtoAction, ActionChat_Channel, ActionError as ProtoActionError},
 };
+use std::collections::HashMap;
 
 pub type Command = (u64, (AbilityId, Target, bool));
+
+#[derive(Default, Clone)]
+pub struct Commander {
+	pub commands: HashMap<(AbilityId, Target, bool), Vec<u64>>,
+}
+impl Commander {
+	pub fn command(&mut self, cmd: Command) {
+		let (tag, order) = cmd;
+		self.commands.entry(order).or_default().push(tag);
+	}
+}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Target {

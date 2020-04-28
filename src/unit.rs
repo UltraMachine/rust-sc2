@@ -1,7 +1,8 @@
 use crate::{
-	action::{Command, Target},
+	action::{Commander, Target},
 	constants::{
-		RaceValues, ADDON_IDS, CONSTRUCTING_IDS, TARGET_AIR, TARGET_GROUND, TOWNHALL_IDS, WORKER_IDS,
+		RaceValues, ADDON_IDS, CONSTRUCTING_IDS, MELEE_IDS, TARGET_AIR, TARGET_GROUND, TOWNHALL_IDS,
+		WORKER_IDS,
 	},
 	game_data::{Attribute, GameData, TargetType, UnitTypeData, Weapon},
 	game_state::Alliance,
@@ -15,19 +16,22 @@ use sc2_proto::raw::{
 	CloakState as ProtoCloakState, DisplayType as ProtoDisplayType, Unit as ProtoUnit,
 	UnitOrder_oneof_target as ProtoTarget,
 };
-use std::rc::Rc;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 #[derive(Default, Clone)]
 pub struct DataForUnit {
+	pub commander: Rc<RefCell<Commander>>,
 	pub game_data: Rc<GameData>,
 	pub techlab_tags: Rc<Vec<u64>>,
 	pub reactor_tags: Rc<Vec<u64>>,
 	pub race_values: Rc<RaceValues>,
+	pub max_cooldowns: Rc<RefCell<HashMap<UnitTypeId, f32>>>,
 }
 
 #[derive(Clone)]
 pub struct Unit {
 	data: Rc<DataForUnit>,
+	pub allow_spam: bool,
 
 	// Fields are populated based on type/alliance
 	pub display_type: DisplayType,
@@ -38,7 +42,7 @@ pub struct Unit {
 	pub owner: u32,
 	pub position: Point2,
 	pub position3d: Point3,
-	pub facing: f32,
+	pub facing: f32, // Range 0..2pi
 	pub radius: f32,
 	pub build_progress: f32, // Range 0..1
 	pub cloak: CloakState,
@@ -94,11 +98,14 @@ impl Unit {
 	pub fn is_addon(&self) -> bool {
 		ADDON_IDS.contains(&self.type_id)
 	}
+	pub fn is_melee(&self) -> bool {
+		MELEE_IDS.contains(&self.type_id)
+	}
 	pub fn is_ready(&self) -> bool {
 		(self.build_progress - 1.0).abs() < std::f32::EPSILON
 	}
 	pub fn has_add_on(&self) -> bool {
-		matches!(self.add_on_tag, Some(_))
+		self.add_on_tag.is_some()
 	}
 	pub fn has_techlab(&self) -> bool {
 		match self.add_on_tag {
@@ -129,10 +136,17 @@ impl Unit {
 		None
 	}
 	pub fn building_size(&self) -> Option<usize> {
+		if self.is_addon() {
+			return Some(2);
+		}
 		if let Some(radius) = self.footprint_radius() {
 			return Some((radius * 2.0) as usize);
 		}
 		None
+	}
+	pub fn towards_facing(&self, offset: f32) -> Point2 {
+		self.position
+			.offset(offset * self.facing.cos(), offset * self.facing.sin())
 	}
 	pub fn is_visible(&self) -> bool {
 		self.display_type == DisplayType::Visible
@@ -147,16 +161,28 @@ impl Unit {
 		self.display_type == DisplayType::Placeholder
 	}
 	pub fn is_mine(&self) -> bool {
-		self.alliance == Alliance::Own
+		self.alliance.is_mine()
 	}
 	pub fn is_enemy(&self) -> bool {
-		self.alliance == Alliance::Enemy
+		self.alliance.is_enemy()
 	}
 	pub fn is_neutral(&self) -> bool {
-		self.alliance == Alliance::Neutral
+		self.alliance.is_neutral()
 	}
 	pub fn is_ally(&self) -> bool {
-		self.alliance == Alliance::Ally
+		self.alliance.is_ally()
+	}
+	pub fn is_cloaked(&self) -> bool {
+		matches!(
+			self.cloak,
+			CloakState::Cloaked | CloakState::CloakedDetected | CloakState::CloakedAllied
+		)
+	}
+	pub fn is_revealed(&self) -> bool {
+		matches!(self.cloak, CloakState::CloakedDetected)
+	}
+	pub fn can_be_attacked(&self) -> bool {
+		matches!(self.cloak, CloakState::NotCloaked | CloakState::CloakedDetected)
 	}
 	pub fn supply_cost(&self) -> f32 {
 		match self.type_data() {
@@ -328,6 +354,19 @@ impl Unit {
 			None => panic!("Can't get cooldown on enemies"),
 		}
 	}
+	// cooldown < 50%
+	pub fn on_half_cooldown(&self) -> bool {
+		match self.weapon_cooldown {
+			Some(cool) => match self.max_cooldown() {
+				Some(max) => cool * 2.0 < max,
+				None => !self.on_cooldown(),
+			},
+			None => panic!("Can't get cooldown on enemies"),
+		}
+	}
+	pub fn max_cooldown(&self) -> Option<f32> {
+		self.data.max_cooldowns.borrow().get(&self.type_id).copied()
+	}
 	pub fn ground_range(&self) -> f32 {
 		match self.weapons() {
 			Some(weapons) => {
@@ -441,9 +480,10 @@ impl Unit {
 	}
 	pub fn is_almost_unused(&self) -> bool {
 		if self.has_reactor() {
-			self.orders.len() < 2 || self.orders.iter().any(|order| order.progress >= 0.95)
+			self.orders.len() < 2
+				|| (self.orders.len() < 4 && self.orders.iter().take(2).any(|order| order.progress >= 0.95))
 		} else {
-			self.is_idle() || self.orders[0].progress >= 0.95
+			self.is_almost_idle()
 		}
 	}
 	pub fn is_using(&self, ability: AbilityId) -> bool {
@@ -453,7 +493,17 @@ impl Unit {
 		!self.is_idle() && abilities.any(|a| self.orders[0].ability == a)
 	}
 	pub fn is_attacking(&self) -> bool {
-		self.is_using(AbilityId::Attack)
+		self.is_using_any(
+			[
+				AbilityId::Attack,
+				AbilityId::AttackAttack,
+				AbilityId::AttackAttackTowards,
+				AbilityId::AttackAttackBarrage,
+				AbilityId::ScanMove,
+			]
+			.iter()
+			.copied(),
+		)
 	}
 	pub fn is_moving(&self) -> bool {
 		self.is_using(AbilityId::MoveMove)
@@ -462,7 +512,15 @@ impl Unit {
 		self.is_using(AbilityId::Patrol)
 	}
 	pub fn is_repairing(&self) -> bool {
-		self.is_using(AbilityId::EffectRepair)
+		self.is_using_any(
+			[
+				AbilityId::EffectRepair,
+				AbilityId::EffectRepairSCV,
+				AbilityId::EffectRepairMule,
+			]
+			.iter()
+			.copied(),
+		)
 	}
 	pub fn is_gathering(&self) -> bool {
 		self.is_using(AbilityId::HarvestGather)
@@ -481,52 +539,55 @@ impl Unit {
 		self.is_using_any(CONSTRUCTING_IDS.iter().copied())
 	}
 	// Actions
-	pub fn command(&self, ability: AbilityId, target: Target, queue: bool) -> Option<Command> {
-		if !self.is_idle() {
+	pub fn command(&self, ability: AbilityId, target: Target, queue: bool) {
+		if !self.allow_spam && !self.is_idle() {
 			let last_order = &self.orders[0];
 			if !queue && ability == last_order.ability && target == last_order.target {
-				return None;
+				return;
 			}
 		}
-		Some((self.tag, (ability, target, queue)))
+		self.data
+			.commander
+			.borrow_mut()
+			.command((self.tag, (ability, target, queue)));
 	}
-	pub fn use_ability(&self, ability: AbilityId, queue: bool) -> Option<Command> {
+	pub fn use_ability(&self, ability: AbilityId, queue: bool) {
 		self.command(ability, Target::None, queue)
 	}
-	pub fn smart(&self, target: Target, queue: bool) -> Option<Command> {
+	pub fn smart(&self, target: Target, queue: bool) {
 		self.command(AbilityId::Smart, target, queue)
 	}
-	pub fn attack(&self, target: Target, queue: bool) -> Option<Command> {
+	pub fn attack(&self, target: Target, queue: bool) {
 		self.command(AbilityId::Attack, target, queue)
 	}
-	pub fn move_to(&self, target: Target, queue: bool) -> Option<Command> {
+	pub fn move_to(&self, target: Target, queue: bool) {
 		self.command(AbilityId::MoveMove, target, queue)
 	}
-	pub fn hold_position(&self, queue: bool) -> Option<Command> {
+	pub fn hold_position(&self, queue: bool) {
 		self.command(AbilityId::HoldPosition, Target::None, queue)
 	}
-	pub fn gather(&self, target: u64, queue: bool) -> Option<Command> {
+	pub fn gather(&self, target: u64, queue: bool) {
 		self.command(AbilityId::HarvestGather, Target::Tag(target), queue)
 	}
-	pub fn return_resource(&self, queue: bool) -> Option<Command> {
+	pub fn return_resource(&self, queue: bool) {
 		self.command(AbilityId::HarvestReturn, Target::None, queue)
 	}
-	pub fn stop(&self, queue: bool) -> Option<Command> {
+	pub fn stop(&self, queue: bool) {
 		self.command(AbilityId::Stop, Target::None, queue)
 	}
-	pub fn patrol(&self, target: Target, queue: bool) -> Option<Command> {
+	pub fn patrol(&self, target: Target, queue: bool) {
 		self.command(AbilityId::Patrol, target, queue)
 	}
-	pub fn repair(&self, target: Target, queue: bool) -> Option<Command> {
+	pub fn repair(&self, target: Target, queue: bool) {
 		self.command(AbilityId::EffectRepair, target, queue)
 	}
-	pub fn cancel_building(&self, queue: bool) -> Option<Command> {
+	pub fn cancel_building(&self, queue: bool) {
 		self.command(AbilityId::CancelBuildInProgress, Target::None, queue)
 	}
-	pub fn cancel_queue(&self, queue: bool) -> Option<Command> {
+	pub fn cancel_queue(&self, queue: bool) {
 		self.command(AbilityId::CancelQueue5, Target::None, queue)
 	}
-	pub fn build_gas(&self, target: u64, queue: bool) -> Option<Command> {
+	pub fn build_gas(&self, target: u64, queue: bool) {
 		self.command(
 			self.data.game_data.units[&self.data.race_values.gas_building]
 				.ability
@@ -535,27 +596,24 @@ impl Unit {
 			queue,
 		)
 	}
-	pub fn build(&self, unit: UnitTypeId, target: Point2, queue: bool) -> Option<Command> {
+	pub fn build(&self, unit: UnitTypeId, target: Point2, queue: bool) {
 		if let Some(type_data) = self.data.game_data.units.get(&unit) {
 			if let Some(ability) = type_data.ability {
-				return self.command(ability, Target::Pos(target), queue);
+				self.command(ability, Target::Pos(target), queue);
 			}
 		}
-		None
 	}
-	pub fn train(&self, unit: UnitTypeId, queue: bool) -> Option<Command> {
+	pub fn train(&self, unit: UnitTypeId, queue: bool) {
 		if let Some(type_data) = self.data.game_data.units.get(&unit) {
 			if let Some(ability) = type_data.ability {
-				return self.command(ability, Target::None, queue);
+				self.command(ability, Target::None, queue);
 			}
 		}
-		None
 	}
-	pub fn research(&self, upgrade: UpgradeId, queue: bool) -> Option<Command> {
+	pub fn research(&self, upgrade: UpgradeId, queue: bool) {
 		if let Some(type_data) = self.data.game_data.upgrades.get(&upgrade) {
-			return self.command(type_data.ability, Target::None, queue);
+			self.command(type_data.ability, Target::None, queue);
 		}
-		None
 	}
 }
 impl FromProtoData<ProtoUnit> for Unit {
@@ -563,6 +621,7 @@ impl FromProtoData<ProtoUnit> for Unit {
 		let pos = u.get_pos();
 		Self {
 			data,
+			allow_spam: false,
 			display_type: DisplayType::from_proto(u.get_display_type()),
 			alliance: Alliance::from_proto(u.get_alliance()),
 			tag: u.get_tag(),
@@ -590,62 +649,14 @@ impl FromProtoData<ProtoUnit> for Unit {
 			armor_upgrade_level: u.get_armor_upgrade_level() as u32,
 			shield_upgrade_level: u.get_shield_upgrade_level() as u32,
 			// Not populated for snapshots
-			health: {
-				if u.has_health() {
-					Some(u.get_health())
-				} else {
-					None
-				}
-			},
-			health_max: {
-				if u.has_health_max() {
-					Some(u.get_health_max())
-				} else {
-					None
-				}
-			},
-			shield: {
-				if u.has_shield() {
-					Some(u.get_shield())
-				} else {
-					None
-				}
-			},
-			shield_max: {
-				if u.has_shield_max() {
-					Some(u.get_shield_max())
-				} else {
-					None
-				}
-			},
-			energy: {
-				if u.has_energy() {
-					Some(u.get_energy())
-				} else {
-					None
-				}
-			},
-			energy_max: {
-				if u.has_energy_max() {
-					Some(u.get_energy_max())
-				} else {
-					None
-				}
-			},
-			mineral_contents: {
-				if u.has_mineral_contents() {
-					Some(u.get_mineral_contents() as u32)
-				} else {
-					None
-				}
-			},
-			vespene_contents: {
-				if u.has_vespene_contents() {
-					Some(u.get_vespene_contents() as u32)
-				} else {
-					None
-				}
-			},
+			health: u.health,
+			health_max: u.health_max,
+			shield: u.shield,
+			shield_max: u.shield_max,
+			energy: u.energy,
+			energy_max: u.energy_max,
+			mineral_contents: u.mineral_contents.map(|x| x as u32),
+			vespene_contents: u.vespene_contents.map(|x| x as u32),
 			is_flying: u.get_is_flying(),
 			is_burrowed: u.get_is_burrowed(),
 			is_hallucination: u.get_is_hallucination(),
@@ -665,13 +676,7 @@ impl FromProtoData<ProtoUnit> for Unit {
 					progress: order.get_progress(),
 				})
 				.collect(),
-			add_on_tag: {
-				if u.has_add_on_tag() {
-					Some(u.get_add_on_tag())
-				} else {
-					None
-				}
-			},
+			add_on_tag: u.add_on_tag,
 			passengers: u
 				.get_passengers()
 				.iter()
@@ -686,74 +691,20 @@ impl FromProtoData<ProtoUnit> for Unit {
 					type_id: UnitTypeId::from_u32(p.get_unit_type()).unwrap(),
 				})
 				.collect(),
-			cargo_space_taken: {
-				if u.has_cargo_space_taken() {
-					Some(u.get_cargo_space_taken() as u32)
-				} else {
-					None
-				}
-			},
-			cargo_space_max: {
-				if u.has_cargo_space_max() {
-					Some(u.get_cargo_space_max() as u32)
-				} else {
-					None
-				}
-			},
-			assigned_harvesters: {
-				if u.has_assigned_harvesters() {
-					Some(u.get_assigned_harvesters() as u32)
-				} else {
-					None
-				}
-			},
-			ideal_harvesters: {
-				if u.has_ideal_harvesters() {
-					Some(u.get_ideal_harvesters() as u32)
-				} else {
-					None
-				}
-			},
-			weapon_cooldown: {
-				if u.has_weapon_cooldown() {
-					Some(u.get_weapon_cooldown())
-				} else {
-					None
-				}
-			},
-			engaged_target_tag: {
-				if u.has_engaged_target_tag() {
-					Some(u.get_engaged_target_tag())
-				} else {
-					None
-				}
-			},
-			buff_duration_remain: {
-				if u.has_buff_duration_remain() {
-					Some(u.get_buff_duration_remain() as u32)
-				} else {
-					None
-				}
-			},
-			buff_duration_max: {
-				if u.has_buff_duration_max() {
-					Some(u.get_buff_duration_max() as u32)
-				} else {
-					None
-				}
-			},
+			cargo_space_taken: u.cargo_space_taken.map(|x| x as u32),
+			cargo_space_max: u.cargo_space_max.map(|x| x as u32),
+			assigned_harvesters: u.assigned_harvesters.map(|x| x as u32),
+			ideal_harvesters: u.ideal_harvesters.map(|x| x as u32),
+			weapon_cooldown: u.weapon_cooldown,
+			engaged_target_tag: u.engaged_target_tag,
+			buff_duration_remain: u.buff_duration_remain.map(|x| x as u32),
+			buff_duration_max: u.buff_duration_max.map(|x| x as u32),
 			rally_targets: u
 				.get_rally_targets()
 				.iter()
 				.map(|t| RallyTarget {
 					point: Point2::from_proto(t.get_point().clone()),
-					tag: {
-						if t.has_tag() {
-							Some(t.get_tag())
-						} else {
-							None
-						}
-					},
+					tag: t.tag,
 				})
 				.collect(),
 		}

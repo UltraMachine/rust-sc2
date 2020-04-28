@@ -3,14 +3,15 @@ extern crate clap;
 
 use rand::prelude::{thread_rng, SliceRandom};
 use rust_sc2::{
-	bot, bot_impl_player, bot_new,
+	action::Target,
+	bot, bot_new,
 	geometry::Point2,
-	ids::BuffId,
-	player::{
-		Difficulty,
-		Players::{Computer, Human},
-	},
-	run_game, run_ladder_game, Player, PlayerSettings,
+	ids::{AbilityId, BuffId, UnitTypeId, UpgradeId},
+	player::{Computer, Difficulty, Race},
+	run_ladder_game, run_vs_computer, run_vs_human,
+	unit::Unit,
+	units::Units,
+	Player, PlayerSettings, SC2Result, WS,
 };
 use std::cmp::{min, Ordering};
 
@@ -23,18 +24,16 @@ impl ZergRushAI {
 	const DISTRIBUTION_DELAY: u32 = 16;
 
 	#[bot_new]
-	fn new(game_step: u32) -> Self {
+	fn new() -> Self {
 		Self {
-			game_step,
 			last_loop_distributed: 0,
 		}
 	}
 	fn distribute_workers(&mut self) {
-		let workers = &self.grouped_units.workers;
-		if workers.is_empty() {
+		if self.grouped_units.workers.is_empty() {
 			return;
 		}
-		let mut idle_workers = workers.idle();
+		let mut idle_workers = self.grouped_units.workers.idle();
 
 		// Check distribution delay if there aren't any idle workers
 		let game_loop = self.state.observation.game_loop;
@@ -81,7 +80,8 @@ impl ZergRushAI {
 						.collect::<Vec<u64>>();
 
 					idle_workers.extend(
-						workers
+						self.grouped_units
+							.workers
 							.filter(|u| {
 								u.target_tag().map_or(false, |target_tag| {
 									local_minerals.contains(&target_tag)
@@ -106,7 +106,8 @@ impl ZergRushAI {
 			gas_buildings.iter().for_each(|gas| {
 				if let Ordering::Greater = gas.assigned_harvesters.cmp(&Some(0)) {
 					idle_workers.extend(
-						workers
+						self.grouped_units
+							.workers
 							.filter(|u| {
 								u.target_tag().map_or(false, |target_tag| {
 									target_tag == gas.tag
@@ -125,7 +126,8 @@ impl ZergRushAI {
 					Ordering::Equal => {}
 					Ordering::Greater => {
 						idle_workers.extend(
-							workers
+							self.grouped_units
+								.workers
 								.filter(|u| {
 									u.target_tag().map_or(false, |target_tag| {
 										target_tag == gas.tag
@@ -143,7 +145,8 @@ impl ZergRushAI {
 					}
 					Ordering::Less => {
 						idle_workers.extend(
-							workers
+							self.grouped_units
+								.workers
 								.filter(|u| {
 									u.target_tag()
 										.map_or(false, |target_tag| mineral_tags.contains(&target_tag))
@@ -177,22 +180,20 @@ impl ZergRushAI {
 			if !deficit_geysers.is_empty() {
 				let closest = deficit_geysers.closest(u).tag;
 				deficit_geysers.remove(closest);
-				self.command(u.gather(closest, false));
+				u.gather(closest, false);
 			} else if !deficit_minings.is_empty() {
 				let closest = deficit_minings.closest(u).clone();
 				deficit_minings.remove(closest.tag);
-				self.command(
-					u.gather(
-						mineral_fields
-							.closer(11.0, &closest)
-							.max(|m| m.mineral_contents.unwrap_or(0))
-							.tag,
-						false,
-					),
+				u.gather(
+					mineral_fields
+						.closer(11.0, &closest)
+						.max(|m| m.mineral_contents.unwrap_or(0))
+						.tag,
+					false,
 				);
 			} else if u.is_idle() {
 				if let Some(minerals) = &minerals_near_base {
-					self.command(u.gather(minerals.closest(u).tag, false));
+					u.gather(minerals.closest(u).tag, false);
 				}
 			}
 		});
@@ -213,17 +214,13 @@ impl ZergRushAI {
 			&& self.can_afford(over, false)
 		{
 			if let Some(larva) = self.grouped_units.larvas.pop() {
-				self.command(larva.train(over, false));
+				larva.train(over, false);
 				self.substract_resources(over);
 			}
 		}
 
 		let drone = UnitTypeId::Drone;
-		if self.current_units.get(&drone).unwrap_or(&0)
-			+ self
-				.orders
-				.get(&self.game_data.units[&drone].ability.unwrap())
-				.unwrap_or(&0)
+		if (self.supply_workers as usize)
 			< min(
 				96,
 				self.current_units
@@ -232,7 +229,7 @@ impl ZergRushAI {
 			) && self.can_afford(drone, true)
 		{
 			if let Some(larva) = self.grouped_units.larvas.pop() {
-				self.command(larva.train(drone, false));
+				larva.train(drone, false);
 				self.substract_resources(drone);
 			}
 		}
@@ -248,7 +245,7 @@ impl ZergRushAI {
 		{
 			let townhalls = self.grouped_units.townhalls.clone();
 			if !townhalls.is_empty() {
-				self.command(townhalls.first().train(queen, false));
+				townhalls.first().train(queen, false);
 				self.substract_resources(queen);
 			}
 		}
@@ -256,7 +253,7 @@ impl ZergRushAI {
 		let zergling = UnitTypeId::Zergling;
 		if self.can_afford(zergling, true) {
 			if let Some(larva) = self.grouped_units.larvas.pop() {
-				self.command(larva.train(zergling, false));
+				larva.train(zergling, false);
 				self.substract_resources(zergling);
 			}
 		}
@@ -301,7 +298,7 @@ impl ZergRushAI {
 				false,
 			) {
 				if let Some(builder) = self.get_builder(location, &mineral_tags) {
-					self.command(builder.build(pool, location, false));
+					builder.build(pool, location, false);
 					self.substract_resources(pool);
 				}
 			}
@@ -317,7 +314,7 @@ impl ZergRushAI {
 		{
 			if let Some(geyser) = self.find_gas_placement(ws, self.start_location) {
 				if let Some(builder) = self.get_builder(geyser.position, &mineral_tags) {
-					self.command(builder.build_gas(geyser.tag, false));
+					builder.build_gas(geyser.tag, false);
 					self.substract_resources(extractor);
 				}
 			}
@@ -327,7 +324,7 @@ impl ZergRushAI {
 		if self.can_afford(hatchery, false) {
 			if let Some((location, _resource_center)) = self.get_expansion(ws) {
 				if let Some(builder) = self.get_builder(location, &mineral_tags) {
-					self.command(builder.build(hatchery, location, false));
+					builder.build(hatchery, location, false);
 					self.substract_resources(hatchery);
 				}
 			}
@@ -345,7 +342,7 @@ impl ZergRushAI {
 		{
 			let pool = self.grouped_units.structures.of_type(UnitTypeId::SpawningPool);
 			if !pool.is_empty() {
-				self.command(pool.first().research(speed_upgrade, false));
+				pool.first().research(speed_upgrade, false);
 				self.substract_upgrade_cost(speed_upgrade);
 			}
 		}
@@ -371,7 +368,7 @@ impl ZergRushAI {
 					if !queens.is_empty() {
 						let queen = queens.closest(h).clone();
 						queens.remove(queen.tag);
-						self.command(queen.command(AbilityId::EffectInjectLarva, Target::Tag(h.tag), false));
+						queen.command(AbilityId::EffectInjectLarva, Target::Tag(h.tag), false);
 					}
 				});
 			}
@@ -429,7 +426,7 @@ impl ZergRushAI {
 						targets.closest(u).tag
 					}
 				};
-				self.command(u.attack(Target::Tag(target), false));
+				u.attack(Target::Tag(target), false);
 			}),
 			None => {
 				let target = if speed_upgrade_is_almost_ready {
@@ -438,38 +435,39 @@ impl ZergRushAI {
 					self.start_location.towards(self.start_resource_center, -8.0)
 				};
 				zerglings.iter().for_each(|u| {
-					self.command(u.move_to(Target::Pos(target), false));
+					u.move_to(Target::Pos(target), false);
 				})
 			}
 		}
 	}
 }
 
-#[bot_impl_player]
 impl Player for ZergRushAI {
-	fn on_start(&mut self, _ws: &mut WS) {
+	fn on_start(&mut self, _ws: &mut WS) -> SC2Result<()> {
 		let townhall = self.grouped_units.townhalls.first().clone();
 
-		self.command(townhall.command(
+		townhall.command(
 			AbilityId::RallyWorkers,
 			Target::Pos(self.start_resource_center),
 			false,
-		));
-		self.command(self.grouped_units.larvas.first().train(UnitTypeId::Drone, false));
+		);
+		self.grouped_units.larvas.first().train(UnitTypeId::Drone, false);
 		self.substract_resources(UnitTypeId::Drone);
 
 		let minerals_near_base = self.grouped_units.mineral_fields.closer(11.0, &townhall);
 		self.grouped_units.workers.clone().iter().for_each(|u| {
-			self.command(u.gather(minerals_near_base.closest(&u).tag, false));
+			u.gather(minerals_near_base.closest(&u).tag, false);
 		});
+		Ok(())
 	}
 
-	fn on_step(&mut self, ws: &mut WS, _iteration: usize) {
+	fn on_step(&mut self, ws: &mut WS, _iteration: usize) -> SC2Result<()> {
 		self.distribute_workers();
 		self.upgrades();
 		self.build(ws);
 		self.order_units();
 		self.execute_micro();
+		Ok(())
 	}
 
 	fn get_player_settings(&self) -> PlayerSettings {
@@ -477,7 +475,7 @@ impl Player for ZergRushAI {
 	}
 }
 
-fn main() {
+fn main() -> SC2Result<()> {
 	let app = clap_app!(RustyLings =>
 		(version: crate_version!())
 		(author: crate_authors!())
@@ -522,7 +520,6 @@ fn main() {
 				+takes_value
 				"Sets human name"
 			)
-			(@arg realtime: --realtime "Enables realtime mode")
 		)
 	)
 	.get_matches();
@@ -533,104 +530,81 @@ fn main() {
 		None => unreachable!(),
 	};
 
-	let bot = Box::new(ZergRushAI::new(game_step));
+	let mut bot = ZergRushAI::new();
+	bot.game_step = game_step;
 
 	if app.is_present("ladder_server") {
 		run_ladder_game(
-			bot,
-			app.value_of("ladder_server").unwrap_or("127.0.0.1").to_string(),
-			app.value_of("host_port")
-				.expect("GamePort must be specified")
-				.to_string(),
+			&mut bot,
+			app.value_of("ladder_server").unwrap_or("127.0.0.1"),
+			app.value_of("host_port").expect("GamePort must be specified"),
 			app.value_of("player_port")
 				.expect("StartPort must be specified")
 				.parse()
 				.expect("Can't parse StartPort"),
 			app.value_of("opponent_id"),
 		)
-		.unwrap();
 	} else {
 		let mut rng = thread_rng();
 
-		let map;
-		let realtime;
-		let players: Vec<Box<dyn Player>>;
-
 		match app.subcommand() {
-			("local", Some(sub)) => {
-				map = match sub.value_of("map") {
-					Some(map) => Some(map.to_string()),
-					None => None,
-				};
-				realtime = sub.is_present("realtime");
-				players = vec![
-					bot,
-					Box::new(Computer(
-						match sub.value_of("race") {
-							Some(race) => race.parse().expect("Can't parse computer race"),
-							None => Race::Random,
-						},
-						match sub.value_of("difficulty") {
-							Some(difficulty) => difficulty.parse().expect("Can't parse computer difficulty"),
-							None => Difficulty::VeryEasy,
-						},
-						match sub.value_of("ai_build") {
-							Some(ai_build) => Some(ai_build.parse().expect("Can't parse computer build")),
-							None => None,
-						},
-					)),
-				];
-			}
-			("human", Some(sub)) => {
-				map = match sub.value_of("map") {
-					Some(map) => Some(map.to_string()),
-					None => None,
-				};
-				realtime = sub.is_present("realtime");
-				players = vec![
-					Box::new(Human(
-						match sub.value_of("race") {
-							Some(race) => race.parse().expect("Can't parse human race"),
-							None => unreachable!("Human race must be set"),
-						},
-						match sub.value_of("name") {
-							Some(name) => Some(name.to_string()),
-							None => None,
-						},
-					)),
-					bot,
-				];
-			}
+			("local", Some(sub)) => run_vs_computer(
+				&mut bot,
+				Computer::new(
+					sub.value_of("race").map_or(Race::Random, |race| {
+						race.parse().expect("Can't parse computer race")
+					}),
+					sub.value_of("difficulty")
+						.map_or(Difficulty::VeryEasy, |difficulty| {
+							difficulty.parse().expect("Can't parse computer difficulty")
+						}),
+					sub.value_of("ai_build")
+						.map(|ai_build| ai_build.parse().expect("Can't parse computer build")),
+				),
+				sub.value_of("map").unwrap_or_else(|| {
+					[
+						"AcropolisLE",
+						"DiscoBloodbathLE",
+						"EphemeronLE",
+						"ThunderbirdLE",
+						"TritonLE",
+						"WintersGateLE",
+						"WorldofSleepersLE",
+					]
+					.choose(&mut rng)
+					.unwrap()
+				}),
+				None,
+				sub.is_present("realtime"),
+			),
+			("human", Some(sub)) => run_vs_human(
+				&mut bot,
+				PlayerSettings::new(
+					sub.value_of("race")
+						.unwrap()
+						.parse()
+						.expect("Can't parse human race"),
+					sub.value_of("name").map(|name| name.to_string()),
+				),
+				sub.value_of("map").unwrap_or_else(|| {
+					[
+						"AcropolisLE",
+						"DiscoBloodbathLE",
+						"EphemeronLE",
+						"ThunderbirdLE",
+						"TritonLE",
+						"WintersGateLE",
+						"WorldofSleepersLE",
+					]
+					.choose(&mut rng)
+					.unwrap()
+				}),
+				None,
+			),
 			_ => {
 				println!("Game mode is not specified! Use -h, --help to print help information.");
 				std::process::exit(0);
 			}
 		}
-
-		// Maps:
-		// - Ladder_2019_Season_3:
-		//   - AcropolisLE, DiscoBloodbathLE, EphemeronLE, ThunderbirdLE, TritonLE, WintersGateLE, WorldofSleepersLE
-		// - Melee: Empty128, Flat32, Flat48, Flat64, Flat96, Flat128, Simple64, Simple96, Simple128.
-
-		run_game(
-			map.unwrap_or_else(|| {
-				(*[
-					"AcropolisLE",
-					"DiscoBloodbathLE",
-					"EphemeronLE",
-					"ThunderbirdLE",
-					"TritonLE",
-					"WintersGateLE",
-					"WorldofSleepersLE",
-				]
-				.choose(&mut rng)
-				.unwrap())
-				.to_string()
-			}),
-			players,
-			realtime,
-			None,
-		)
-		.unwrap();
 	}
 }

@@ -54,8 +54,8 @@ pub fn get_latest_base_version(sc2_path: &str) -> u32 {
 		.unwrap()
 }
 
-pub fn get_base_version(version: String) -> u32 {
-	match version.as_str() {
+pub fn get_base_version(version: &str) -> u32 {
+	match version {
 		"4.11.4" => 78285,
 		"4.11.3" => 77661,
 		"4.11.2" => 77535,

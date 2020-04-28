@@ -3,13 +3,11 @@ extern crate clap;
 
 use rand::prelude::{thread_rng, SliceRandom};
 use rust_sc2::{
-	bot, bot_impl_player, bot_new,
-	geometry::Point2,
-	player::{
-		Difficulty,
-		Players::{Computer, Human},
-	},
-	run_game, run_ladder_game, Player, PlayerSettings,
+	action::Target,
+	bot, bot_new,
+	ids::UnitTypeId,
+	player::{Computer, Difficulty, Race},
+	run_ladder_game, run_vs_computer, run_vs_human, Player, PlayerSettings, SC2Result, WS,
 };
 
 #[bot]
@@ -20,19 +18,20 @@ struct WorkerRushAI {
 
 impl WorkerRushAI {
 	#[bot_new]
-	fn new(game_step: u32) -> Self {
+	fn new() -> Self {
 		Self {
-			game_step,
 			mineral_forward: Default::default(),
 			mineral_back: Default::default(),
 		}
 	}
 }
 
-#[bot_impl_player]
 impl Player for WorkerRushAI {
-	fn on_start(&mut self, _ws: &mut WS) {
-		self.command(self.grouped_units.townhalls.first().train(UnitTypeId::Probe, false));
+	fn on_start(&mut self, _ws: &mut WS) -> SC2Result<()> {
+		self.grouped_units
+			.townhalls
+			.first()
+			.train(UnitTypeId::Probe, false);
 
 		self.mineral_forward = self
 			.grouped_units
@@ -44,9 +43,10 @@ impl Player for WorkerRushAI {
 			.mineral_fields
 			.closest_pos(self.start_location)
 			.tag;
+		Ok(())
 	}
 
-	fn on_step(&mut self, _ws: &mut WS, _iteration: usize) {
+	fn on_step(&mut self, _ws: &mut WS, _iteration: usize) -> SC2Result<()> {
 		let ground_attackers = self.grouped_units.enemy_units.filter(|u| {
 			!u.is_flying && u.can_attack_ground() && u.distance_pos_squared(self.enemy_start) < 2025.0
 		});
@@ -54,11 +54,11 @@ impl Player for WorkerRushAI {
 			self.grouped_units.workers.clone().iter().for_each(|u| {
 				let closest = ground_attackers.closest(&u);
 				if u.shield > Some(0.0) {
-					self.command(u.attack(Target::Tag(closest.tag), false));
+					u.attack(Target::Tag(closest.tag), false);
 				} else if u.in_range_of(&closest, 2.0) {
-					self.command(u.gather(self.mineral_back, false));
+					u.gather(self.mineral_back, false);
 				} else {
-					self.command(u.gather(self.mineral_forward, false));
+					u.gather(self.mineral_forward, false);
 				}
 			})
 		} else {
@@ -68,14 +68,15 @@ impl Player for WorkerRushAI {
 				.filter(|u| !u.is_flying && u.distance_pos_squared(self.enemy_start) < 2025.0);
 			if !ground_structures.is_empty() {
 				self.grouped_units.workers.clone().iter().for_each(|u| {
-					self.command(u.attack(Target::Tag(ground_structures.closest(&u).tag), false));
+					u.attack(Target::Tag(ground_structures.closest(&u).tag), false);
 				})
 			} else {
 				self.grouped_units.workers.clone().iter().for_each(|u| {
-					self.command(u.gather(self.mineral_forward, false));
+					u.gather(self.mineral_forward, false);
 				})
 			}
 		}
+		Ok(())
 	}
 
 	fn get_player_settings(&self) -> PlayerSettings {
@@ -83,7 +84,7 @@ impl Player for WorkerRushAI {
 	}
 }
 
-fn main() {
+fn main() -> SC2Result<()> {
 	let app = clap_app!(RustyWorkers =>
 		(version: crate_version!())
 		(author: crate_authors!())
@@ -128,7 +129,6 @@ fn main() {
 				+takes_value
 				"Sets human name"
 			)
-			(@arg realtime: --realtime "Enables realtime mode")
 		)
 	)
 	.get_matches();
@@ -139,104 +139,81 @@ fn main() {
 		None => unreachable!(),
 	};
 
-	let bot = Box::new(WorkerRushAI::new(game_step));
+	let mut bot = WorkerRushAI::new();
+	bot.game_step = game_step;
 
 	if app.is_present("ladder_server") {
 		run_ladder_game(
-			bot,
-			app.value_of("ladder_server").unwrap_or("127.0.0.1").to_string(),
-			app.value_of("host_port")
-				.expect("GamePort must be specified")
-				.to_string(),
+			&mut bot,
+			app.value_of("ladder_server").unwrap_or("127.0.0.1"),
+			app.value_of("host_port").expect("GamePort must be specified"),
 			app.value_of("player_port")
 				.expect("StartPort must be specified")
 				.parse()
 				.expect("Can't parse StartPort"),
 			app.value_of("opponent_id"),
 		)
-		.unwrap();
 	} else {
 		let mut rng = thread_rng();
 
-		let map;
-		let realtime;
-		let players: Vec<Box<dyn Player>>;
-
 		match app.subcommand() {
-			("local", Some(sub)) => {
-				map = match sub.value_of("map") {
-					Some(map) => Some(map.to_string()),
-					None => None,
-				};
-				realtime = sub.is_present("realtime");
-				players = vec![
-					bot,
-					Box::new(Computer(
-						match sub.value_of("race") {
-							Some(race) => race.parse().expect("Can't parse computer race"),
-							None => Race::Random,
-						},
-						match sub.value_of("difficulty") {
-							Some(difficulty) => difficulty.parse().expect("Can't parse computer difficulty"),
-							None => Difficulty::VeryEasy,
-						},
-						match sub.value_of("ai_build") {
-							Some(ai_build) => Some(ai_build.parse().expect("Can't parse computer build")),
-							None => None,
-						},
-					)),
-				];
-			}
-			("human", Some(sub)) => {
-				map = match sub.value_of("map") {
-					Some(map) => Some(map.to_string()),
-					None => None,
-				};
-				realtime = sub.is_present("realtime");
-				players = vec![
-					Box::new(Human(
-						match sub.value_of("race") {
-							Some(race) => race.parse().expect("Can't parse human race"),
-							None => unreachable!("Human race must be set"),
-						},
-						match sub.value_of("name") {
-							Some(name) => Some(name.to_string()),
-							None => None,
-						},
-					)),
-					bot,
-				];
-			}
+			("local", Some(sub)) => run_vs_computer(
+				&mut bot,
+				Computer::new(
+					sub.value_of("race").map_or(Race::Random, |race| {
+						race.parse().expect("Can't parse computer race")
+					}),
+					sub.value_of("difficulty")
+						.map_or(Difficulty::VeryEasy, |difficulty| {
+							difficulty.parse().expect("Can't parse computer difficulty")
+						}),
+					sub.value_of("ai_build")
+						.map(|ai_build| ai_build.parse().expect("Can't parse computer build")),
+				),
+				sub.value_of("map").unwrap_or_else(|| {
+					[
+						"AcropolisLE",
+						"DiscoBloodbathLE",
+						"EphemeronLE",
+						"ThunderbirdLE",
+						"TritonLE",
+						"WintersGateLE",
+						"WorldofSleepersLE",
+					]
+					.choose(&mut rng)
+					.unwrap()
+				}),
+				None,
+				sub.is_present("realtime"),
+			),
+			("human", Some(sub)) => run_vs_human(
+				&mut bot,
+				PlayerSettings::new(
+					sub.value_of("race")
+						.unwrap()
+						.parse()
+						.expect("Can't parse human race"),
+					sub.value_of("name").map(|name| name.to_string()),
+				),
+				sub.value_of("map").unwrap_or_else(|| {
+					[
+						"AcropolisLE",
+						"DiscoBloodbathLE",
+						"EphemeronLE",
+						"ThunderbirdLE",
+						"TritonLE",
+						"WintersGateLE",
+						"WorldofSleepersLE",
+					]
+					.choose(&mut rng)
+					.unwrap()
+				}),
+				None,
+			),
 			_ => {
 				println!("Game mode is not specified! Use -h, --help to print help information.");
 				std::process::exit(0);
 			}
 		}
-
-		// Maps:
-		// - Ladder_2019_Season_3:
-		//   - AcropolisLE, DiscoBloodbathLE, EphemeronLE, ThunderbirdLE, TritonLE, WintersGateLE, WorldofSleepersLE
-		// - Melee: Empty128, Flat32, Flat48, Flat64, Flat96, Flat128, Simple64, Simple96, Simple128.
-
-		run_game(
-			map.unwrap_or_else(|| {
-				(*[
-					"AcropolisLE",
-					"DiscoBloodbathLE",
-					"EphemeronLE",
-					"ThunderbirdLE",
-					"TritonLE",
-					"WintersGateLE",
-					"WorldofSleepersLE",
-				]
-				.choose(&mut rng)
-				.unwrap())
-				.to_string()
-			}),
-			players,
-			realtime,
-			None,
-		)
-		.unwrap();
 	}
 }

@@ -3,9 +3,9 @@ use crate::{
 	geometry::Point2,
 	ids::{AbilityId, EffectId, UpgradeId},
 	pixel_map::{PixelMap, VisibilityMap},
-	unit::Unit,
+	unit::{DataForUnit, Unit},
 	units::Units,
-	FromProto, FromProtoData, FromProtoPlayer, PlayerBox,
+	FromProto, FromProtoData,
 };
 use num_traits::FromPrimitive;
 use sc2_proto::{
@@ -22,8 +22,8 @@ pub struct GameState {
 	// player_result,
 	pub chat: Vec<ChatMessage>,
 }
-impl FromProtoPlayer<&ResponseObservation> for GameState {
-	fn from_proto_player(player: Rc<PlayerBox>, response_observation: &ResponseObservation) -> Self {
+impl FromProtoData<&ResponseObservation> for GameState {
+	fn from_proto_data(data: Rc<DataForUnit>, response_observation: &ResponseObservation) -> Self {
 		// let player_result = response_observation.get_player_result();
 		Self {
 			actions: response_observation
@@ -36,10 +36,7 @@ impl FromProtoPlayer<&ResponseObservation> for GameState {
 				.iter()
 				.map(|e| ActionError::from_proto(e.clone()))
 				.collect(),
-			observation: Observation::from_proto_player(
-				player,
-				response_observation.get_observation().clone(),
-			),
+			observation: Observation::from_proto_data(data, response_observation.get_observation().clone()),
 			chat: response_observation
 				.get_chat()
 				.iter()
@@ -67,8 +64,8 @@ pub struct Observation {
 	// pub score: Score,
 	pub raw: RawData,
 }
-impl FromProtoPlayer<ProtoObservation> for Observation {
-	fn from_proto_player(player: Rc<PlayerBox>, obs: ProtoObservation) -> Self {
+impl FromProtoData<ProtoObservation> for Observation {
+	fn from_proto_data(data: Rc<DataForUnit>, obs: ProtoObservation) -> Self {
 		let common = obs.get_player_common();
 		Self {
 			game_loop: obs.get_game_loop(),
@@ -94,7 +91,7 @@ impl FromProtoPlayer<ProtoObservation> for Observation {
 					requires_point: a.get_requires_point(),
 				})
 				.collect(),
-			raw: RawData::from_proto_player(player, obs.get_raw_data().clone()),
+			raw: RawData::from_proto_data(data, obs.get_raw_data().clone()),
 		}
 	}
 }
@@ -111,8 +108,8 @@ pub struct RawData {
 	pub effects: Vec<Effect>,
 	pub radars: Vec<Radar>,
 }
-impl FromProtoPlayer<ObservationRaw> for RawData {
-	fn from_proto_player(player: Rc<PlayerBox>, raw: ObservationRaw) -> Self {
+impl FromProtoData<ObservationRaw> for RawData {
+	fn from_proto_data(data: Rc<DataForUnit>, raw: ObservationRaw) -> Self {
 		let raw_player = raw.get_player();
 		let map_state = raw.get_map_state();
 		Self {
@@ -125,7 +122,7 @@ impl FromProtoPlayer<ObservationRaw> for RawData {
 			units: raw
 				.get_units()
 				.iter()
-				.map(|u| Unit::from_proto_data(player.get_data_for_unit(), u.clone()))
+				.map(|u| Unit::from_proto_data(Rc::clone(&data), u.clone()))
 				.collect(),
 			upgrades: raw_player
 				.get_upgrade_ids()
@@ -187,12 +184,26 @@ pub struct Effect {
 	pub radius: f32,
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum Alliance {
 	Own,
 	Ally,
 	Neutral,
 	Enemy,
+}
+impl Alliance {
+	pub fn is_mine(self) -> bool {
+		matches!(self, Alliance::Own)
+	}
+	pub fn is_enemy(self) -> bool {
+		matches!(self, Alliance::Enemy)
+	}
+	pub fn is_neutral(self) -> bool {
+		matches!(self, Alliance::Neutral)
+	}
+	pub fn is_ally(self) -> bool {
+		matches!(self, Alliance::Ally)
+	}
 }
 impl FromProto<ProtoAlliance> for Alliance {
 	fn from_proto(alliance: ProtoAlliance) -> Self {

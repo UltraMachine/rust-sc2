@@ -64,6 +64,34 @@ impl Point2 {
 			y: (self.y + 0.5) as u32 as f32,
 		}
 	}
+	pub fn neighbors4(self) -> [Self; 4] {
+		[
+			self.offset(1.0, 0.0),
+			self.offset(-1.0, 0.0),
+			self.offset(0.0, 1.0),
+			self.offset(0.0, -1.0),
+		]
+	}
+	pub fn neighbors4diagonal(self) -> [Self; 4] {
+		[
+			self.offset(1.0, 1.0),
+			self.offset(-1.0, -1.0),
+			self.offset(1.0, -1.0),
+			self.offset(-1.0, 1.0),
+		]
+	}
+	pub fn neighbors8(self) -> [Self; 8] {
+		[
+			self.offset(1.0, 0.0),
+			self.offset(-1.0, 0.0),
+			self.offset(0.0, 1.0),
+			self.offset(0.0, -1.0),
+			self.offset(1.0, 1.0),
+			self.offset(-1.0, -1.0),
+			self.offset(1.0, -1.0),
+			self.offset(-1.0, 1.0),
+		]
+	}
 	pub fn as_tuple(self) -> (f32, f32) {
 		(self.x, self.y)
 	}

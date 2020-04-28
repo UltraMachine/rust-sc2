@@ -81,34 +81,10 @@ impl FromProto<ResponseGameInfo> for GameInfo {
 							id,
 							player_type: PlayerType::from_proto(i.get_field_type()),
 							race_requested: Race::from_proto(i.get_race_requested()),
-							race_actual: {
-								if i.has_race_actual() {
-									Some(Race::from_proto(i.get_race_actual()))
-								} else {
-									None
-								}
-							},
-							difficulty: {
-								if i.has_difficulty() {
-									Some(Difficulty::from_proto(i.get_difficulty()))
-								} else {
-									None
-								}
-							},
-							ai_build: {
-								if i.has_ai_build() {
-									Some(AIBuild::from_proto(i.get_ai_build()))
-								} else {
-									None
-								}
-							},
-							player_name: {
-								if i.has_player_name() {
-									Some(i.get_player_name().to_string())
-								} else {
-									None
-								}
-							},
+							race_actual: i.race_actual.map(Race::from_proto),
+							difficulty: i.difficulty.map(Difficulty::from_proto),
+							ai_build: i.ai_build.map(AIBuild::from_proto),
+							player_name: i.player_name.clone().into_option(),
 						},
 					)
 				})

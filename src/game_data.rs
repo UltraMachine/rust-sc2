@@ -79,7 +79,7 @@ impl FromProto<ResponseData> for GameData {
 	}
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Cost {
 	pub minerals: u32,
 	pub vespene: u32,
@@ -139,7 +139,7 @@ impl FromProto<ProtoAttribute> for Attribute {
 	}
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum TargetType {
 	Ground,
 	Air,
@@ -208,54 +208,18 @@ impl TryFromProto<ProtoAbilityData> for AbilityData {
 			},
 			link_name: a.get_link_name().to_string(),
 			link_index: a.get_link_index(),
-			button_name: {
-				if a.has_button_name() {
-					Some(a.get_button_name().to_string())
-				} else {
-					None
-				}
-			},
-			friendly_name: {
-				if a.has_friendly_name() {
-					Some(a.get_friendly_name().to_string())
-				} else {
-					None
-				}
-			},
-			hotkey: {
-				if a.has_hotkey() {
-					Some(a.get_hotkey().to_string())
-				} else {
-					None
-				}
-			},
-			remaps_to_ability_id: {
-				if a.has_remaps_to_ability_id() {
-					AbilityId::from_u32(a.get_remaps_to_ability_id())
-				} else {
-					None
-				}
-			},
+			button_name: a.button_name.clone().into_option(),
+			friendly_name: a.friendly_name.clone().into_option(),
+			hotkey: a.hotkey.clone().into_option(),
+			remaps_to_ability_id: a.remaps_to_ability_id.and_then(AbilityId::from_u32),
 			available: a.get_available(),
 			target: AbilityTarget::from_proto(a.get_target()),
 			allow_minimap: a.get_allow_minimap(),
 			allow_autocast: a.get_allow_autocast(),
 			is_building: a.get_is_building(),
-			footprint_radius: {
-				if a.has_footprint_radius() {
-					Some(a.get_footprint_radius())
-				} else {
-					None
-				}
-			},
+			footprint_radius: a.footprint_radius,
 			is_instant_placement: a.get_is_instant_placement(),
-			cast_range: {
-				if a.has_cast_range() {
-					Some(a.get_cast_range())
-				} else {
-					None
-				}
-			},
+			cast_range: a.cast_range,
 		})
 	}
 }
@@ -309,13 +273,7 @@ impl TryFromProto<ProtoUnitTypeData> for UnitTypeData {
 			vespene_cost: u.get_vespene_cost(),
 			food_required: u.get_food_required(),
 			food_provided: u.get_food_provided(),
-			ability: {
-				if u.has_ability_id() {
-					AbilityId::from_u32(u.get_ability_id())
-				} else {
-					None
-				}
-			},
+			ability: u.ability_id.and_then(AbilityId::from_u32),
 			race: Race::from_proto(u.get_race()),
 			build_time: u.get_build_time(),
 			has_vespene: u.get_has_vespene(),
@@ -326,20 +284,8 @@ impl TryFromProto<ProtoUnitTypeData> for UnitTypeData {
 				.iter()
 				.filter_map(|a| UnitTypeId::from_u32(*a))
 				.collect(),
-			unit_alias: {
-				if u.has_unit_alias() {
-					UnitTypeId::from_u32(u.get_unit_alias())
-				} else {
-					None
-				}
-			},
-			tech_requirement: {
-				if u.has_tech_requirement() {
-					UnitTypeId::from_u32(u.get_tech_requirement())
-				} else {
-					None
-				}
-			},
+			unit_alias: u.unit_alias.and_then(UnitTypeId::from_u32),
+			tech_requirement: u.tech_requirement.and_then(UnitTypeId::from_u32),
 			require_attached: u.get_require_attached(),
 			attributes: u
 				.get_attributes()
@@ -418,17 +364,34 @@ pub struct EffectData {
 	pub name: String,
 	pub friendly_name: String,
 	pub radius: f32,
+	pub target: TargetType,
+	pub friendly_fire: bool,
 }
 impl TryFromProto<ProtoEffectData> for EffectData {
 	fn try_from_proto(e: ProtoEffectData) -> Option<Self> {
+		let id = match EffectId::from_u32(e.get_effect_id()) {
+			Some(id) => id,
+			None => return None,
+		};
 		Some(Self {
-			id: match EffectId::from_u32(e.get_effect_id()) {
-				Some(id) => id,
-				None => return None,
-			},
+			id,
 			name: e.get_name().to_string(),
 			friendly_name: e.get_friendly_name().to_string(),
 			radius: e.get_radius(),
+			target: match id {
+				EffectId::Null
+				| EffectId::PsiStormPersistent
+				| EffectId::ScannerSweep
+				| EffectId::NukePersistent
+				| EffectId::RavagerCorrosiveBileCP => TargetType::Any,
+				_ => TargetType::Ground,
+			},
+			friendly_fire: match id {
+				EffectId::PsiStormPersistent
+				| EffectId::NukePersistent
+				| EffectId::RavagerCorrosiveBileCP => true,
+				_ => false,
+			},
 		})
 	}
 }

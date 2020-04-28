@@ -29,6 +29,7 @@ pub struct GroupedUnits {
 	pub inhibitor_zones: Units,
 	pub gas_buildings: Units,
 	pub larvas: Units,
+	pub placeholders: Units,
 }
 
 #[derive(Default, Clone)]
@@ -108,6 +109,11 @@ impl Units {
 		self.units.len()
 	}
 
+	#[inline]
+	pub fn clear(&mut self) {
+		self.units.clear()
+	}
+
 	// Units methods
 	pub fn find_tag(&self, tag: u64) -> Option<&Unit> {
 		self.units.get(&tag)
@@ -122,7 +128,7 @@ impl Units {
 		self.filter(|u| types.any(|u_type| u.type_id == u_type))
 	}
 	pub fn center(&self) -> Point2 {
-		self.iter().map(|u| u.position).sum::<Point2>() / (self.len() as f32)
+		self.sum(|u| u.position) / (self.len() as f32)
 	}
 	// Get closest | furthest
 	pub fn closest(&self, other: &Unit) -> &Unit {
@@ -202,6 +208,12 @@ impl Units {
 	}
 	pub fn almost_idle(&self) -> Self {
 		self.filter(|u| u.is_almost_idle())
+	}
+	pub fn unused(&self) -> Self {
+		self.filter(|u| u.is_unused())
+	}
+	pub fn almost_unused(&self) -> Self {
+		self.filter(|u| u.is_almost_unused())
 	}
 	pub fn in_range_of(&self, unit: &Unit, gap: f32) -> Self {
 		self.filter(|u| unit.in_range(u, gap))

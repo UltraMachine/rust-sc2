@@ -3,13 +3,9 @@ extern crate clap;
 
 use rand::prelude::{thread_rng, SliceRandom};
 use rust_sc2::{
-	bot, bot_impl_player, bot_new,
-	geometry::Point2,
-	player::{
-		Difficulty,
-		Players::{Computer, Human},
-	},
-	run_game, run_ladder_game, Player, PlayerSettings,
+	bot, bot_new,
+	player::{Computer, Difficulty, Race},
+	run_ladder_game, run_vs_computer, run_vs_human, Player, PlayerSettings, SC2Result, WS,
 };
 
 #[bot]
@@ -19,27 +15,25 @@ struct DebugAI {
 
 impl DebugAI {
 	#[bot_new]
-	fn new(game_step: u32) -> Self {
-		Self {
-			game_step,
-			debug_z: 0.0,
-		}
+	fn new() -> Self {
+		Self { debug_z: 0.0 }
 	}
 }
 
-#[bot_impl_player]
 impl Player for DebugAI {
-	fn on_start(&mut self, _ws: &mut WS) {
+	fn on_start(&mut self, _ws: &mut WS) -> SC2Result<()> {
 		self.debug_z = self.grouped_units.townhalls.first().position3d.z;
+		Ok(())
 	}
 
-	fn on_step(&mut self, _ws: &mut WS, _iteration: usize) {
+	fn on_step(&mut self, _ws: &mut WS, _iteration: usize) -> SC2Result<()> {
 		// Debug expansion locations
+		let debug_z = self.debug_z;
 		self.expansions.clone().iter().for_each(|(loc, center)| {
 			self.debug
-				.draw_sphere(loc.to3(self.debug_z), 0.6, Some((255, 128, 255)));
+				.draw_sphere(loc.to3(debug_z), 0.6, Some((255, 128, 255)));
 			self.debug
-				.draw_sphere(center.to3(self.debug_z), 0.5, Some((255, 128, 64)));
+				.draw_sphere(center.to3(debug_z), 0.5, Some((255, 128, 64)));
 		});
 
 		// Debug unit types
@@ -51,6 +45,7 @@ impl Player for DebugAI {
 				None,
 			)
 		});
+		Ok(())
 	}
 
 	fn get_player_settings(&self) -> PlayerSettings {
@@ -58,7 +53,7 @@ impl Player for DebugAI {
 	}
 }
 
-fn main() {
+fn main() -> SC2Result<()> {
 	let app = clap_app!(DebugBot =>
 		(version: crate_version!())
 		(author: crate_authors!())
@@ -103,7 +98,6 @@ fn main() {
 				+takes_value
 				"Sets human name"
 			)
-			(@arg realtime: --realtime "Enables realtime mode")
 		)
 	)
 	.get_matches();
@@ -114,104 +108,81 @@ fn main() {
 		None => unreachable!(),
 	};
 
-	let bot = Box::new(DebugAI::new(game_step));
+	let mut bot = DebugAI::new();
+	bot.game_step = game_step;
 
 	if app.is_present("ladder_server") {
 		run_ladder_game(
-			bot,
-			app.value_of("ladder_server").unwrap_or("127.0.0.1").to_string(),
-			app.value_of("host_port")
-				.expect("GamePort must be specified")
-				.to_string(),
+			&mut bot,
+			app.value_of("ladder_server").unwrap_or("127.0.0.1"),
+			app.value_of("host_port").expect("GamePort must be specified"),
 			app.value_of("player_port")
 				.expect("StartPort must be specified")
 				.parse()
 				.expect("Can't parse StartPort"),
 			app.value_of("opponent_id"),
 		)
-		.unwrap();
 	} else {
 		let mut rng = thread_rng();
 
-		let map;
-		let realtime;
-		let players: Vec<Box<dyn Player>>;
-
 		match app.subcommand() {
-			("local", Some(sub)) => {
-				map = match sub.value_of("map") {
-					Some(map) => Some(map.to_string()),
-					None => None,
-				};
-				realtime = sub.is_present("realtime");
-				players = vec![
-					bot,
-					Box::new(Computer(
-						match sub.value_of("race") {
-							Some(race) => race.parse().expect("Can't parse computer race"),
-							None => Race::Random,
-						},
-						match sub.value_of("difficulty") {
-							Some(difficulty) => difficulty.parse().expect("Can't parse computer difficulty"),
-							None => Difficulty::VeryEasy,
-						},
-						match sub.value_of("ai_build") {
-							Some(ai_build) => Some(ai_build.parse().expect("Can't parse computer build")),
-							None => None,
-						},
-					)),
-				];
-			}
-			("human", Some(sub)) => {
-				map = match sub.value_of("map") {
-					Some(map) => Some(map.to_string()),
-					None => None,
-				};
-				realtime = sub.is_present("realtime");
-				players = vec![
-					Box::new(Human(
-						match sub.value_of("race") {
-							Some(race) => race.parse().expect("Can't parse human race"),
-							None => unreachable!("Human race must be set"),
-						},
-						match sub.value_of("name") {
-							Some(name) => Some(name.to_string()),
-							None => None,
-						},
-					)),
-					bot,
-				];
-			}
+			("local", Some(sub)) => run_vs_computer(
+				&mut bot,
+				Computer::new(
+					sub.value_of("race").map_or(Race::Random, |race| {
+						race.parse().expect("Can't parse computer race")
+					}),
+					sub.value_of("difficulty")
+						.map_or(Difficulty::VeryEasy, |difficulty| {
+							difficulty.parse().expect("Can't parse computer difficulty")
+						}),
+					sub.value_of("ai_build")
+						.map(|ai_build| ai_build.parse().expect("Can't parse computer build")),
+				),
+				sub.value_of("map").unwrap_or_else(|| {
+					[
+						"AcropolisLE",
+						"DiscoBloodbathLE",
+						"EphemeronLE",
+						"ThunderbirdLE",
+						"TritonLE",
+						"WintersGateLE",
+						"WorldofSleepersLE",
+					]
+					.choose(&mut rng)
+					.unwrap()
+				}),
+				None,
+				sub.is_present("realtime"),
+			),
+			("human", Some(sub)) => run_vs_human(
+				&mut bot,
+				PlayerSettings::new(
+					sub.value_of("race")
+						.unwrap()
+						.parse()
+						.expect("Can't parse human race"),
+					sub.value_of("name").map(|name| name.to_string()),
+				),
+				sub.value_of("map").unwrap_or_else(|| {
+					[
+						"AcropolisLE",
+						"DiscoBloodbathLE",
+						"EphemeronLE",
+						"ThunderbirdLE",
+						"TritonLE",
+						"WintersGateLE",
+						"WorldofSleepersLE",
+					]
+					.choose(&mut rng)
+					.unwrap()
+				}),
+				None,
+			),
 			_ => {
 				println!("Game mode is not specified! Use -h, --help to print help information.");
 				std::process::exit(0);
 			}
 		}
-
-		// Maps:
-		// - Ladder_2019_Season_3:
-		//   - AcropolisLE, DiscoBloodbathLE, EphemeronLE, ThunderbirdLE, TritonLE, WintersGateLE, WorldofSleepersLE
-		// - Melee: Empty128, Flat32, Flat48, Flat64, Flat96, Flat128, Simple64, Simple96, Simple128.
-
-		run_game(
-			map.unwrap_or_else(|| {
-				(*[
-					"AcropolisLE",
-					"DiscoBloodbathLE",
-					"EphemeronLE",
-					"ThunderbirdLE",
-					"TritonLE",
-					"WintersGateLE",
-					"WorldofSleepersLE",
-				]
-				.choose(&mut rng)
-				.unwrap())
-				.to_string()
-			}),
-			players,
-			realtime,
-			None,
-		)
-		.unwrap();
 	}
 }
