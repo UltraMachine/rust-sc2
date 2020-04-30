@@ -16,7 +16,8 @@ use sc2_proto::{
 };
 use std::{
 	error::Error,
-	io::Write,
+	fs,
+	io::{stdout, Write},
 	net::TcpListener,
 	ops::{Deref, DerefMut},
 	process::{Child, Command},
@@ -76,7 +77,7 @@ pub fn send(ws: &mut WS, req: Request) -> SC2Result<Response> {
 
 #[inline]
 fn flush() -> SC2Result<()> {
-	std::io::stdout().flush()?;
+	stdout().flush()?;
 	Ok(())
 }
 
@@ -129,7 +130,11 @@ where
 	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
 {
 	println!("Starting game vs Computer.");
+
 	let sc2_path = get_path_to_sc2();
+	let map_path = format!("{}/Maps/{}.SC2Map", sc2_path, map_name);
+	// Check if path exists
+	fs::metadata(&map_path).unwrap_or_else(|_| panic!("Path doesn't exists: {}", map_path));
 	let port = get_unused_port();
 	let mut process = launch_client(&sc2_path, port, sc2_version)?;
 	let mut ws = connect_to_websocket(HOST, port)?;
@@ -141,9 +146,8 @@ where
 		// Create game
 		let mut req = Request::new();
 		let req_create_game = req.mut_create_game();
-		req_create_game
-			.mut_local_map()
-			.set_map_path(format!("{}/Maps/{}.SC2Map", sc2_path, map_name));
+
+		req_create_game.mut_local_map().set_map_path(map_path);
 		/*
 		Set Map
 			req.mut_create_game().mut_local_map().set_map_path("");
