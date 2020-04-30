@@ -268,12 +268,12 @@ impl Bot {
 				if u.race() != Race::Terran || !u.is_structure() {
 					if let Some(data) = self.game_data.units.get(&u.type_id) {
 						if let Some(ability) = data.ability {
-							*self.orders.entry(ability).or_default() += 1
+							*self.orders.entry(ability).or_default() += 1;
 						}
 					}
 				}
 			} else {
-				*self.current_units.entry(u.type_id).or_default() += 1
+				*self.current_units.entry(u.type_id).or_default() += 1;
 			}
 		});
 	}
@@ -470,14 +470,16 @@ impl Bot {
 		});
 	}
 	pub fn get_unit_api_cost(&self, unit: UnitTypeId) -> Cost {
-		match self.game_data.units.get(&unit) {
-			Some(data) => data.cost(),
-			None => Default::default(),
-		}
+		self.game_data
+			.units
+			.get(&unit)
+			.map_or_else(Default::default, |data| data.cost())
 	}
 	pub fn get_unit_cost(&self, unit: UnitTypeId) -> Cost {
-		match self.game_data.units.get(&unit) {
-			Some(data) => {
+		self.game_data
+			.units
+			.get(&unit)
+			.map_or_else(Default::default, |data| {
 				let mut cost = data.cost();
 				match unit {
 					UnitTypeId::Reactor => {
@@ -494,9 +496,7 @@ impl Bot {
 					_ => {}
 				}
 				cost
-			}
-			None => Default::default(),
-		}
+			})
 	}
 	pub fn can_afford(&self, unit: UnitTypeId, check_supply: bool) -> bool {
 		let cost = self.get_unit_cost(unit);
@@ -509,10 +509,10 @@ impl Bot {
 		true
 	}
 	pub fn get_upgrade_cost(&self, upgrade: UpgradeId) -> Cost {
-		match self.game_data.upgrades.get(&upgrade) {
-			Some(data) => data.cost(),
-			None => Default::default(),
-		}
+		self.game_data
+			.upgrades
+			.get(&upgrade)
+			.map_or_else(Default::default, |data| data.cost())
 	}
 	pub fn can_afford_upgrade(&self, upgrade: UpgradeId) -> bool {
 		let cost = self.get_upgrade_cost(upgrade);

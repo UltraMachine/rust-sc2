@@ -1,9 +1,6 @@
 use crate::{
 	action::{Commander, Target},
-	constants::{
-		RaceValues, ADDON_IDS, CONSTRUCTING_IDS, MELEE_IDS, TARGET_AIR, TARGET_GROUND, TOWNHALL_IDS,
-		WORKER_IDS,
-	},
+	constants::{RaceValues, TARGET_AIR, TARGET_GROUND},
 	game_data::{Attribute, GameData, TargetType, UnitTypeData, Weapon},
 	game_state::Alliance,
 	geometry::{Point2, Point3},
@@ -90,16 +87,68 @@ impl Unit {
 		self.data.game_data.units.get(&self.type_id)
 	}
 	pub fn is_worker(&self) -> bool {
-		WORKER_IDS.contains(&self.type_id)
+		matches!(
+			self.type_id,
+			UnitTypeId::SCV | UnitTypeId::Drone | UnitTypeId::Probe
+		)
 	}
 	pub fn is_townhall(&self) -> bool {
-		TOWNHALL_IDS.contains(&self.type_id)
+		matches!(
+			self.type_id,
+			UnitTypeId::CommandCenter
+				| UnitTypeId::OrbitalCommand
+				| UnitTypeId::PlanetaryFortress
+				| UnitTypeId::CommandCenterFlying
+				| UnitTypeId::OrbitalCommandFlying
+				| UnitTypeId::Hatchery
+				| UnitTypeId::Lair
+				| UnitTypeId::Hive
+				| UnitTypeId::Nexus
+		)
 	}
 	pub fn is_addon(&self) -> bool {
-		ADDON_IDS.contains(&self.type_id)
+		matches!(
+			self.type_id,
+			UnitTypeId::TechLab
+				| UnitTypeId::Reactor
+				| UnitTypeId::BarracksTechLab
+				| UnitTypeId::BarracksReactor
+				| UnitTypeId::FactoryTechLab
+				| UnitTypeId::FactoryReactor
+				| UnitTypeId::StarportTechLab
+				| UnitTypeId::StarportReactor
+		)
 	}
 	pub fn is_melee(&self) -> bool {
-		MELEE_IDS.contains(&self.type_id)
+		matches!(
+			self.type_id,
+			UnitTypeId::SCV
+				| UnitTypeId::Drone
+				| UnitTypeId::DroneBurrowed
+				| UnitTypeId::Probe
+				| UnitTypeId::Zergling
+				| UnitTypeId::ZerglingBurrowed
+				| UnitTypeId::BanelingCocoon
+				| UnitTypeId::Baneling
+				| UnitTypeId::BanelingBurrowed
+				| UnitTypeId::Broodling
+				| UnitTypeId::Zealot
+				| UnitTypeId::DarkTemplar
+				| UnitTypeId::Ultralisk
+				| UnitTypeId::UltraliskBurrowed
+		)
+	}
+	pub fn is_detector(&self) -> bool {
+		matches!(
+			self.type_id,
+			UnitTypeId::Observer
+				| UnitTypeId::ObserverSiegeMode
+				| UnitTypeId::Raven
+				| UnitTypeId::Overseer
+				| UnitTypeId::OverseerSiegeMode
+		) || (self.is_ready()
+			&& (matches!(self.type_id, UnitTypeId::MissileTurret | UnitTypeId::SporeCrawler)
+				|| (matches!(self.type_id, UnitTypeId::PhotonCannon) && self.is_powered)))
 	}
 	pub fn is_ready(&self) -> bool {
 		(self.build_progress - 1.0).abs() < std::f32::EPSILON
@@ -108,57 +157,49 @@ impl Unit {
 		self.add_on_tag.is_some()
 	}
 	pub fn has_techlab(&self) -> bool {
-		match self.add_on_tag {
-			Some(tag) => self.data.techlab_tags.contains(&tag),
-			None => false,
-		}
+		self.add_on_tag
+			.map_or(false, |tag| self.data.techlab_tags.contains(&tag))
 	}
 	pub fn has_reactor(&self) -> bool {
-		match self.add_on_tag {
-			Some(tag) => self.data.reactor_tags.contains(&tag),
-			None => false,
-		}
+		self.add_on_tag
+			.map_or(false, |tag| self.data.reactor_tags.contains(&tag))
 	}
 	pub fn race(&self) -> Race {
-		match self.type_data() {
-			Some(data) => data.race,
-			None => Race::Random,
-		}
+		self.type_data().map_or(Race::Random, |data| data.race)
 	}
 	pub fn footprint_radius(&self) -> Option<f32> {
-		if let Some(data) = self.type_data() {
-			if let Some(ability) = data.ability {
-				if let Some(ability_data) = self.data.game_data.abilities.get(&ability) {
-					return ability_data.footprint_radius;
-				}
-			}
-		}
-		None
+		self.type_data().and_then(|data| {
+			data.ability.and_then(|ability| {
+				self.data
+					.game_data
+					.abilities
+					.get(&ability)
+					.and_then(|ability_data| ability_data.footprint_radius)
+			})
+		})
 	}
 	pub fn building_size(&self) -> Option<usize> {
 		if self.is_addon() {
-			return Some(2);
+			Some(2)
+		} else {
+			self.footprint_radius().map(|radius| (radius * 2.0) as usize)
 		}
-		if let Some(radius) = self.footprint_radius() {
-			return Some((radius * 2.0) as usize);
-		}
-		None
 	}
 	pub fn towards_facing(&self, offset: f32) -> Point2 {
 		self.position
 			.offset(offset * self.facing.cos(), offset * self.facing.sin())
 	}
 	pub fn is_visible(&self) -> bool {
-		self.display_type == DisplayType::Visible
+		self.display_type.is_visible()
 	}
 	pub fn is_snapshot(&self) -> bool {
-		self.display_type == DisplayType::Snapshot
+		self.display_type.is_snapshot()
 	}
 	pub fn is_hidden(&self) -> bool {
-		self.display_type == DisplayType::Hidden
+		self.display_type.is_hidden()
 	}
 	pub fn is_placeholder(&self) -> bool {
-		self.display_type == DisplayType::Placeholder
+		self.display_type.is_placeholder()
 	}
 	pub fn is_mine(&self) -> bool {
 		self.alliance.is_mine()
@@ -185,10 +226,7 @@ impl Unit {
 		matches!(self.cloak, CloakState::NotCloaked | CloakState::CloakedDetected)
 	}
 	pub fn supply_cost(&self) -> f32 {
-		match self.type_data() {
-			Some(data) => data.food_required,
-			None => 0.0,
-		}
+		self.type_data().map_or(0.0, |data| data.food_required)
 	}
 	pub fn hits(&self) -> Option<f32> {
 		match (self.health, self.shield) {
@@ -207,16 +245,11 @@ impl Unit {
 		}
 	}
 	pub fn speed(&self) -> f32 {
-		match self.type_data() {
-			Some(data) => data.movement_speed,
-			None => 0.0,
-		}
+		self.type_data().map_or(0.0, |data| data.movement_speed)
 	}
 	pub fn has_attribute(&self, attribute: Attribute) -> bool {
-		match self.type_data() {
-			Some(data) => data.attributes.contains(&attribute),
-			None => false,
-		}
+		self.type_data()
+			.map_or(false, |data| data.attributes.contains(&attribute))
 	}
 	pub fn is_light(&self) -> bool {
 		self.has_attribute(Attribute::Light)
@@ -302,122 +335,98 @@ impl Unit {
 		dx * dx + dy * dy
 	}
 	fn weapons(&self) -> Option<Vec<Weapon>> {
-		if let Some(data) = self.type_data() {
-			return Some(data.weapons.clone());
-		}
-		None
+		self.type_data().map(|data| data.weapons.clone())
 	}
 	pub fn can_attack(&self) -> bool {
-		match self.weapons() {
-			Some(weapons) => !weapons.is_empty(),
-			None => false,
-		}
+		self.weapons().map_or(false, |weapons| !weapons.is_empty())
 	}
 	pub fn can_attack_both(&self) -> bool {
-		match self.weapons() {
-			Some(weapons) => {
-				!weapons.is_empty() && weapons.iter().any(|w| w.target == TargetType::Any)
-				/*|| {
-					let mut ground = false;
-					let mut air = false;
-					for w in weapons {
-						match w.target {
-							TargetType::Ground => ground = true,
-							TargetType::Air => air = true,
-							_ => break,
-						}
-						if ground && air {
-							break;
-						}
+		self.weapons().map_or(false, |weapons| {
+			!weapons.is_empty() && weapons.iter().any(|w| w.target == TargetType::Any)
+			/* || {
+				let mut ground = false;
+				let mut air = false;
+				for w in weapons {
+					match w.target {
+						TargetType::Ground => ground = true,
+						TargetType::Air => air = true,
+						_ => break,
 					}
-					ground && air
-				})*/
-			}
-			None => false,
-		}
+					if ground && air {
+						break;
+					}
+				}
+				ground && air
+			}*/
+		})
 	}
 	pub fn can_attack_ground(&self) -> bool {
-		match self.weapons() {
-			Some(weapons) => !weapons.is_empty() && weapons.iter().any(|w| TARGET_GROUND.contains(&w.target)),
-			None => false,
-		}
+		// todo: fix Sentry
+		self.weapons().map_or(false, |weapons| {
+			!weapons.is_empty() && weapons.iter().any(|w| TARGET_GROUND.contains(&w.target))
+		})
 	}
 	pub fn can_attack_air(&self) -> bool {
-		match self.weapons() {
-			Some(weapons) => !weapons.is_empty() && weapons.iter().any(|w| TARGET_AIR.contains(&w.target)),
-			None => false,
-		}
+		self.weapons().map_or(false, |weapons| {
+			!weapons.is_empty() && weapons.iter().any(|w| TARGET_AIR.contains(&w.target))
+		})
 	}
 	pub fn on_cooldown(&self) -> bool {
-		match self.weapon_cooldown {
-			Some(cool) => cool > 0.0,
-			None => panic!("Can't get cooldown on enemies"),
-		}
+		self.weapon_cooldown
+			.map_or_else(|| panic!("Can't get cooldown on enemies"), |cool| cool > 0.0)
 	}
 	// cooldown < 50%
 	pub fn on_half_cooldown(&self) -> bool {
-		match self.weapon_cooldown {
-			Some(cool) => match self.max_cooldown() {
-				Some(max) => cool * 2.0 < max,
-				None => !self.on_cooldown(),
+		self.weapon_cooldown.map_or_else(
+			|| panic!("Can't get cooldown on enemies"),
+			|cool| {
+				self.max_cooldown()
+					.map_or_else(|| !self.on_cooldown(), |max| cool * 2.0 < max)
 			},
-			None => panic!("Can't get cooldown on enemies"),
-		}
+		)
 	}
 	pub fn max_cooldown(&self) -> Option<f32> {
 		self.data.max_cooldowns.borrow().get(&self.type_id).copied()
 	}
 	pub fn ground_range(&self) -> f32 {
-		match self.weapons() {
-			Some(weapons) => {
-				for w in weapons {
-					if TARGET_GROUND.contains(&w.target) {
-						return w.range;
-					}
+		self.weapons().map_or(0.0, |weapons| {
+			for w in weapons {
+				if TARGET_GROUND.contains(&w.target) {
+					return w.range;
 				}
-				0.0
 			}
-			None => 0.0,
-		}
+			0.0
+		})
 	}
 	pub fn air_range(&self) -> f32 {
-		match self.weapons() {
-			Some(weapons) => {
-				for w in weapons {
-					if TARGET_AIR.contains(&w.target) {
-						return w.range;
-					}
+		self.weapons().map_or(0.0, |weapons| {
+			for w in weapons {
+				if TARGET_AIR.contains(&w.target) {
+					return w.range;
 				}
-				0.0
 			}
-			None => 0.0,
-		}
+			0.0
+		})
 	}
 	pub fn ground_dps(&self) -> f32 {
-		match self.weapons() {
-			Some(weapons) => {
-				for w in weapons {
-					if TARGET_GROUND.contains(&w.target) {
-						return w.damage * (w.attacks as f32) / w.speed;
-					}
+		self.weapons().map_or(0.0, |weapons| {
+			for w in weapons {
+				if TARGET_GROUND.contains(&w.target) {
+					return w.damage * (w.attacks as f32) / w.speed;
 				}
-				0.0
 			}
-			None => 0.0,
-		}
+			0.0
+		})
 	}
 	pub fn air_dps(&self) -> f32 {
-		match self.weapons() {
-			Some(weapons) => {
-				for w in weapons {
-					if TARGET_AIR.contains(&w.target) {
-						return w.damage * (w.attacks as f32) / w.speed;
-					}
+		self.weapons().map_or(0.0, |weapons| {
+			for w in weapons {
+				if TARGET_AIR.contains(&w.target) {
+					return w.damage * (w.attacks as f32) / w.speed;
 				}
-				0.0
 			}
-			None => 0.0,
-		}
+			0.0
+		})
 	}
 	pub fn in_range(&self, target: &Unit, gap: f32) -> bool {
 		let range = {
@@ -447,16 +456,16 @@ impl Unit {
 		}
 	}
 	pub fn target_pos(&self) -> Option<Point2> {
-		if let Target::Pos(pos) = self.target() {
-			return Some(pos);
+		match self.target() {
+			Target::Pos(pos) => Some(pos),
+			_ => None,
 		}
-		None
 	}
 	pub fn target_tag(&self) -> Option<u64> {
-		if let Target::Tag(tag) = self.target() {
-			return Some(tag);
+		match self.target() {
+			Target::Tag(tag) => Some(tag),
+			_ => None,
 		}
-		None
 	}
 	pub fn ordered_ability(&self) -> Option<AbilityId> {
 		if self.is_idle() {
@@ -493,17 +502,15 @@ impl Unit {
 		!self.is_idle() && abilities.any(|a| self.orders[0].ability == a)
 	}
 	pub fn is_attacking(&self) -> bool {
-		self.is_using_any(
-			[
-				AbilityId::Attack,
-				AbilityId::AttackAttack,
-				AbilityId::AttackAttackTowards,
-				AbilityId::AttackAttackBarrage,
-				AbilityId::ScanMove,
-			]
-			.iter()
-			.copied(),
-		)
+		!self.is_idle()
+			&& matches!(
+				self.orders[0].ability,
+				AbilityId::Attack
+					| AbilityId::AttackAttack
+					| AbilityId::AttackAttackTowards
+					| AbilityId::AttackAttackBarrage
+					| AbilityId::ScanMove
+			)
 	}
 	pub fn is_moving(&self) -> bool {
 		self.is_using(AbilityId::MoveMove)
@@ -512,15 +519,11 @@ impl Unit {
 		self.is_using(AbilityId::Patrol)
 	}
 	pub fn is_repairing(&self) -> bool {
-		self.is_using_any(
-			[
-				AbilityId::EffectRepair,
-				AbilityId::EffectRepairSCV,
-				AbilityId::EffectRepairMule,
-			]
-			.iter()
-			.copied(),
-		)
+		!self.is_idle()
+			&& matches!(
+				self.orders[0].ability,
+				AbilityId::EffectRepair | AbilityId::EffectRepairSCV | AbilityId::EffectRepairMule
+			)
 	}
 	pub fn is_gathering(&self) -> bool {
 		self.is_using(AbilityId::HarvestGather)
@@ -529,20 +532,69 @@ impl Unit {
 		self.is_using(AbilityId::HarvestReturn)
 	}
 	pub fn is_collecting(&self) -> bool {
-		self.is_using_any(
-			[AbilityId::HarvestGather, AbilityId::HarvestReturn]
-				.iter()
-				.copied(),
-		)
+		!self.is_idle()
+			&& matches!(
+				self.orders[0].ability,
+				AbilityId::HarvestGather | AbilityId::HarvestReturn
+			)
 	}
 	pub fn is_constructing(&self) -> bool {
-		self.is_using_any(CONSTRUCTING_IDS.iter().copied())
+		!self.is_idle()
+			&& matches!(
+				self.orders[0].ability,
+				// Terran
+				AbilityId::TerranBuildCommandCenter
+					| AbilityId::TerranBuildSupplyDepot
+					| AbilityId::TerranBuildRefinery
+					| AbilityId::TerranBuildBarracks
+					| AbilityId::TerranBuildEngineeringBay
+					| AbilityId::TerranBuildMissileTurret
+					| AbilityId::TerranBuildBunker
+					| AbilityId::TerranBuildSensorTower
+					| AbilityId::TerranBuildGhostAcademy
+					| AbilityId::TerranBuildFactory
+					| AbilityId::TerranBuildStarport
+					| AbilityId::TerranBuildArmory
+					| AbilityId::TerranBuildFusionCore
+					// Protoss
+					| AbilityId::ProtossBuildNexus
+					| AbilityId::ProtossBuildPylon
+					| AbilityId::ProtossBuildAssimilator
+					| AbilityId::ProtossBuildGateway
+					| AbilityId::ProtossBuildForge
+					| AbilityId::ProtossBuildFleetBeacon
+					| AbilityId::ProtossBuildTwilightCouncil
+					| AbilityId::ProtossBuildPhotonCannon
+					| AbilityId::ProtossBuildStargate
+					| AbilityId::ProtossBuildTemplarArchive
+					| AbilityId::ProtossBuildDarkShrine
+					| AbilityId::ProtossBuildRoboticsBay
+					| AbilityId::ProtossBuildRoboticsFacility
+					| AbilityId::ProtossBuildCyberneticsCore
+					| AbilityId::BuildShieldBattery
+					// Zerg
+					| AbilityId::ZergBuildHatchery
+					| AbilityId::ZergBuildCreepTumor
+					| AbilityId::ZergBuildExtractor
+					| AbilityId::ZergBuildSpawningPool
+					| AbilityId::ZergBuildEvolutionChamber
+					| AbilityId::ZergBuildHydraliskDen
+					| AbilityId::ZergBuildSpire
+					| AbilityId::ZergBuildUltraliskCavern
+					| AbilityId::ZergBuildInfestationPit
+					| AbilityId::ZergBuildNydusNetwork
+					| AbilityId::ZergBuildBanelingNest
+					| AbilityId::BuildLurkerDen
+					| AbilityId::ZergBuildRoachWarren
+					| AbilityId::ZergBuildSpineCrawler
+					| AbilityId::ZergBuildSporeCrawler
+			)
 	}
 	// Actions
 	pub fn command(&self, ability: AbilityId, target: Target, queue: bool) {
-		if !self.allow_spam && !self.is_idle() {
+		if !queue && !self.allow_spam && !self.is_idle() {
 			let last_order = &self.orders[0];
-			if !queue && ability == last_order.ability && target == last_order.target {
+			if ability == last_order.ability && target == last_order.target {
 				return;
 			}
 		}
@@ -711,12 +763,26 @@ impl FromProtoData<ProtoUnit> for Unit {
 	}
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum DisplayType {
 	Visible,     // Fully visible
 	Snapshot,    // Dimmed version of unit left behind after entering fog of war
 	Hidden,      // Fully hidden
 	Placeholder, // Building that hasn't started construction.
+}
+impl DisplayType {
+	pub fn is_visible(self) -> bool {
+		matches!(self, DisplayType::Visible)
+	}
+	pub fn is_snapshot(self) -> bool {
+		matches!(self, DisplayType::Snapshot)
+	}
+	pub fn is_hidden(self) -> bool {
+		matches!(self, DisplayType::Hidden)
+	}
+	pub fn is_placeholder(self) -> bool {
+		matches!(self, DisplayType::Placeholder)
+	}
 }
 impl FromProto<ProtoDisplayType> for DisplayType {
 	fn from_proto(display_type: ProtoDisplayType) -> Self {

@@ -12,6 +12,20 @@ pub enum Race {
 	Protoss,
 	Random,
 }
+impl Race {
+	pub fn is_terran(self) -> bool {
+		matches!(self, Race::Terran)
+	}
+	pub fn is_zerg(self) -> bool {
+		matches!(self, Race::Zerg)
+	}
+	pub fn is_protoss(self) -> bool {
+		matches!(self, Race::Protoss)
+	}
+	pub fn is_random(self) -> bool {
+		matches!(self, Race::Random)
+	}
+}
 impl FromProto<ProtoRace> for Race {
 	fn from_proto(race: ProtoRace) -> Self {
 		match race {

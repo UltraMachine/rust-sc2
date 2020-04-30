@@ -38,17 +38,12 @@ pub fn get_latest_base_version(sc2_path: &str) -> u32 {
 		.expect("Can't read `Versions` folder")
 		.filter_map(|dir| {
 			let dir = dir.unwrap();
-			if match dir.file_type() {
-				Ok(ftype) => ftype.is_dir(),
-				Err(_) => false,
-			} {
-				match dir.file_name().to_str() {
-					Some(name) if name.starts_with("Base") => Some(name[4..].parse::<u32>().unwrap()),
-					_ => None,
-				}
-			} else {
-				None
-			}
+			dir.file_type().ok().filter(|ftype| ftype.is_dir()).and(
+				dir.file_name()
+					.to_str()
+					.filter(|name| name.starts_with("Base"))
+					.map(|name| name[4..].parse::<u32>().unwrap()),
+			)
 		})
 		.max()
 		.unwrap()

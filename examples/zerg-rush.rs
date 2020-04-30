@@ -21,7 +21,7 @@ struct ZergRushAI {
 }
 
 impl ZergRushAI {
-	const DISTRIBUTION_DELAY: u32 = 16;
+	const DISTRIBUTION_DELAY: u32 = 8;
 
 	#[bot_new]
 	fn new() -> Self {
@@ -364,13 +364,14 @@ impl ZergRushAI {
 							abilities.contains(&AbilityId::EffectInjectLarva)
 						})
 				});
-				hatcheries.iter().for_each(|h| {
-					if !queens.is_empty() {
-						let queen = queens.closest(h).clone();
-						queens.remove(queen.tag);
-						queen.command(AbilityId::EffectInjectLarva, Target::Tag(h.tag), false);
+				for h in hatcheries.iter() {
+					if queens.is_empty() {
+						break;
 					}
-				});
+					let queen = queens.closest(h).clone();
+					queens.remove(queen.tag);
+					queen.command(AbilityId::EffectInjectLarva, Target::Tag(h.tag), false);
+				}
 			}
 		}
 

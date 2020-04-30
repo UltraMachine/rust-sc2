@@ -22,7 +22,7 @@ struct ReaperRushAI {
 }
 
 impl ReaperRushAI {
-	const DISTRIBUTION_DELAY: u32 = 16;
+	const DISTRIBUTION_DELAY: u32 = 8;
 
 	#[bot_new]
 	fn new() -> Self {
@@ -251,7 +251,7 @@ impl ReaperRushAI {
 		self.game_info.pathing_grid[pos].is_empty()
 	}
 	fn throw_mine(&mut self, reaper: &Unit, target: &Unit) -> bool {
-		if let Some(abilities) = self.abilities_units.get(&reaper.tag) {
+		self.abilities_units.get(&reaper.tag).map_or(false, |abilities| {
 			if abilities.contains(&AbilityId::KD8ChargeKD8Charge)
 				&& reaper.distance_squared(target)
 					<= (reaper.radius
@@ -261,10 +261,11 @@ impl ReaperRushAI {
 					.powi(2)
 			{
 				reaper.command(AbilityId::KD8ChargeKD8Charge, Target::Pos(target.position), false);
-				return true;
+				true
+			} else {
+				false
 			}
-		}
-		false
+		})
 	}
 	fn execute_micro(&mut self) {
 		// Lower ready depots
@@ -279,22 +280,13 @@ impl ReaperRushAI {
 		if reapers.is_empty() {
 			return;
 		}
-		let targets = {
-			let attackers = self
-				.grouped_units
+		let targets = Some(
+			self.grouped_units
 				.enemies
-				.filter(|u| !u.is_flying && u.can_attack_ground());
-			if attackers.is_empty() {
-				let ground = self.grouped_units.enemies.ground();
-				if ground.is_empty() {
-					None
-				} else {
-					Some(ground)
-				}
-			} else {
-				Some(attackers)
-			}
-		};
+				.filter(|u| !u.is_flying && u.can_attack_ground()),
+		)
+		.filter(|attackers| !attackers.is_empty())
+		.or_else(|| Some(self.grouped_units.enemies.ground()).filter(|ground| !ground.is_empty()));
 
 		reapers.iter().for_each(|u| {
 			let is_retreating = self.reapers_retreat.contains(&u.tag);
@@ -312,13 +304,8 @@ impl ReaperRushAI {
 				Some(targets) => {
 					if !self.throw_mine(u, &targets.closest(u)) {
 						if is_retreating || u.on_cooldown() {
-							let close_enemies = targets.in_range(u, {
-								if is_retreating {
-									2.0
-								} else {
-									0.5
-								}
-							});
+							let close_enemies = targets
+								.filter(|t| t.in_range(u, t.speed() + if is_retreating { 2.0 } else { 0.5 }));
 							if !close_enemies.is_empty() {
 								let retreat_position = {
 									let closest = close_enemies.closest(u).position;
@@ -342,14 +329,14 @@ impl ReaperRushAI {
 							} else {
 								let closest = targets.closest(u);
 								if !u.in_range(&closest, 0.0) {
-									(u.move_to(
+									u.move_to(
 										Target::Pos(if is_retreating {
 											u.position
 										} else {
 											closest.position
 										}),
 										false,
-									));
+									);
 								}
 							}
 						} else {
@@ -363,14 +350,14 @@ impl ReaperRushAI {
 					}
 				}
 				None => {
-					(u.move_to(
+					u.move_to(
 						Target::Pos(if is_retreating {
 							u.position
 						} else {
 							self.enemy_start
 						}),
 						false,
-					));
+					);
 				}
 			}
 		});

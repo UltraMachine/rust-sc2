@@ -28,52 +28,27 @@ impl FromProto<ResponseData> for GameData {
 			abilities: data
 				.get_abilities()
 				.iter()
-				.filter_map(|a| {
-					if let Some(data) = AbilityData::try_from_proto(a.clone()) {
-						return Some((data.id, data));
-					}
-					None
-				})
+				.filter_map(|a| AbilityData::try_from_proto(a.clone()).map(|data| (data.id, data)))
 				.collect(),
 			units: data
 				.get_units()
 				.iter()
-				.filter_map(|u| {
-					if let Some(data) = UnitTypeData::try_from_proto(u.clone()) {
-						return Some((data.id, data));
-					}
-					None
-				})
+				.filter_map(|u| UnitTypeData::try_from_proto(u.clone()).map(|data| (data.id, data)))
 				.collect(),
 			upgrades: data
 				.get_upgrades()
 				.iter()
-				.filter_map(|u| {
-					if let Some(data) = UpgradeData::try_from_proto(u.clone()) {
-						return Some((data.id, data));
-					}
-					None
-				})
+				.filter_map(|u| UpgradeData::try_from_proto(u.clone()).map(|data| (data.id, data)))
 				.collect(),
 			buffs: data
 				.get_buffs()
 				.iter()
-				.filter_map(|b| {
-					if let Some(data) = BuffData::try_from_proto(b.clone()) {
-						return Some((data.id, data));
-					}
-					None
-				})
+				.filter_map(|b| BuffData::try_from_proto(b.clone()).map(|data| (data.id, data)))
 				.collect(),
 			effects: data
 				.get_effects()
 				.iter()
-				.filter_map(|e| {
-					if let Some(data) = EffectData::try_from_proto(e.clone()) {
-						return Some((data.id, data));
-					}
-					None
-				})
+				.filter_map(|e| EffectData::try_from_proto(e.clone()).map(|data| (data.id, data)))
 				.collect(),
 		}
 	}
@@ -201,11 +176,8 @@ pub struct AbilityData {
 }
 impl TryFromProto<ProtoAbilityData> for AbilityData {
 	fn try_from_proto(a: ProtoAbilityData) -> Option<Self> {
-		Some(Self {
-			id: match AbilityId::from_u32(a.get_ability_id()) {
-				Some(id) => id,
-				None => return None,
-			},
+		AbilityId::from_u32(a.get_ability_id()).map(|id| Self {
+			id,
 			link_name: a.get_link_name().to_string(),
 			link_index: a.get_link_index(),
 			button_name: a.button_name.clone().into_option(),
@@ -261,11 +233,8 @@ impl UnitTypeData {
 }
 impl TryFromProto<ProtoUnitTypeData> for UnitTypeData {
 	fn try_from_proto(u: ProtoUnitTypeData) -> Option<Self> {
-		Some(Self {
-			id: match UnitTypeId::from_u32(u.get_unit_id()) {
-				Some(id) => id,
-				None => return None,
-			},
+		UnitTypeId::from_u32(u.get_unit_id()).map(|id| Self {
+			id,
 			name: u.get_name().to_string(),
 			available: u.get_available(),
 			cargo_size: u.get_cargo_size(),
@@ -324,19 +293,15 @@ impl UpgradeData {
 }
 impl TryFromProto<ProtoUpgradeData> for UpgradeData {
 	fn try_from_proto(u: ProtoUpgradeData) -> Option<Self> {
-		Some(Self {
-			id: match UpgradeId::from_u32(u.get_upgrade_id()) {
-				Some(id) => id,
-				None => return None,
-			},
-			name: u.get_name().to_string(),
-			mineral_cost: u.get_mineral_cost(),
-			vespene_cost: u.get_vespene_cost(),
-			research_time: u.get_research_time(),
-			ability: match AbilityId::from_u32(u.get_ability_id()) {
-				Some(id) => id,
-				None => return None,
-			},
+		UpgradeId::from_u32(u.get_upgrade_id()).and_then(|id| {
+			AbilityId::from_u32(u.get_ability_id()).map(|ability| Self {
+				id,
+				name: u.get_name().to_string(),
+				mineral_cost: u.get_mineral_cost(),
+				vespene_cost: u.get_vespene_cost(),
+				research_time: u.get_research_time(),
+				ability,
+			})
 		})
 	}
 }
@@ -348,11 +313,8 @@ pub struct BuffData {
 }
 impl TryFromProto<ProtoBuffData> for BuffData {
 	fn try_from_proto(b: ProtoBuffData) -> Option<Self> {
-		Some(Self {
-			id: match BuffId::from_u32(b.get_buff_id()) {
-				Some(id) => id,
-				None => return None,
-			},
+		BuffId::from_u32(b.get_buff_id()).map(|id| Self {
+			id,
 			name: b.get_name().to_string(),
 		})
 	}
@@ -369,11 +331,7 @@ pub struct EffectData {
 }
 impl TryFromProto<ProtoEffectData> for EffectData {
 	fn try_from_proto(e: ProtoEffectData) -> Option<Self> {
-		let id = match EffectId::from_u32(e.get_effect_id()) {
-			Some(id) => id,
-			None => return None,
-		};
-		Some(Self {
+		EffectId::from_u32(e.get_effect_id()).map(|id| Self {
 			id,
 			name: e.get_name().to_string(),
 			friendly_name: e.get_friendly_name().to_string(),

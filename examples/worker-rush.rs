@@ -51,14 +51,20 @@ impl Player for WorkerRushAI {
 			!u.is_flying && u.can_attack_ground() && u.distance_pos_squared(self.enemy_start) < 2025.0
 		});
 		if !ground_attackers.is_empty() {
-			self.grouped_units.workers.clone().iter().for_each(|u| {
+			let mineral_back = self.mineral_back;
+			let mineral_forward = self.mineral_forward;
+			self.grouped_units.workers.iter().for_each(|u| {
 				let closest = ground_attackers.closest(&u);
-				if u.shield > Some(0.0) {
-					u.attack(Target::Tag(closest.tag), false);
+				if u.shield > Some(5.0) {
+					if !u.on_cooldown() {
+						u.attack(Target::Tag(closest.tag), false);
+					} else {
+						u.gather(mineral_back, false);
+					}
 				} else if u.in_range_of(&closest, 2.0) {
-					u.gather(self.mineral_back, false);
+					u.gather(mineral_back, false);
 				} else {
-					u.gather(self.mineral_forward, false);
+					u.gather(mineral_forward, false);
 				}
 			})
 		} else {
@@ -67,12 +73,13 @@ impl Player for WorkerRushAI {
 				.enemy_structures
 				.filter(|u| !u.is_flying && u.distance_pos_squared(self.enemy_start) < 2025.0);
 			if !ground_structures.is_empty() {
-				self.grouped_units.workers.clone().iter().for_each(|u| {
+				self.grouped_units.workers.iter().for_each(|u| {
 					u.attack(Target::Tag(ground_structures.closest(&u).tag), false);
 				})
 			} else {
-				self.grouped_units.workers.clone().iter().for_each(|u| {
-					u.gather(self.mineral_forward, false);
+				let mineral_forward = self.mineral_forward;
+				self.grouped_units.workers.iter().for_each(|u| {
+					u.gather(mineral_forward, false);
 				})
 			}
 		}
