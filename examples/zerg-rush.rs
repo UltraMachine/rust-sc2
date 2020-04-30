@@ -34,11 +34,12 @@ impl ZergRushAI {
 			return;
 		}
 		let mut idle_workers = self.grouped_units.workers.idle();
+		let bases = self.grouped_units.townhalls.ready();
 
 		// Check distribution delay if there aren't any idle workers
 		let game_loop = self.state.observation.game_loop;
 		let last_loop = &mut self.last_loop_distributed;
-		if idle_workers.is_empty() && *last_loop + Self::DISTRIBUTION_DELAY > game_loop {
+		if idle_workers.is_empty() && *last_loop + Self::DISTRIBUTION_DELAY + bases.len() as u32 > game_loop {
 			return;
 		}
 		*last_loop = game_loop;
@@ -48,7 +49,6 @@ impl ZergRushAI {
 		if mineral_fields.is_empty() {
 			return;
 		}
-		let bases = self.grouped_units.townhalls.ready();
 		if bases.is_empty() {
 			return;
 		}

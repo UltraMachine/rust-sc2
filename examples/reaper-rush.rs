@@ -223,7 +223,7 @@ impl ReaperRushAI {
 	}
 
 	fn train(&mut self) {
-		if self.supply_workers < 20 && self.can_afford(UnitTypeId::SCV, true) {
+		if self.supply_workers < 22 && self.can_afford(UnitTypeId::SCV, true) {
 			let townhalls = &self.grouped_units.townhalls;
 			if !townhalls.is_empty() {
 				let ccs = townhalls.filter(|u| u.is_ready() && u.is_almost_idle());
