@@ -51,8 +51,8 @@ pub struct Bot {
 	pub supply_left: u32,
 	pub start_location: Point2,
 	pub enemy_start: Point2,
-	pub start_resource_center: Point2,
-	pub enemy_start_resource_center: Point2,
+	pub start_center: Point2,
+	pub enemy_start_center: Point2,
 	pub techlab_tags: Rc<Vec<u64>>,
 	pub reactor_tags: Rc<Vec<u64>>,
 	pub expansions: Vec<(Point2, Point2)>,
@@ -90,8 +90,8 @@ impl Bot {
 			supply_left: Default::default(),
 			start_location: Default::default(),
 			enemy_start: Default::default(),
-			start_resource_center: Default::default(),
-			enemy_start_resource_center: Default::default(),
+			start_center: Default::default(),
+			enemy_start_center: Default::default(),
 			techlab_tags: Default::default(),
 			reactor_tags: Default::default(),
 			expansions: Default::default(),
@@ -165,12 +165,12 @@ impl Bot {
 		self.start_location = self.grouped_units.townhalls[0].position;
 		self.enemy_start = self.game_info.start_locations[0];
 
-		self.start_resource_center = self
+		self.start_center = self
 			.grouped_units
 			.resources
 			.closer_pos(11.0, self.start_location)
 			.center();
-		self.enemy_start_resource_center = self
+		self.enemy_start_center = self
 			.grouped_units
 			.resources
 			.closer_pos(11.0, self.enemy_start)
@@ -301,12 +301,12 @@ impl Bot {
 		let mut reactor_tags = Vec::new();
 		let mut max_cooldowns = self.max_cooldowns.borrow_mut();
 
-		self.state.observation.raw.units.iter().cloned().for_each(|u| {
+		self.state.observation.raw.units.iter().for_each(|u| {
 			let u_type = u.type_id;
 			match u.alliance {
 				Alliance::Neutral => match u_type {
 					UnitTypeId::XelNagaTower => {
-						watchtowers.push(u);
+						watchtowers.push(u.clone());
 					}
 					UnitTypeId::RichMineralField
 					| UnitTypeId::RichMineralField750
@@ -324,7 +324,7 @@ impl Bot {
 					| UnitTypeId::MineralFieldOpaque
 					| UnitTypeId::MineralFieldOpaque900 => {
 						resources.push(u.clone());
-						mineral_fields.push(u);
+						mineral_fields.push(u.clone());
 					}
 					UnitTypeId::VespeneGeyser
 					| UnitTypeId::SpacePlatformGeyser
@@ -333,15 +333,15 @@ impl Bot {
 					| UnitTypeId::PurifierVespeneGeyser
 					| UnitTypeId::ShakurasVespeneGeyser => {
 						resources.push(u.clone());
-						vespene_geysers.push(u);
+						vespene_geysers.push(u.clone());
 					}
 					UnitTypeId::InhibitorZoneSmall
 					| UnitTypeId::InhibitorZoneMedium
 					| UnitTypeId::InhibitorZoneLarge => {
-						inhibitor_zones.push(u);
+						inhibitor_zones.push(u.clone());
 					}
 					_ => {
-						destructables.push(u);
+						destructables.push(u.clone());
 					}
 				},
 				Alliance::Own => {
@@ -358,7 +358,7 @@ impl Bot {
 					}
 					if u.is_structure() {
 						if u.is_placeholder() {
-							placeholders.push(u);
+							placeholders.push(u.clone());
 						} else {
 							structures.push(u.clone());
 							match u_type {
@@ -371,7 +371,7 @@ impl Bot {
 								| UnitTypeId::Lair
 								| UnitTypeId::Hive
 								| UnitTypeId::Nexus => {
-									townhalls.push(u);
+									townhalls.push(u.clone());
 								}
 								UnitTypeId::Refinery
 								| UnitTypeId::RefineryRich
@@ -379,7 +379,7 @@ impl Bot {
 								| UnitTypeId::AssimilatorRich
 								| UnitTypeId::Extractor
 								| UnitTypeId::ExtractorRich => {
-									gas_buildings.push(u);
+									gas_buildings.push(u.clone());
 								}
 								UnitTypeId::TechLab
 								| UnitTypeId::BarracksTechLab
@@ -397,10 +397,10 @@ impl Bot {
 						units.push(u.clone());
 						match u_type {
 							UnitTypeId::SCV | UnitTypeId::Probe | UnitTypeId::Drone => {
-								workers.push(u);
+								workers.push(u.clone());
 							}
 							UnitTypeId::Larva => {
-								larvas.push(u);
+								larvas.push(u.clone());
 							}
 							_ => {}
 						}
@@ -423,12 +423,12 @@ impl Bot {
 						]
 						.contains(&u_type)
 						{
-							enemy_townhalls.push(u);
+							enemy_townhalls.push(u.clone());
 						}
 					} else {
 						enemy_units.push(u.clone());
 						if [UnitTypeId::SCV, UnitTypeId::Probe, UnitTypeId::Drone].contains(&u_type) {
-							enemy_workers.push(u);
+							enemy_workers.push(u.clone());
 						}
 					}
 				}
@@ -682,7 +682,7 @@ impl Bot {
 				self.grouped_units
 					.townhalls
 					.iter()
-					.all(|t| t.distance_pos_squared(*loc) > 225.0)
+					.all(|t| t.is_further_pos(15.0, *loc))
 			})
 			.copied()
 			.collect::<Vec<(Point2, Point2)>>();
@@ -712,7 +712,7 @@ impl Bot {
 				self.grouped_units
 					.enemy_townhalls
 					.iter()
-					.all(|t| t.distance_pos_squared(*loc) > 225.0)
+					.all(|t| t.is_further_pos(15.0, *loc))
 			})
 			.copied()
 			.collect::<Vec<(Point2, Point2)>>();
@@ -733,6 +733,30 @@ impl Bot {
 			.filter_map(|(loc, path)| path.map(|path| (loc, path)))
 			.min_by(|(_, path1), (_, path2)| path1.partial_cmp(&path2).unwrap())
 			.map(|(loc, _path)| *loc)
+	}
+	pub fn owned_expansions(&self) -> Vec<(Point2, Point2)> {
+		self.expansions
+			.iter()
+			.filter(|(loc, _)| {
+				self.grouped_units
+					.townhalls
+					.iter()
+					.any(|t| t.is_closer_pos(15.0, *loc))
+			})
+			.copied()
+			.collect()
+	}
+	pub fn enemy_expansions(&self) -> Vec<(Point2, Point2)> {
+		self.expansions
+			.iter()
+			.filter(|(loc, _)| {
+				self.grouped_units
+					.enemy_townhalls
+					.iter()
+					.any(|t| t.is_closer_pos(15.0, *loc))
+			})
+			.copied()
+			.collect()
 	}
 }
 

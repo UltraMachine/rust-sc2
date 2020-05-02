@@ -2,7 +2,10 @@
 extern crate quote;
 
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, Data, DeriveInput, Expr, Fields, ItemFn, ItemStruct, Meta, NestedMeta, Stmt};
+use regex::Regex;
+use syn::{
+	parse_macro_input, Data, DeriveInput, Expr, Fields, ItemEnum, ItemFn, ItemStruct, Meta, NestedMeta, Stmt,
+};
 
 #[proc_macro_attribute]
 pub fn bot(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -86,7 +89,7 @@ pub fn enum_from_str_derive(input: TokenStream) -> TokenStream {
 	if let Data::Enum(data) = item.data {
 		let name = item.ident;
 		let variants = data.variants.iter().map(|v| &v.ident);
-		let name_iter = vec![name.clone(); variants.len()];
+		let variants2 = variants.clone().map(|v| format!("{}::{}", name, v));
 
 		#[allow(clippy::block_in_if_condition_stmt)]
 		let other_cases = if item.attrs.iter().any(|a| {
@@ -126,7 +129,7 @@ pub fn enum_from_str_derive(input: TokenStream) -> TokenStream {
 					Ok(match s {
 						#(
 							stringify!(#variants) => Self::#variants,
-							concat!(stringify!(#name_iter), "::", stringify!(#variants)) => Self::#variants,
+							#variants2 => Self::#variants,
 
 						)*
 						#other_cases,
@@ -137,4 +140,34 @@ pub fn enum_from_str_derive(input: TokenStream) -> TokenStream {
 	} else {
 		panic!("Can only derive FromStr for enums")
 	}
+}
+
+#[proc_macro_attribute]
+pub fn variant_checkers(_attr: TokenStream, item: TokenStream) -> TokenStream {
+	// let attr = parse_macro_input!(attr as AttributeArgs);
+	let item = parse_macro_input!(item as ItemEnum);
+
+	let name = &item.ident;
+	let variants = item.variants.iter().map(|v| &v.ident);
+	let re = Regex::new(r"[A-Z0-9]{1}[a-z0-9]*").unwrap();
+	let snake_variants = variants.clone().map(|v| {
+		format_ident!(
+			"is_{}",
+			re.find_iter(&v.to_string())
+				.map(|m| m.as_str().to_ascii_lowercase())
+				.collect::<Vec<String>>()
+				.join("_")
+		)
+	});
+
+	TokenStream::from(quote! {
+		#item
+		impl #name {
+			#(
+				pub fn #snake_variants(self) -> bool {
+					matches!(self, Self::#variants)
+				}
+			)*
+		}
+	})
 }

@@ -49,7 +49,7 @@ impl Player for DebugAI {
 	}
 
 	fn get_player_settings(&self) -> PlayerSettings {
-		PlayerSettings::new(Race::Random, None)
+		PlayerSettings::new(self.race, None)
 	}
 }
 
@@ -61,6 +61,10 @@ fn main() -> SC2Result<()> {
 		(@arg opponent_id: --OpponentId +takes_value)
 		(@arg host_port: --GamePort +takes_value)
 		(@arg player_port: --StartPort +takes_value)
+		(@arg race: --race
+			+takes_value
+			"Sets race for debug bot"
+		)
 		(@arg game_step: -s --step
 			+takes_value
 			default_value("1")
@@ -83,6 +87,10 @@ fn main() -> SC2Result<()> {
 				+takes_value
 				"Sets opponent build"
 			)
+			(@arg sc2_version: --("sc2-version")
+				+takes_value
+				"Sets sc2 version"
+			)
 			(@arg realtime: --realtime "Enables realtime mode")
 		)
 		(@subcommand human =>
@@ -98,6 +106,10 @@ fn main() -> SC2Result<()> {
 				+takes_value
 				"Sets human name"
 			)
+			(@arg sc2_version: --("sc2-version")
+				+takes_value
+				"Sets sc2 version"
+			)
 		)
 	)
 	.get_matches();
@@ -110,6 +122,12 @@ fn main() -> SC2Result<()> {
 
 	let mut bot = DebugAI::new();
 	bot.game_step = game_step;
+	if let Some(race) = app
+		.value_of("race")
+		.map(|race| race.parse().expect("Can't parse bot race"))
+	{
+		bot.race = race;
+	}
 
 	if app.is_present("ladder_server") {
 		run_ladder_game(
@@ -152,7 +170,7 @@ fn main() -> SC2Result<()> {
 					.choose(&mut rng)
 					.unwrap()
 				}),
-				None,
+				sub.value_of("sc2_version"),
 				sub.is_present("realtime"),
 			),
 			("human", Some(sub)) => run_vs_human(
@@ -177,7 +195,7 @@ fn main() -> SC2Result<()> {
 					.choose(&mut rng)
 					.unwrap()
 				}),
-				None,
+				sub.value_of("sc2_version"),
 			),
 			_ => {
 				println!("Game mode is not specified! Use -h, --help to print help information.");

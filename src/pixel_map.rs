@@ -74,18 +74,11 @@ impl FromProto<ImageData> for VisibilityMap {
 	}
 }
 
+#[variant_checkers]
 #[derive(FromPrimitive, ToPrimitive, Copy, Clone, PartialEq, Eq)]
 pub enum Pixel {
 	Set,
 	Empty,
-}
-impl Pixel {
-	pub fn is_empty(self) -> bool {
-		matches!(self, Pixel::Empty)
-	}
-	pub fn is_set(self) -> bool {
-		matches!(self, Pixel::Set)
-	}
 }
 impl Default for Pixel {
 	fn default() -> Self {
@@ -101,6 +94,7 @@ impl std::fmt::Debug for Pixel {
 	}
 }
 
+#[variant_checkers]
 #[derive(Debug, FromPrimitive, ToPrimitive, Copy, Clone, PartialEq, Eq)]
 pub enum Visibility {
 	Hidden,
@@ -109,18 +103,6 @@ pub enum Visibility {
 	FullHidden,
 }
 impl Visibility {
-	pub fn is_hidden(self) -> bool {
-		matches!(self, Visibility::Hidden)
-	}
-	pub fn is_fogged(self) -> bool {
-		matches!(self, Visibility::Fogged)
-	}
-	pub fn is_visible(self) -> bool {
-		matches!(self, Visibility::Visible)
-	}
-	pub fn is_full_hidden(self) -> bool {
-		matches!(self, Visibility::FullHidden)
-	}
 	pub fn is_explored(self) -> bool {
 		!matches!(self, Visibility::Hidden)
 	}

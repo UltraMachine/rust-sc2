@@ -2,29 +2,19 @@ use crate::{FromProto, IntoProto};
 use num_traits::FromPrimitive;
 use sc2_proto::{
 	common::Race as ProtoRace,
-	sc2api::{AIBuild as ProtoAIBuild, Difficulty as ProtoDifficulty, PlayerType as ProtoPlayerType},
+	sc2api::{
+		AIBuild as ProtoAIBuild, Difficulty as ProtoDifficulty, PlayerType as ProtoPlayerType,
+		Result as ProtoGameResult,
+	},
 };
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash, FromStr)]
+#[variant_checkers]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FromStr)]
 pub enum Race {
 	Terran,
 	Zerg,
 	Protoss,
 	Random,
-}
-impl Race {
-	pub fn is_terran(self) -> bool {
-		matches!(self, Race::Terran)
-	}
-	pub fn is_zerg(self) -> bool {
-		matches!(self, Race::Zerg)
-	}
-	pub fn is_protoss(self) -> bool {
-		matches!(self, Race::Protoss)
-	}
-	pub fn is_random(self) -> bool {
-		matches!(self, Race::Random)
-	}
 }
 impl FromProto<ProtoRace> for Race {
 	fn from_proto(race: ProtoRace) -> Self {
@@ -53,7 +43,7 @@ impl Default for Race {
 	}
 }
 
-#[derive(Copy, Clone, FromPrimitive, FromStr)]
+#[derive(Debug, Copy, Clone, FromPrimitive, FromStr)]
 #[enum_from_str(use_primitives)]
 pub enum Difficulty {
 	VeryEasy,
@@ -100,7 +90,7 @@ impl IntoProto<ProtoDifficulty> for Difficulty {
 	}
 }
 
-#[derive(Copy, Clone, FromStr)]
+#[derive(Debug, Copy, Clone, FromStr)]
 pub enum AIBuild {
 	RandomBuild,
 	Rush,
@@ -175,6 +165,25 @@ impl Computer {
 			race,
 			difficulty,
 			ai_build,
+		}
+	}
+}
+
+#[variant_checkers]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum GameResult {
+	Victory,
+	Defeat,
+	Tie,
+	Undecided,
+}
+impl FromProto<ProtoGameResult> for GameResult {
+	fn from_proto(player_type: ProtoGameResult) -> Self {
+		match player_type {
+			ProtoGameResult::Victory => GameResult::Victory,
+			ProtoGameResult::Defeat => GameResult::Defeat,
+			ProtoGameResult::Tie => GameResult::Tie,
+			ProtoGameResult::Undecided => GameResult::Undecided,
 		}
 	}
 }

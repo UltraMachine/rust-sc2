@@ -76,7 +76,7 @@ pub struct Unit {
 	pub cargo_space_max: Option<u32>,
 	pub assigned_harvesters: Option<u32>,
 	pub ideal_harvesters: Option<u32>,
-	pub weapon_cooldown: Option<f32>,
+	pub weapon_cooldown: Option<f32>, // In frames
 	pub engaged_target_tag: Option<u64>,
 	pub buff_duration_remain: Option<u32>, // How long a buff or unit is still around (eg mule, broodling, chronoboost).
 	pub buff_duration_max: Option<u32>, // How long the maximum duration of buff or unit (eg mule, broodling, chronoboost).
@@ -247,6 +247,9 @@ impl Unit {
 	pub fn speed(&self) -> f32 {
 		self.type_data().map_or(0.0, |data| data.movement_speed)
 	}
+	pub fn attributes(&self) -> Option<&Vec<Attribute>> {
+		self.type_data().map(|data| &data.attributes)
+	}
 	pub fn has_attribute(&self, attribute: Attribute) -> bool {
 		self.type_data()
 			.map_or(false, |data| data.attributes.contains(&attribute))
@@ -334,41 +337,113 @@ impl Unit {
 		let dy = self.position.y - other.y;
 		dx * dx + dy * dy
 	}
+	pub fn is_closer_pos(&self, distance: f32, pos: Point2) -> bool {
+		self.distance_pos_squared(pos) < distance * distance
+	}
+	pub fn is_closer(&self, distance: f32, other: &Unit) -> bool {
+		self.distance_squared(other) < distance * distance
+	}
+	pub fn is_further_pos(&self, distance: f32, pos: Point2) -> bool {
+		self.distance_pos_squared(pos) > distance * distance
+	}
+	pub fn is_further(&self, distance: f32, other: &Unit) -> bool {
+		self.distance_squared(other) > distance * distance
+	}
 	fn weapons(&self) -> Option<Vec<Weapon>> {
 		self.type_data().map(|data| data.weapons.clone())
 	}
+	pub fn weapon_target(&self) -> Option<TargetType> {
+		self.weapons().and_then(|weapons| {
+			let mut ground = false;
+			let mut air = false;
+			if weapons.iter().any(|w| match w.target {
+				TargetType::Ground => {
+					ground = true;
+					ground && air
+				}
+				TargetType::Air => {
+					air = true;
+					ground && air
+				}
+				_ => true,
+			}) || (ground && air)
+			{
+				Some(TargetType::Any)
+			} else if ground {
+				Some(TargetType::Ground)
+			} else if air {
+				Some(TargetType::Air)
+			} else {
+				None
+			}
+		})
+	}
 	pub fn can_attack(&self) -> bool {
-		self.weapons().map_or(false, |weapons| !weapons.is_empty())
+		matches!(
+			self.type_id,
+			UnitTypeId::Battlecruiser
+				| UnitTypeId::WidowMineBurrowed
+				| UnitTypeId::Bunker
+				| UnitTypeId::Baneling
+				| UnitTypeId::BanelingBurrowed
+				| UnitTypeId::Sentry
+				| UnitTypeId::VoidRay
+				| UnitTypeId::Carrier
+				| UnitTypeId::Oracle
+		) || self.weapons().map_or(false, |weapons| !weapons.is_empty())
 	}
 	pub fn can_attack_both(&self) -> bool {
-		self.weapons().map_or(false, |weapons| {
-			!weapons.is_empty() && weapons.iter().any(|w| w.target == TargetType::Any)
-			/* || {
-				let mut ground = false;
-				let mut air = false;
-				for w in weapons {
-					match w.target {
-						TargetType::Ground => ground = true,
-						TargetType::Air => air = true,
-						_ => break,
-					}
-					if ground && air {
-						break;
-					}
+		matches!(
+			self.type_id,
+			UnitTypeId::Battlecruiser
+				| UnitTypeId::WidowMineBurrowed
+				| UnitTypeId::Bunker
+				| UnitTypeId::Sentry
+				| UnitTypeId::VoidRay
+				| UnitTypeId::Carrier
+		) || self.weapons().map_or(false, |weapons| {
+			let mut ground = false;
+			let mut air = false;
+			weapons.iter().any(|w| match w.target {
+				TargetType::Ground => {
+					ground = true;
+					ground && air
 				}
-				ground && air
-			}*/
+				TargetType::Air => {
+					air = true;
+					ground && air
+				}
+				_ => true,
+			}) || (ground && air)
 		})
 	}
 	pub fn can_attack_ground(&self) -> bool {
-		// todo: fix Sentry
-		self.weapons().map_or(false, |weapons| {
-			!weapons.is_empty() && weapons.iter().any(|w| TARGET_GROUND.contains(&w.target))
+		matches!(
+			self.type_id,
+			UnitTypeId::Battlecruiser
+				| UnitTypeId::WidowMineBurrowed
+				| UnitTypeId::Bunker
+				| UnitTypeId::Baneling
+				| UnitTypeId::BanelingBurrowed
+				| UnitTypeId::Sentry
+				| UnitTypeId::VoidRay
+				| UnitTypeId::Carrier
+				| UnitTypeId::Oracle
+		) || self.weapons().map_or(false, |weapons| {
+			weapons.iter().any(|w| TARGET_GROUND.contains(&w.target))
 		})
 	}
 	pub fn can_attack_air(&self) -> bool {
-		self.weapons().map_or(false, |weapons| {
-			!weapons.is_empty() && weapons.iter().any(|w| TARGET_AIR.contains(&w.target))
+		matches!(
+			self.type_id,
+			UnitTypeId::Battlecruiser
+				| UnitTypeId::WidowMineBurrowed
+				| UnitTypeId::Bunker
+				| UnitTypeId::Sentry
+				| UnitTypeId::VoidRay
+				| UnitTypeId::Carrier
+		) || self.weapons().map_or(false, |weapons| {
+			weapons.iter().any(|w| TARGET_AIR.contains(&w.target))
 		})
 	}
 	pub fn on_cooldown(&self) -> bool {
@@ -389,44 +464,74 @@ impl Unit {
 		self.data.max_cooldowns.borrow().get(&self.type_id).copied()
 	}
 	pub fn ground_range(&self) -> f32 {
-		self.weapons().map_or(0.0, |weapons| {
-			for w in weapons {
-				if TARGET_GROUND.contains(&w.target) {
-					return w.range;
-				}
-			}
-			0.0
-		})
+		match self.type_id {
+			UnitTypeId::Battlecruiser => 6.0,
+			UnitTypeId::WidowMineBurrowed => 5.0,
+			UnitTypeId::Bunker => 6.0,   // Marine range + 1
+			UnitTypeId::Baneling => 2.2, // Splash radius
+			UnitTypeId::BanelingBurrowed => 2.2,
+			UnitTypeId::Sentry => 5.0,
+			UnitTypeId::VoidRay => 6.0,
+			UnitTypeId::Carrier => 8.0, // Interceptors launch range
+			UnitTypeId::Oracle => 4.0,
+			_ => self.weapons().map_or(0.0, |weapons| {
+				weapons
+					.iter()
+					.find(|w| TARGET_GROUND.contains(&w.target))
+					.map_or(0.0, |w| w.range)
+			}),
+		}
 	}
 	pub fn air_range(&self) -> f32 {
-		self.weapons().map_or(0.0, |weapons| {
-			for w in weapons {
-				if TARGET_AIR.contains(&w.target) {
-					return w.range;
-				}
-			}
-			0.0
-		})
+		match self.type_id {
+			UnitTypeId::Battlecruiser => 6.0,
+			UnitTypeId::WidowMineBurrowed => 5.0,
+			UnitTypeId::Bunker => 6.0, // Marine range + 1
+			UnitTypeId::Sentry => 5.0,
+			UnitTypeId::VoidRay => 6.0,
+			UnitTypeId::Carrier => 8.0, // Interceptors launch range
+			_ => self.weapons().map_or(0.0, |weapons| {
+				weapons
+					.iter()
+					.find(|w| TARGET_AIR.contains(&w.target))
+					.map_or(0.0, |w| w.range)
+			}),
+		}
 	}
 	pub fn ground_dps(&self) -> f32 {
-		self.weapons().map_or(0.0, |weapons| {
-			for w in weapons {
-				if TARGET_GROUND.contains(&w.target) {
-					return w.damage * (w.attacks as f32) / w.speed;
-				}
-			}
-			0.0
-		})
+		match self.type_id {
+			UnitTypeId::Battlecruiser => 35.714_287,
+			UnitTypeId::WidowMineBurrowed => 125.0, // Damage of single explosion because dps is not relevant
+			UnitTypeId::Bunker => 28.103_045,       // Dps of 4 Marines
+			UnitTypeId::Baneling => 20.0,           // Damage of single explosion because dps is not relevant
+			UnitTypeId::BanelingBurrowed => 20.0,
+			UnitTypeId::Sentry => 6.036_217,
+			UnitTypeId::VoidRay => 11.904_762,
+			UnitTypeId::Carrier => 26.702_27, // Dps of 8 Interceptors
+			UnitTypeId::Oracle => 17.564_404,
+			_ => self.weapons().map_or(0.0, |weapons| {
+				weapons
+					.iter()
+					.find(|w| TARGET_GROUND.contains(&w.target))
+					.map_or(0.0, |w| w.damage * (w.attacks as f32) / w.speed)
+			}),
+		}
 	}
 	pub fn air_dps(&self) -> f32 {
-		self.weapons().map_or(0.0, |weapons| {
-			for w in weapons {
-				if TARGET_AIR.contains(&w.target) {
-					return w.damage * (w.attacks as f32) / w.speed;
-				}
-			}
-			0.0
-		})
+		match self.type_id {
+			UnitTypeId::Battlecruiser => 22.321_428,
+			UnitTypeId::WidowMineBurrowed => 125.0, // Damage of single explosion because dps is not relevant
+			UnitTypeId::Bunker => 28.103_045,       // Dps of 4 Marines
+			UnitTypeId::Sentry => 6.036_217,
+			UnitTypeId::VoidRay => 11.904_762,
+			UnitTypeId::Carrier => 26.702_27, // Dps of 8 Interceptors
+			_ => self.weapons().map_or(0.0, |weapons| {
+				weapons
+					.iter()
+					.find(|w| TARGET_AIR.contains(&w.target))
+					.map_or(0.0, |w| w.damage * (w.attacks as f32) / w.speed)
+			}),
+		}
 	}
 	pub fn in_range(&self, target: &Unit, gap: f32) -> bool {
 		let range = {
@@ -447,6 +552,14 @@ impl Unit {
 	}
 	pub fn in_range_of(&self, threat: &Unit, gap: f32) -> bool {
 		threat.in_range(self, gap)
+	}
+	pub fn damage_bonus(&self) -> Option<(Attribute, f32)> {
+		self.weapons().and_then(|weapons| {
+			weapons
+				.iter()
+				.find(|w| !w.damage_bonus.is_empty())
+				.map(|w| w.damage_bonus[0])
+		})
 	}
 	pub fn target(&self) -> Target {
 		if self.is_idle() {
@@ -544,50 +657,50 @@ impl Unit {
 				self.orders[0].ability,
 				// Terran
 				AbilityId::TerranBuildCommandCenter
-					| AbilityId::TerranBuildSupplyDepot
-					| AbilityId::TerranBuildRefinery
-					| AbilityId::TerranBuildBarracks
-					| AbilityId::TerranBuildEngineeringBay
-					| AbilityId::TerranBuildMissileTurret
-					| AbilityId::TerranBuildBunker
-					| AbilityId::TerranBuildSensorTower
-					| AbilityId::TerranBuildGhostAcademy
-					| AbilityId::TerranBuildFactory
-					| AbilityId::TerranBuildStarport
-					| AbilityId::TerranBuildArmory
-					| AbilityId::TerranBuildFusionCore
-					// Protoss
-					| AbilityId::ProtossBuildNexus
-					| AbilityId::ProtossBuildPylon
-					| AbilityId::ProtossBuildAssimilator
-					| AbilityId::ProtossBuildGateway
-					| AbilityId::ProtossBuildForge
-					| AbilityId::ProtossBuildFleetBeacon
-					| AbilityId::ProtossBuildTwilightCouncil
-					| AbilityId::ProtossBuildPhotonCannon
-					| AbilityId::ProtossBuildStargate
-					| AbilityId::ProtossBuildTemplarArchive
-					| AbilityId::ProtossBuildDarkShrine
-					| AbilityId::ProtossBuildRoboticsBay
-					| AbilityId::ProtossBuildRoboticsFacility
-					| AbilityId::ProtossBuildCyberneticsCore
-					| AbilityId::BuildShieldBattery
-					// Zerg
-					| AbilityId::ZergBuildHatchery
-					| AbilityId::ZergBuildCreepTumor
-					| AbilityId::ZergBuildExtractor
-					| AbilityId::ZergBuildSpawningPool
-					| AbilityId::ZergBuildEvolutionChamber
-					| AbilityId::ZergBuildHydraliskDen
-					| AbilityId::ZergBuildSpire
-					| AbilityId::ZergBuildUltraliskCavern
-					| AbilityId::ZergBuildInfestationPit
-					| AbilityId::ZergBuildNydusNetwork
-					| AbilityId::ZergBuildBanelingNest
-					| AbilityId::BuildLurkerDen
-					| AbilityId::ZergBuildRoachWarren
-					| AbilityId::ZergBuildSpineCrawler
-					| AbilityId::ZergBuildSporeCrawler
+				| AbilityId::TerranBuildSupplyDepot
+				| AbilityId::TerranBuildRefinery
+				| AbilityId::TerranBuildBarracks
+				| AbilityId::TerranBuildEngineeringBay
+				| AbilityId::TerranBuildMissileTurret
+				| AbilityId::TerranBuildBunker
+				| AbilityId::TerranBuildSensorTower
+				| AbilityId::TerranBuildGhostAcademy
+				| AbilityId::TerranBuildFactory
+				| AbilityId::TerranBuildStarport
+				| AbilityId::TerranBuildArmory
+				| AbilityId::TerranBuildFusionCore
+				// Protoss
+				| AbilityId::ProtossBuildNexus
+				| AbilityId::ProtossBuildPylon
+				| AbilityId::ProtossBuildAssimilator
+				| AbilityId::ProtossBuildGateway
+				| AbilityId::ProtossBuildForge
+				| AbilityId::ProtossBuildFleetBeacon
+				| AbilityId::ProtossBuildTwilightCouncil
+				| AbilityId::ProtossBuildPhotonCannon
+				| AbilityId::ProtossBuildStargate
+				| AbilityId::ProtossBuildTemplarArchive
+				| AbilityId::ProtossBuildDarkShrine
+				| AbilityId::ProtossBuildRoboticsBay
+				| AbilityId::ProtossBuildRoboticsFacility
+				| AbilityId::ProtossBuildCyberneticsCore
+				| AbilityId::BuildShieldBattery
+				// Zerg
+				| AbilityId::ZergBuildHatchery
+				| AbilityId::ZergBuildCreepTumor
+				| AbilityId::ZergBuildExtractor
+				| AbilityId::ZergBuildSpawningPool
+				| AbilityId::ZergBuildEvolutionChamber
+				| AbilityId::ZergBuildHydraliskDen
+				| AbilityId::ZergBuildSpire
+				| AbilityId::ZergBuildUltraliskCavern
+				| AbilityId::ZergBuildInfestationPit
+				| AbilityId::ZergBuildNydusNetwork
+				| AbilityId::ZergBuildBanelingNest
+				| AbilityId::BuildLurkerDen
+				| AbilityId::ZergBuildRoachWarren
+				| AbilityId::ZergBuildSpineCrawler
+				| AbilityId::ZergBuildSporeCrawler
 			)
 	}
 	// Actions
@@ -763,6 +876,7 @@ impl FromProtoData<ProtoUnit> for Unit {
 	}
 }
 
+#[variant_checkers]
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum DisplayType {
 	Visible,     // Fully visible
@@ -770,20 +884,7 @@ pub enum DisplayType {
 	Hidden,      // Fully hidden
 	Placeholder, // Building that hasn't started construction.
 }
-impl DisplayType {
-	pub fn is_visible(self) -> bool {
-		matches!(self, DisplayType::Visible)
-	}
-	pub fn is_snapshot(self) -> bool {
-		matches!(self, DisplayType::Snapshot)
-	}
-	pub fn is_hidden(self) -> bool {
-		matches!(self, DisplayType::Hidden)
-	}
-	pub fn is_placeholder(self) -> bool {
-		matches!(self, DisplayType::Placeholder)
-	}
-}
+
 impl FromProto<ProtoDisplayType> for DisplayType {
 	fn from_proto(display_type: ProtoDisplayType) -> Self {
 		match display_type {

@@ -367,7 +367,7 @@ impl ReaperRushAI {
 impl Player for ReaperRushAI {
 	fn on_start(&mut self, _ws: &mut WS) -> SC2Result<()> {
 		let townhall = self.grouped_units.townhalls.first().clone();
-		townhall.smart(Target::Pos(self.start_resource_center), false);
+		townhall.smart(Target::Pos(self.start_center), false);
 		townhall.train(UnitTypeId::SCV, false);
 		self.substract_resources(UnitTypeId::SCV);
 
@@ -421,6 +421,10 @@ fn main() -> SC2Result<()> {
 				+takes_value
 				"Sets opponent build"
 			)
+			(@arg sc2_version: --("sc2-version")
+				+takes_value
+				"Sets sc2 version"
+			)
 			(@arg realtime: --realtime "Enables realtime mode")
 		)
 		(@subcommand human =>
@@ -435,6 +439,10 @@ fn main() -> SC2Result<()> {
 			(@arg name: --name
 				+takes_value
 				"Sets human name"
+			)
+			(@arg sc2_version: --("sc2-version")
+				+takes_value
+				"Sets sc2 version"
 			)
 		)
 	)
@@ -490,7 +498,7 @@ fn main() -> SC2Result<()> {
 					.choose(&mut rng)
 					.unwrap()
 				}),
-				None,
+				sub.value_of("sc2_version"),
 				sub.is_present("realtime"),
 			),
 			("human", Some(sub)) => run_vs_human(
@@ -515,7 +523,7 @@ fn main() -> SC2Result<()> {
 					.choose(&mut rng)
 					.unwrap()
 				}),
-				None,
+				sub.value_of("sc2_version"),
 			),
 			_ => {
 				println!("Game mode is not specified! Use -h, --help to print help information.");

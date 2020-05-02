@@ -25,32 +25,6 @@ pub struct GameInfo {
 impl FromProto<ResponseGameInfo> for GameInfo {
 	fn from_proto(game_info: ResponseGameInfo) -> Self {
 		let start_raw = game_info.get_start_raw();
-		/*
-		println!("Pathing Grid");
-		let grid = start_raw.get_pathing_grid().clone();
-		println!("size: {:?}", grid.get_size());
-		println!("lenght: {:?}", grid.get_data().len());
-		println!("data: {:?}", grid.get_data());
-		println!(
-			"binary data: {:?}",
-			grid.get_data()
-				.iter()
-				.flat_map(|n| to_binary(*n))
-				.collect::<Vec<Pixel>>()
-		);
-		println!("Placement Grid");
-		let grid = start_raw.get_placement_grid().clone();
-		println!("size: {:?}", grid.get_size());
-		println!("lenght: {:?}", grid.get_data().len());
-		println!("data: {:?}", grid.get_data());
-		println!(
-			"binary data: {:?}",
-			grid.get_data()
-				.iter()
-				.flat_map(|n| to_binary(*n))
-				.collect::<Vec<Pixel>>()
-		);
-		*/
 		let map_size = start_raw.get_map_size();
 		let area = start_raw.get_playable_area();
 		let area_p0 = area.get_p0();

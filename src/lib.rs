@@ -8,26 +8,28 @@ extern crate sc2_macro;
 extern crate itertools;
 #[macro_use]
 extern crate maplit;
+#[macro_use]
+extern crate log;
 
 mod client;
+mod debug;
+mod game_info;
 mod paths;
+mod query;
 
 pub mod action;
 pub mod bot;
 pub mod constants;
-pub mod debug;
 pub mod game_data;
-pub mod game_info;
 pub mod game_state;
 pub mod geometry;
 pub mod ids;
 pub mod pixel_map;
 pub mod player;
-pub mod query;
 pub mod unit;
 pub mod units;
 
-use player::Race;
+use player::{GameResult, Race};
 use std::rc::Rc;
 use unit::DataForUnit;
 
@@ -55,6 +57,9 @@ pub trait Player {
 	fn on_step(&mut self, _ws: &mut WS, _iteration: usize) -> SC2Result<()> {
 		Ok(())
 	}
+	fn on_end(&self, _result: GameResult) -> SC2Result<()> {
+		Ok(())
+	}
 }
 
 trait FromProto<T>
@@ -62,6 +67,15 @@ where
 	Self: Sized,
 {
 	fn from_proto(p: T) -> Self;
+}
+
+trait IntoSC2<T> {
+	fn into_sc2(self) -> T;
+}
+impl<T, U: FromProto<T>> IntoSC2<U> for T {
+	fn into_sc2(self) -> U {
+		U::from_proto(self)
+	}
 }
 
 trait TryFromProto<T>

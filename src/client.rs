@@ -4,9 +4,9 @@ use crate::{
 	game_info::GameInfo,
 	game_state::GameState,
 	ids::AbilityId,
-	paths::{get_base_version, get_latest_base_version, get_path_to_sc2},
+	paths::{get_latest_base_version, get_path_to_sc2, get_version_info},
 	player::Computer,
-	FromProto, FromProtoData, IntoProto, Player, PlayerSettings,
+	FromProto, FromProtoData, IntoProto, IntoSC2, Player, PlayerSettings,
 };
 use num_traits::FromPrimitive;
 use protobuf::Message;
@@ -16,8 +16,7 @@ use sc2_proto::{
 };
 use std::{
 	error::Error,
-	fs,
-	io::{stdout, Write},
+	fmt, fs,
 	net::TcpListener,
 	ops::{Deref, DerefMut},
 	process::{Child, Command},
@@ -31,6 +30,20 @@ pub type SC2Result<T> = Result<T, Box<dyn Error>>;
 
 const HOST: &str = "127.0.0.1";
 
+#[derive(Debug)]
+struct ProtoError(String);
+impl ProtoError {
+	fn new<E: fmt::Debug>(error: E, details: &str) -> Self {
+		Self(format!("{:?}: {}", error, details))
+	}
+}
+impl fmt::Display for ProtoError {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", self.0)
+	}
+}
+impl Error for ProtoError {}
+
 #[derive(Clone)]
 struct Ports {
 	shared: i32,
@@ -38,6 +51,223 @@ struct Ports {
 	client: Vec<[i32; 2]>,
 }
 
+// Runners
+pub fn run_vs_computer<B>(
+	bot: &mut B,
+	computer: Computer,
+	map_name: &str,
+	sc2_version: Option<&str>,
+	realtime: bool,
+) -> SC2Result<()>
+where
+	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
+{
+	debug!("Starting game vs computer");
+
+	let sc2_path = get_path_to_sc2();
+	let map_path = format!("{}/Maps/{}.SC2Map", sc2_path, map_name);
+	// Check if path exists
+	fs::metadata(&map_path).unwrap_or_else(|_| panic!("Path doesn't exists: {}", map_path));
+	let port = get_unused_port();
+	debug!("Launching SC2 process");
+	let mut process = launch_client(&sc2_path, port, sc2_version)?;
+	debug!("Connecting to websocket");
+	let mut ws = connect_to_websocket(HOST, port)?;
+
+	match {
+		let settings = bot.get_player_settings();
+		debug!("Sending CreateGame request");
+		// Create game
+		let mut req = Request::new();
+		let req_create_game = req.mut_create_game();
+
+		req_create_game.mut_local_map().set_map_path(map_path);
+		/*
+		Set Map
+			req.mut_create_game().mut_local_map().set_map_path("");
+		OR
+			req.mut_create_game().set_battlenet_map_name("");
+		*/
+		create_player_setup(&settings, req_create_game);
+		create_computer_setup(computer, req_create_game);
+		// req_create_game.set_disable_fog(bool); // Cheat
+		// req_create_game.set_random_seed(u32);
+		req_create_game.set_realtime(realtime);
+
+		let res = send(&mut ws, req)?;
+		let res_create_game = res.get_create_game();
+		if res_create_game.has_error() {
+			terminate(&mut process, &mut ws)?;
+			let err = format!(
+				"{:?}: {}",
+				res_create_game.get_error(),
+				res_create_game.get_error_details()
+			);
+			error!("{}", err);
+			panic!(err);
+		}
+
+		debug!("Sending JoinGame request");
+		bot.player_id = join_game(&settings, &mut ws, None)?;
+
+		set_static_data(bot, &mut ws)?;
+
+		debug!("Entered main loop");
+		// Main loop
+		play_first_step(&mut ws, bot, realtime)?;
+		let mut iteration = 0;
+		while play_step(&mut ws, bot, iteration, realtime)? {
+			iteration += 1;
+		}
+		debug!("Game finished");
+		Ok(())
+	} {
+		Ok(()) => terminate(&mut process, &mut ws),
+		err => {
+			terminate(&mut process, &mut ws)?;
+			err
+		}
+	}
+}
+
+pub fn run_ladder_game<B>(
+	bot: &mut B,
+	host: &str,
+	port: &str,
+	player_port: i32,
+	opponent_id: Option<&str>,
+) -> SC2Result<()>
+where
+	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
+{
+	debug!("Starting ladder game");
+
+	debug!("Connecting to websocket");
+	let mut ws = connect_to_websocket(&host, port.parse()?)?;
+
+	debug!("Sending JoinGame request");
+
+	if let Some(id) = opponent_id {
+		bot.opponent_id = id.to_string();
+	}
+
+	bot.player_id = join_game(
+		&bot.get_player_settings(),
+		&mut ws,
+		Some(Ports {
+			shared: player_port + 1,
+			server: [player_port + 2, player_port + 3],
+			client: vec![[player_port + 4, player_port + 5]],
+		}),
+	)?;
+
+	set_static_data(bot, &mut ws)?;
+
+	debug!("Entered main loop");
+	// Main loop
+	let mut iteration = 0;
+	play_first_step(&mut ws, bot, false)?;
+	while play_step(&mut ws, bot, iteration, false)? {
+		iteration += 1;
+	}
+	debug!("Game finished");
+
+	Ok(())
+}
+
+pub fn run_vs_human<B>(
+	bot: &mut B,
+	human: PlayerSettings,
+	map_name: &str,
+	sc2_version: Option<&str>,
+) -> SC2Result<()>
+where
+	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
+{
+	debug!("Starting human vs bot");
+	let ports = get_unused_ports(9);
+	let sc2_path = get_path_to_sc2();
+	let (port_host, port_client) = (ports[0], ports[1]);
+
+	debug!("Launching host SC2 process");
+	let mut process_host = launch_client(&sc2_path, port_host, sc2_version)?;
+	debug!("Launching client SC2 process");
+	let mut process_client = launch_client(&sc2_path, port_client, sc2_version)?;
+	debug!("Connecting to host websocket");
+	let mut ws_host = connect_to_websocket(HOST, port_host)?;
+	debug!("Connecting to client websocket");
+	let mut ws_client = connect_to_websocket(HOST, port_client)?;
+
+	match {
+		debug!("Sending CreateGame request to host process");
+		let mut req = Request::new();
+		let req_create_game = req.mut_create_game();
+		req_create_game
+			.mut_local_map()
+			.set_map_path(format!("{}/Maps/{}.SC2Map", sc2_path, map_name));
+		create_player_setup(&human, req_create_game);
+		create_player_setup(&bot.get_player_settings(), req_create_game);
+		// req_create_game.set_disable_fog(bool); // Cheat
+		// req_create_game.set_random_seed(u32);
+		req_create_game.set_realtime(true);
+
+		let res = send(&mut ws_host, req)?;
+		let res_create_game = res.get_create_game();
+		if res_create_game.has_error() {
+			terminate_both(
+				&mut process_host,
+				&mut ws_host,
+				&mut process_client,
+				&mut ws_client,
+			)?;
+			let err = format!(
+				"{:?}: {}",
+				res_create_game.get_error(),
+				res_create_game.get_error_details()
+			);
+			error!("{}", err);
+			panic!(err);
+		}
+
+		debug!("Sending JoinGame request to both processes");
+		let ports = Ports {
+			shared: ports[2],
+			server: [ports[3], ports[4]],
+			client: vec![[ports[5], ports[6]], [ports[7], ports[8]]],
+		};
+		join_game(&human, &mut ws_host, Some(ports.clone()))?;
+		bot.player_id = join_game(&bot.get_player_settings(), &mut ws_client, Some(ports))?;
+
+		set_static_data(bot, &mut ws_client)?;
+
+		debug!("Entered main loop");
+		play_first_step(&mut ws_client, bot, true)?;
+		let mut iteration = 0;
+		while play_step(&mut ws_client, bot, iteration, true)? {
+			iteration += 1;
+		}
+		debug!("Game finished");
+		Ok(())
+	} {
+		Ok(()) => terminate_both(
+			&mut process_host,
+			&mut ws_host,
+			&mut process_client,
+			&mut ws_client,
+		),
+		err => {
+			terminate_both(
+				&mut process_host,
+				&mut ws_host,
+				&mut process_client,
+				&mut ws_client,
+			)?;
+			err
+		}
+	}
+}
+
+// Mini Helpers
 fn get_unused_port() -> i32 {
 	(1025..65535)
 		.find(|port| TcpListener::bind(("127.0.0.1", *port)).is_ok())
@@ -75,22 +305,15 @@ pub fn send(ws: &mut WS, req: Request) -> SC2Result<Response> {
 	Ok(res)
 }
 
-#[inline]
-fn flush() -> SC2Result<()> {
-	stdout().flush()?;
-	Ok(())
-}
-
+// Helpers
 fn terminate(process: &mut Child, ws: &mut WS) -> SC2Result<()> {
-	print!("Sending QuitGame request and terminating SC2 process... ");
-	flush()?;
+	debug!("Sending QuitGame request and terminating SC2 process");
 
 	let mut req = Request::new();
 	req.mut_quit();
 	send_request(ws, req)?;
 
 	process.kill()?;
-	println!("Done");
 	Ok(())
 }
 
@@ -100,8 +323,7 @@ fn terminate_both(
 	process_client: &mut Child,
 	ws_client: &mut WS,
 ) -> SC2Result<()> {
-	print!("Sending LeaveGame and QuitGame requests and terminating SC2 both processes... ");
-	flush()?;
+	debug!("Sending LeaveGame and QuitGame requests and terminating both SC2 processes");
 
 	let mut req = Request::new();
 	req.mut_leave_game();
@@ -115,241 +337,17 @@ fn terminate_both(
 
 	process_host.kill()?;
 	process_client.kill()?;
-	println!("Done");
 	Ok(())
-}
-
-pub fn run_vs_computer<B>(
-	bot: &mut B,
-	computer: Computer,
-	map_name: &str,
-	sc2_version: Option<&str>,
-	realtime: bool,
-) -> SC2Result<()>
-where
-	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
-{
-	println!("Starting game vs Computer.");
-
-	let sc2_path = get_path_to_sc2();
-	let map_path = format!("{}/Maps/{}.SC2Map", sc2_path, map_name);
-	// Check if path exists
-	fs::metadata(&map_path).unwrap_or_else(|_| panic!("Path doesn't exists: {}", map_path));
-	let port = get_unused_port();
-	let mut process = launch_client(&sc2_path, port, sc2_version)?;
-	let mut ws = connect_to_websocket(HOST, port)?;
-
-	match {
-		let settings = bot.get_player_settings();
-		print!("Sending CreateGame request... ");
-		flush()?;
-		// Create game
-		let mut req = Request::new();
-		let req_create_game = req.mut_create_game();
-
-		req_create_game.mut_local_map().set_map_path(map_path);
-		/*
-		Set Map
-			req.mut_create_game().mut_local_map().set_map_path("");
-		OR
-			req.mut_create_game().set_battlenet_map_name("");
-		*/
-		create_player_setup(&settings, req_create_game);
-		create_computer_setup(computer, req_create_game);
-		// req_create_game.set_disable_fog(bool); // Cheat
-		// req_create_game.set_random_seed(u32);
-		req_create_game.set_realtime(realtime);
-
-		let res = send(&mut ws, req)?;
-		let res_create_game = res.get_create_game();
-		if res_create_game.has_error() {
-			terminate(&mut process, &mut ws)?;
-			panic!(
-				"{:?}: {}",
-				res_create_game.get_error(),
-				res_create_game.get_error_details()
-			);
-		}
-		println!("Done");
-
-		print!("Sending JoinGame request... ");
-		flush()?;
-		bot.player_id = join_game(&settings, &mut ws, None)?;
-		println!("Done");
-
-		set_static_data(bot, &mut ws)?;
-
-		print!("Entered main loop... ");
-		flush()?;
-		// Main loop
-		play_first_step(&mut ws, bot, realtime)?;
-		let mut iteration = 0;
-		loop {
-			if !play_step(&mut ws, bot, iteration, realtime)? {
-				break;
-			}
-			iteration += 1;
-		}
-		println!("Finished");
-		Ok(())
-	} {
-		Ok(()) => terminate(&mut process, &mut ws),
-		err @ Err(_) => {
-			terminate(&mut process, &mut ws)?;
-			err
-		}
-	}
-}
-
-pub fn run_ladder_game<B>(
-	bot: &mut B,
-	host: &str,
-	port: &str,
-	player_port: i32,
-	opponent_id: Option<&str>,
-) -> SC2Result<()>
-where
-	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
-{
-	println!("Starting ladder game.");
-
-	let mut ws = connect_to_websocket(&host, port.parse()?)?;
-
-	print!("Sending JoinGame request... ");
-	flush()?;
-
-	if let Some(id) = opponent_id {
-		bot.opponent_id = id.to_string();
-	}
-
-	bot.player_id = join_game(
-		&bot.get_player_settings(),
-		&mut ws,
-		Some(Ports {
-			shared: player_port + 1,
-			server: [player_port + 2, player_port + 3],
-			client: vec![[player_port + 4, player_port + 5]],
-		}),
-	)?;
-	println!("Done");
-
-	set_static_data(bot, &mut ws)?;
-
-	print!("Entered main loop... ");
-	flush()?;
-	// Main loop
-	let mut iteration = 0;
-	play_first_step(&mut ws, bot, false)?;
-	loop {
-		if !play_step(&mut ws, bot, iteration, false)? {
-			break;
-		}
-		iteration += 1;
-	}
-	println!("Finished");
-
-	Ok(())
-}
-
-pub fn run_vs_human<B>(
-	bot: &mut B,
-	human: PlayerSettings,
-	map_name: &str,
-	sc2_version: Option<&str>,
-) -> SC2Result<()>
-where
-	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
-{
-	println!("Starting Human vs Bot game.");
-	let ports = get_unused_ports(9);
-	let sc2_path = get_path_to_sc2();
-	let (port_host, port_client) = (ports[0], ports[1]);
-
-	let mut process_host = launch_client(&sc2_path, port_host, sc2_version)?;
-	let mut process_client = launch_client(&sc2_path, port_client, sc2_version)?;
-	let mut ws_host = connect_to_websocket(HOST, port_host)?;
-	let mut ws_client = connect_to_websocket(HOST, port_client)?;
-
-	match {
-		print!("Sending CreateGame request to host process... ");
-		flush()?;
-		let mut req = Request::new();
-		let req_create_game = req.mut_create_game();
-		req_create_game
-			.mut_local_map()
-			.set_map_path(format!("{}/Maps/{}.SC2Map", sc2_path, map_name));
-		create_player_setup(&human, req_create_game);
-		create_player_setup(&bot.get_player_settings(), req_create_game);
-		// req_create_game.set_disable_fog(bool); // Cheat
-		// req_create_game.set_random_seed(u32);
-		req_create_game.set_realtime(true);
-
-		let res = send(&mut ws_host, req)?;
-		let res_create_game = res.get_create_game();
-		if res_create_game.has_error() {
-			panic!(
-				"{:?}: {}",
-				res_create_game.get_error(),
-				res_create_game.get_error_details()
-			);
-		}
-		println!("Done");
-
-		print!("Sending JoinGame request to both processes... ");
-		flush()?;
-		let ports = Ports {
-			shared: ports[2],
-			server: [ports[3], ports[4]],
-			client: vec![[ports[5], ports[6]], [ports[7], ports[8]]],
-		};
-		join_game(&human, &mut ws_host, Some(ports.clone()))?;
-		bot.player_id = join_game(&bot.get_player_settings(), &mut ws_client, Some(ports))?;
-		println!("Done");
-
-		set_static_data(bot, &mut ws_client)?;
-
-		print!("Entered main loop... ");
-		flush()?;
-		play_first_step(&mut ws_client, bot, true)?;
-		let mut iteration = 0;
-		loop {
-			if !play_step(&mut ws_client, bot, iteration, true)? {
-				break;
-			}
-			iteration += 1;
-		}
-		println!("Finished");
-		Ok(())
-	} {
-		Ok(()) => terminate_both(
-			&mut process_host,
-			&mut ws_host,
-			&mut process_client,
-			&mut ws_client,
-		),
-		Err(why) => {
-			terminate_both(
-				&mut process_host,
-				&mut ws_host,
-				&mut process_client,
-				&mut ws_client,
-			)?;
-			Err(why)
-		}
-	}
 }
 
 fn set_static_data(bot: &mut Bot, ws: &mut WS) -> SC2Result<()> {
-	print!("Requesting GameInfo... ");
-	flush()?;
+	debug!("Requesting GameInfo");
 	let mut req = Request::new();
 	req.mut_game_info();
 	let res = send(ws, req)?;
 	bot.game_info = GameInfo::from_proto(res.get_game_info().clone());
-	println!("Done");
 
-	print!("Requesting GameData... ");
-	flush()?;
+	debug!("Requesting GameData");
 	let mut req = Request::new();
 	let req_game_data = req.mut_data();
 	req_game_data.set_ability_id(true);
@@ -359,7 +357,6 @@ fn set_static_data(bot: &mut Bot, ws: &mut WS) -> SC2Result<()> {
 	req_game_data.set_effect_id(true);
 	let res = send(ws, req)?;
 	bot.game_data = Rc::new(GameData::from_proto(res.get_data().clone()));
-	println!("Done");
 	Ok(())
 }
 
@@ -415,24 +412,23 @@ fn join_game(settings: &PlayerSettings, ws: &mut WS, ports: Option<Ports>) -> SC
 		server_ports.set_base_port(ports.server[1]);
 
 		let client_ports = req_join_game.mut_client_ports();
-		for client in ports.client {
+		ports.client.iter().for_each(|client| {
 			let mut port_set = PortSet::new();
 			port_set.set_game_port(client[0]);
 			port_set.set_base_port(client[1]);
 			client_ports.push(port_set);
-		}
+		});
 	}
 
 	let res = send(ws, req)?;
 	let res_join_game = res.get_join_game();
 	if res_join_game.has_error() {
-		panic!(
-			"{:?}: {}",
-			res_join_game.get_error(),
-			res_join_game.get_error_details()
-		);
+		let err = ProtoError::new(res_join_game.get_error(), res_join_game.get_error_details());
+		error!("{}", err);
+		Err(Box::new(err))
+	} else {
+		Ok(res_join_game.get_player_id())
 	}
-	Ok(res_join_game.get_player_id())
 }
 
 fn play_first_step<B>(ws: &mut WS, bot: &mut B, realtime: bool) -> SC2Result<()>
@@ -475,7 +471,12 @@ where
 
 	let res = send(ws, req)?;
 
-	if res.get_status() == Status::ended {
+	if matches!(res.get_status(), Status::ended) {
+		let result = res.get_observation().get_player_result()[bot.player_id as usize]
+			.get_result()
+			.into_sc2();
+		debug!("Result for bot: {:?}", result);
+		bot.on_end(result)?;
 		return Ok(false);
 	}
 
@@ -548,9 +549,9 @@ where
 }
 
 fn launch_client(sc2_path: &str, port: i32, sc2_version: Option<&str>) -> SC2Result<Child> {
-	let base_version = match sc2_version {
-		Some(ver) => get_base_version(ver),
-		None => get_latest_base_version(sc2_path),
+	let (base_version, data_hash) = match sc2_version {
+		Some(ver) => get_version_info(ver),
+		None => (get_latest_base_version(sc2_path), ""),
 	};
 	let sc2_binary = if cfg!(target_os = "windows") {
 		"SC2_x64.exe"
@@ -560,45 +561,32 @@ fn launch_client(sc2_path: &str, port: i32, sc2_version: Option<&str>) -> SC2Res
 		panic!("Unsupported OS")
 	};
 
-	print!("Launching SC2 process... ");
-	flush()?;
-	let process = Command::new(format!(
+	let mut process = Command::new(format!(
 		"{}/Versions/Base{}/{}",
 		sc2_path, base_version, sc2_binary
-	))
-	.current_dir(format!("{}/Support64", sc2_path))
-	.arg("-listen")
-	.arg(HOST)
-	.arg("-port")
-	.arg(port.to_string())
-	// 0 - windowed, 1 - fullscreen
-	.arg("-displayMode")
-	.arg("0")
-	/*
-	.arg("-windowX")
-	.arg("10")
-	.arg("-windowY")
-	.arg("10")
-	.arg("-windowWidth")
-	.arg("1024")
-	.arg("-windowHeight")
-	.arg("768")
-	*/
-	.spawn()
-	.expect("Can't launch SC2 process.");
-	println!("Done");
+	));
+	process
+		.current_dir(format!("{}/Support64", sc2_path))
+		.arg("-listen")
+		.arg(HOST)
+		.arg("-port")
+		.arg(port.to_string())
+		// 0 - windowed, 1 - fullscreen
+		.arg("-displayMode")
+		.arg("0");
+	if !data_hash.is_empty() {
+		process.arg("-dataVersion").arg(data_hash);
+	}
+	let process = process.spawn().expect("Can't launch SC2 process.");
 	Ok(process)
 }
 
 fn connect_to_websocket(host: &str, port: i32) -> SC2Result<WS> {
-	print!("Connecting to websocket... ");
-	flush()?;
 	let url = Url::parse(format!("ws://{}:{}/sc2api", host, port).as_str())?;
 	let (ws, _rs) = loop {
 		if let Ok(result) = connect(url.clone()) {
 			break result;
 		}
 	};
-	println!("Done");
 	Ok(ws)
 }

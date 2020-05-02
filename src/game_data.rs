@@ -62,7 +62,7 @@ pub struct Cost {
 	pub time: f32,
 }
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub enum AbilityTarget {
 	None,
 	Point,
@@ -82,7 +82,8 @@ impl FromProto<AbilityData_Target> for AbilityTarget {
 	}
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[variant_checkers]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Attribute {
 	Light,
 	Armored,
@@ -114,7 +115,8 @@ impl FromProto<ProtoAttribute> for Attribute {
 	}
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+#[variant_checkers]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum TargetType {
 	Ground,
 	Air,

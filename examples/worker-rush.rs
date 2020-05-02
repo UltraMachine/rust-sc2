@@ -121,6 +121,10 @@ fn main() -> SC2Result<()> {
 				+takes_value
 				"Sets opponent build"
 			)
+			(@arg sc2_version: --("sc2-version")
+				+takes_value
+				"Sets sc2 version"
+			)
 			(@arg realtime: --realtime "Enables realtime mode")
 		)
 		(@subcommand human =>
@@ -135,6 +139,10 @@ fn main() -> SC2Result<()> {
 			(@arg name: --name
 				+takes_value
 				"Sets human name"
+			)
+			(@arg sc2_version: --("sc2-version")
+				+takes_value
+				"Sets sc2 version"
 			)
 		)
 	)
@@ -190,7 +198,7 @@ fn main() -> SC2Result<()> {
 					.choose(&mut rng)
 					.unwrap()
 				}),
-				None,
+				sub.value_of("sc2_version"),
 				sub.is_present("realtime"),
 			),
 			("human", Some(sub)) => run_vs_human(
@@ -215,7 +223,7 @@ fn main() -> SC2Result<()> {
 					.choose(&mut rng)
 					.unwrap()
 				}),
-				None,
+				sub.value_of("sc2_version"),
 			),
 			_ => {
 				println!("Game mode is not specified! Use -h, --help to print help information.");
