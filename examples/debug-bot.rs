@@ -22,7 +22,7 @@ impl DebugAI {
 
 impl Player for DebugAI {
 	fn on_start(&mut self, _ws: &mut WS) -> SC2Result<()> {
-		self.debug_z = self.grouped_units.townhalls.first().position3d.z;
+		self.debug_z = self.grouped_units.townhalls.first().unwrap().position3d.z;
 		Ok(())
 	}
 

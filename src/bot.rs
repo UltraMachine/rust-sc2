@@ -162,7 +162,7 @@ impl Bot {
 
 		self.group_units();
 
-		self.start_location = self.grouped_units.townhalls[0].position;
+		self.start_location = self.grouped_units.townhalls.first().unwrap().position;
 		self.enemy_start = self.game_info.start_locations[0];
 
 		self.start_center = self
@@ -210,9 +210,9 @@ impl Bot {
 					let res1 = res[0];
 					let res2 = res[1];
 					if !res1.is_disjoint(&res2)
-						|| iproduct!(res1, res2).any(|(r1, r2)| {
-							all_resources.get(*r1).distance_squared(&all_resources.get(*r2)) < 72.25
-						}) {
+						|| iproduct!(res1, res2)
+							.any(|(r1, r2)| all_resources[*r1].distance_squared(&all_resources[*r2]) < 72.25)
+					{
 						if let Some(i) = resource_groups.iter().position(|r| r == res1) {
 							resource_groups.remove(i);
 						}

@@ -111,7 +111,8 @@ impl ZergRushAI {
 							.filter(|u| {
 								u.target_tag().map_or(false, |target_tag| {
 									target_tag == gas.tag
-										|| (u.is_carrying_vespene() && target_tag == bases.closest(gas).tag)
+										|| (u.is_carrying_vespene()
+											&& target_tag == bases.closest(gas).unwrap().tag)
 								})
 							})
 							.iter()
@@ -132,7 +133,7 @@ impl ZergRushAI {
 									u.target_tag().map_or(false, |target_tag| {
 										target_tag == gas.tag
 											|| (u.is_carrying_vespene()
-												&& target_tag == bases.closest(gas).tag)
+												&& target_tag == bases.closest(gas).unwrap().tag)
 									})
 								})
 								.iter()
@@ -178,22 +179,23 @@ impl ZergRushAI {
 		let mineral_fields = mineral_fields.clone();
 		idle_workers.iter().for_each(|u| {
 			if !deficit_geysers.is_empty() {
-				let closest = deficit_geysers.closest(u).tag;
+				let closest = deficit_geysers.closest(u).unwrap().tag;
 				deficit_geysers.remove(closest);
 				u.gather(closest, false);
 			} else if !deficit_minings.is_empty() {
-				let closest = deficit_minings.closest(u).clone();
+				let closest = deficit_minings.closest(u).unwrap().clone();
 				deficit_minings.remove(closest.tag);
 				u.gather(
 					mineral_fields
 						.closer(11.0, &closest)
 						.max(|m| m.mineral_contents.unwrap_or(0))
+						.unwrap()
 						.tag,
 					false,
 				);
 			} else if u.is_idle() {
 				if let Some(minerals) = &minerals_near_base {
-					u.gather(minerals.closest(u).tag, false);
+					u.gather(minerals.closest(u).unwrap().tag, false);
 				}
 			}
 		});
@@ -245,7 +247,7 @@ impl ZergRushAI {
 		{
 			let townhalls = self.grouped_units.townhalls.clone();
 			if !townhalls.is_empty() {
-				townhalls.first().train(queen, false);
+				townhalls.first().unwrap().train(queen, false);
 				self.substract_resources(queen);
 			}
 		}
@@ -269,7 +271,7 @@ impl ZergRushAI {
 		if workers.is_empty() {
 			None
 		} else {
-			Some(workers.closest_pos(pos).clone())
+			Some(workers.closest_pos(pos).unwrap().clone())
 		}
 	}
 	fn build(&mut self, ws: &mut WS) {
@@ -342,7 +344,7 @@ impl ZergRushAI {
 		{
 			let pool = self.grouped_units.structures.of_type(UnitTypeId::SpawningPool);
 			if !pool.is_empty() {
-				pool.first().research(speed_upgrade, false);
+				pool.first().unwrap().research(speed_upgrade, false);
 				self.substract_upgrade_cost(speed_upgrade);
 			}
 		}
@@ -368,7 +370,7 @@ impl ZergRushAI {
 					if queens.is_empty() {
 						break;
 					}
-					let queen = queens.closest(h).clone();
+					let queen = queens.closest(h).unwrap().clone();
 					queens.remove(queen.tag);
 					queen.command(AbilityId::EffectInjectLarva, Target::Tag(h.tag), false);
 				}
@@ -422,9 +424,9 @@ impl ZergRushAI {
 				let target = {
 					let close_targets = targets.in_range_of(u, 0.0);
 					if !close_targets.is_empty() {
-						close_targets.partial_min(|t| t.hits()).tag
+						close_targets.partial_min(|t| t.hits()).unwrap().tag
 					} else {
-						targets.closest(u).tag
+						targets.closest(u).unwrap().tag
 					}
 				};
 				u.attack(Target::Tag(target), false);
@@ -445,19 +447,19 @@ impl ZergRushAI {
 
 impl Player for ZergRushAI {
 	fn on_start(&mut self, _ws: &mut WS) -> SC2Result<()> {
-		let townhall = self.grouped_units.townhalls.first().clone();
+		let townhall = self.grouped_units.townhalls.first().unwrap().clone();
 
-		townhall.command(
-			AbilityId::RallyWorkers,
-			Target::Pos(self.start_center),
-			false,
-		);
-		self.grouped_units.larvas.first().train(UnitTypeId::Drone, false);
+		townhall.command(AbilityId::RallyWorkers, Target::Pos(self.start_center), false);
+		self.grouped_units
+			.larvas
+			.first()
+			.unwrap()
+			.train(UnitTypeId::Drone, false);
 		self.substract_resources(UnitTypeId::Drone);
 
 		let minerals_near_base = self.grouped_units.mineral_fields.closer(11.0, &townhall);
 		self.grouped_units.workers.clone().iter().for_each(|u| {
-			u.gather(minerals_near_base.closest(&u).tag, false);
+			u.gather(minerals_near_base.closest(&u).unwrap().tag, false);
 		});
 		Ok(())
 	}

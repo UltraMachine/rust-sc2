@@ -107,7 +107,8 @@ impl ReaperRushAI {
 							.filter(|u| {
 								u.target_tag().map_or(false, |target_tag| {
 									target_tag == gas.tag
-										|| (u.is_carrying_vespene() && target_tag == bases.closest(gas).tag)
+										|| (u.is_carrying_vespene()
+											&& target_tag == bases.closest(gas).unwrap().tag)
 								})
 							})
 							.iter()
@@ -136,22 +137,23 @@ impl ReaperRushAI {
 		let mineral_fields = mineral_fields.clone();
 		idle_workers.iter().for_each(|u| {
 			if !deficit_geysers.is_empty() {
-				let closest = deficit_geysers.closest(u).tag;
+				let closest = deficit_geysers.closest(u).unwrap().tag;
 				deficit_geysers.remove(closest);
 				u.gather(closest, false);
 			} else if !deficit_minings.is_empty() {
-				let closest = deficit_minings.closest(u).clone();
+				let closest = deficit_minings.closest(u).unwrap().clone();
 				deficit_minings.remove(closest.tag);
 				u.gather(
 					mineral_fields
 						.closer(11.0, &closest)
 						.max(|m| m.mineral_contents.unwrap_or(0))
+						.unwrap()
 						.tag,
 					false,
 				);
 			} else if u.is_idle() {
 				if let Some(minerals) = &minerals_near_base {
-					u.gather(minerals.closest(u).tag, false);
+					u.gather(minerals.closest(u).unwrap().tag, false);
 				}
 			}
 		});
@@ -167,7 +169,7 @@ impl ReaperRushAI {
 		if workers.is_empty() {
 			None
 		} else {
-			Some(workers.closest_pos(pos).clone())
+			Some(workers.closest_pos(pos).unwrap().clone())
 		}
 	}
 	fn build(&mut self, ws: &mut WS) {
@@ -228,7 +230,7 @@ impl ReaperRushAI {
 			if !townhalls.is_empty() {
 				let ccs = townhalls.filter(|u| u.is_ready() && u.is_almost_idle());
 				if !ccs.is_empty() {
-					ccs.first().train(UnitTypeId::SCV, false);
+					ccs.first().unwrap().train(UnitTypeId::SCV, false);
 					self.substract_resources(UnitTypeId::SCV);
 				}
 			}
@@ -240,7 +242,7 @@ impl ReaperRushAI {
 				let barracks = structures
 					.filter(|u| u.type_id == UnitTypeId::Barracks && u.is_ready() && u.is_almost_idle());
 				if !barracks.is_empty() {
-					barracks.first().train(UnitTypeId::Reaper, false);
+					barracks.first().unwrap().train(UnitTypeId::Reaper, false);
 					self.substract_resources(UnitTypeId::Reaper);
 				}
 			}
@@ -302,13 +304,13 @@ impl ReaperRushAI {
 
 			match &targets {
 				Some(targets) => {
-					if !self.throw_mine(u, &targets.closest(u)) {
+					if !self.throw_mine(u, &targets.closest(u).unwrap()) {
 						if is_retreating || u.on_cooldown() {
 							let close_enemies = targets
 								.filter(|t| t.in_range(u, t.speed() + if is_retreating { 2.0 } else { 0.5 }));
 							if !close_enemies.is_empty() {
 								let retreat_position = {
-									let closest = close_enemies.closest(u).position;
+									let closest = close_enemies.closest(u).unwrap().position;
 									let pos = u.position.towards(closest, -u.speed());
 									if self.is_pathable(pos) {
 										pos
@@ -327,7 +329,7 @@ impl ReaperRushAI {
 								};
 								u.move_to(Target::Pos(retreat_position), false);
 							} else {
-								let closest = targets.closest(u);
+								let closest = targets.closest(u).unwrap();
 								if !u.in_range(&closest, 0.0) {
 									u.move_to(
 										Target::Pos(if is_retreating {
@@ -342,9 +344,12 @@ impl ReaperRushAI {
 						} else {
 							let close_targets = targets.in_range_of(u, 0.0);
 							if !close_targets.is_empty() {
-								u.attack(Target::Tag(close_targets.partial_min(|t| t.hits()).tag), false);
+								u.attack(
+									Target::Tag(close_targets.partial_min(|t| t.hits()).unwrap().tag),
+									false,
+								);
 							} else {
-								u.move_to(Target::Pos(targets.closest(u).position), false);
+								u.move_to(Target::Pos(targets.closest(u).unwrap().position), false);
 							}
 						}
 					}
@@ -366,14 +371,14 @@ impl ReaperRushAI {
 
 impl Player for ReaperRushAI {
 	fn on_start(&mut self, _ws: &mut WS) -> SC2Result<()> {
-		let townhall = self.grouped_units.townhalls.first().clone();
+		let townhall = self.grouped_units.townhalls.first().unwrap().clone();
 		townhall.smart(Target::Pos(self.start_center), false);
 		townhall.train(UnitTypeId::SCV, false);
 		self.substract_resources(UnitTypeId::SCV);
 
 		let minerals_near_base = self.grouped_units.mineral_fields.closer(11.0, &townhall);
 		self.grouped_units.workers.clone().iter().for_each(|u| {
-			u.gather(minerals_near_base.closest(&u).tag, false);
+			u.gather(minerals_near_base.closest(&u).unwrap().tag, false);
 		});
 		Ok(())
 	}

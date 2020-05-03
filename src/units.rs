@@ -46,13 +46,8 @@ impl Units {
 	}
 
 	#[inline]
-	pub fn first(&self) -> &Unit {
-		self.units.values().next().expect("empty Units")
-	}
-
-	#[inline]
-	pub fn get(&self, tag: u64) -> &Unit {
-		&self.units[&tag]
+	pub fn first(&self) -> Option<&Unit> {
+		self.units.values().next()
 	}
 
 	#[inline]
@@ -131,42 +126,46 @@ impl Units {
 		self.sum(|u| u.position) / (self.len() as f32)
 	}
 	// Get closest | furthest
-	pub fn closest(&self, other: &Unit) -> &Unit {
+	pub fn closest(&self, other: &Unit) -> Option<&Unit> {
 		self.partial_min(|u| u.distance_squared(other))
 	}
-	pub fn closest_pos(&self, other: Point2) -> &Unit {
+	pub fn closest_pos(&self, other: Point2) -> Option<&Unit> {
 		self.partial_min(|u| u.distance_pos_squared(other))
 	}
-	pub fn furthest(&self, other: &Unit) -> &Unit {
+	pub fn furthest(&self, other: &Unit) -> Option<&Unit> {
 		self.partial_max(|u| u.distance_squared(other))
 	}
-	pub fn furthest_pos(&self, other: Point2) -> &Unit {
+	pub fn furthest_pos(&self, other: Point2) -> Option<&Unit> {
 		self.partial_max(|u| u.distance_pos_squared(other))
 	}
 	// Get closest | furthest distance
-	pub fn closest_distance(&self, other: &Unit) -> f32 {
-		self.partial_min_value(|u| u.distance_squared(other)).sqrt()
+	pub fn closest_distance(&self, other: &Unit) -> Option<f32> {
+		self.partial_min_value(|u| u.distance_squared(other))
+			.map(|dist| dist.sqrt())
 	}
-	pub fn closest_distance_pos(&self, other: Point2) -> f32 {
-		self.partial_min_value(|u| u.distance_pos_squared(other)).sqrt()
+	pub fn closest_distance_pos(&self, other: Point2) -> Option<f32> {
+		self.partial_min_value(|u| u.distance_pos_squared(other))
+			.map(|dist| dist.sqrt())
 	}
-	pub fn furthest_distance(&self, other: &Unit) -> f32 {
-		self.partial_max_value(|u| u.distance_squared(other)).sqrt()
+	pub fn furthest_distance(&self, other: &Unit) -> Option<f32> {
+		self.partial_max_value(|u| u.distance_squared(other))
+			.map(|dist| dist.sqrt())
 	}
-	pub fn furthest_distance_pos(&self, other: Point2) -> f32 {
-		self.partial_max_value(|u| u.distance_pos_squared(other)).sqrt()
+	pub fn furthest_distance_pos(&self, other: Point2) -> Option<f32> {
+		self.partial_max_value(|u| u.distance_pos_squared(other))
+			.map(|dist| dist.sqrt())
 	}
 	// Squared
-	pub fn closest_distance_squared(&self, other: &Unit) -> f32 {
+	pub fn closest_distance_squared(&self, other: &Unit) -> Option<f32> {
 		self.partial_min_value(|u| u.distance_squared(other))
 	}
-	pub fn closest_distance_pos_squared(&self, other: Point2) -> f32 {
+	pub fn closest_distance_pos_squared(&self, other: Point2) -> Option<f32> {
 		self.partial_min_value(|u| u.distance_pos_squared(other))
 	}
-	pub fn furthest_distance_squared(&self, other: &Unit) -> f32 {
+	pub fn furthest_distance_squared(&self, other: &Unit) -> Option<f32> {
 		self.partial_max_value(|u| u.distance_squared(other))
 	}
-	pub fn furthest_distance_pos_squared(&self, other: Point2) -> f32 {
+	pub fn furthest_distance_pos_squared(&self, other: Point2) -> Option<f32> {
 		self.partial_max_value(|u| u.distance_pos_squared(other))
 	}
 	// Filter closer | further than distance
@@ -231,71 +230,61 @@ impl Units {
 	{
 		self.iter().map(f).sum::<T>()
 	}
-	pub fn min<T, F>(&self, f: F) -> &Unit
+	pub fn min<T, F>(&self, f: F) -> Option<&Unit>
 	where
 		T: Ord,
 		F: for<'r> FnMut(&'r &Unit) -> T,
 	{
-		self.iter().min_by_key(f).unwrap()
+		self.iter().min_by_key(f)
 	}
-	pub fn partial_min<T, F>(&self, mut f: F) -> &Unit
+	pub fn partial_min<T, F>(&self, mut f: F) -> Option<&Unit>
 	where
 		T: PartialOrd,
 		F: for<'r> FnMut(&'r &Unit) -> T,
 	{
-		self.iter()
-			.min_by(|u1, u2| f(u1).partial_cmp(&f(u2)).unwrap())
-			.unwrap()
+		self.iter().min_by(|u1, u2| f(u1).partial_cmp(&f(u2)).unwrap())
 	}
-	pub fn min_value<T, F>(&self, f: F) -> T
+	pub fn min_value<T, F>(&self, f: F) -> Option<T>
 	where
 		T: Ord,
 		F: FnMut(&Unit) -> T,
 	{
-		self.iter().map(f).min().unwrap()
+		self.iter().map(f).min()
 	}
-	pub fn partial_min_value<T, F>(&self, f: F) -> T
+	pub fn partial_min_value<T, F>(&self, f: F) -> Option<T>
 	where
 		T: PartialOrd,
 		F: FnMut(&Unit) -> T,
 	{
-		self.iter()
-			.map(f)
-			.min_by(|a, b| a.partial_cmp(&b).unwrap())
-			.unwrap()
+		self.iter().map(f).min_by(|a, b| a.partial_cmp(&b).unwrap())
 	}
-	pub fn max<T, F>(&self, f: F) -> &Unit
+	pub fn max<T, F>(&self, f: F) -> Option<&Unit>
 	where
 		T: Ord,
 		F: for<'r> FnMut(&'r &Unit) -> T,
 	{
-		self.iter().max_by_key(f).unwrap()
+		self.iter().max_by_key(f)
 	}
-	pub fn partial_max<T, F>(&self, mut f: F) -> &Unit
+	pub fn partial_max<T, F>(&self, mut f: F) -> Option<&Unit>
 	where
 		T: PartialOrd,
 		F: for<'r> FnMut(&'r &Unit) -> T,
 	{
-		self.iter()
-			.max_by(|u1, u2| f(u1).partial_cmp(&f(u2)).unwrap())
-			.unwrap()
+		self.iter().max_by(|u1, u2| f(u1).partial_cmp(&f(u2)).unwrap())
 	}
-	pub fn max_value<T, F>(&self, f: F) -> T
+	pub fn max_value<T, F>(&self, f: F) -> Option<T>
 	where
 		T: Ord,
 		F: FnMut(&Unit) -> T,
 	{
-		self.iter().map(f).max().unwrap()
+		self.iter().map(f).max()
 	}
-	pub fn partial_max_value<T, F>(&self, f: F) -> T
+	pub fn partial_max_value<T, F>(&self, f: F) -> Option<T>
 	where
 		T: PartialOrd,
 		F: FnMut(&Unit) -> T,
 	{
-		self.iter()
-			.map(f)
-			.max_by(|a, b| a.partial_cmp(&b).unwrap())
-			.unwrap()
+		self.iter().map(f).max_by(|a, b| a.partial_cmp(&b).unwrap())
 	}
 	pub fn sort<T, F>(&self, f: F) -> Self
 	where
@@ -332,12 +321,12 @@ impl IntoIterator for Units {
 		self.units.into_iter()
 	}
 }
-impl Index<usize> for Units {
+impl Index<u64> for Units {
 	type Output = Unit;
 
 	#[inline]
-	fn index(&self, i: usize) -> &Self::Output {
-		&self.units.values().nth(i).expect("Units index out of bounds")
+	fn index(&self, tag: u64) -> &Self::Output {
+		&self.units[&tag]
 	}
 }
 impl Extend<Unit> for Units {

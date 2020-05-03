@@ -31,17 +31,20 @@ impl Player for WorkerRushAI {
 		self.grouped_units
 			.townhalls
 			.first()
+			.unwrap()
 			.train(UnitTypeId::Probe, false);
 
 		self.mineral_forward = self
 			.grouped_units
 			.mineral_fields
 			.closest_pos(self.enemy_start)
+			.unwrap()
 			.tag;
 		self.mineral_back = self
 			.grouped_units
 			.mineral_fields
 			.closest_pos(self.start_location)
+			.unwrap()
 			.tag;
 		Ok(())
 	}
@@ -54,7 +57,7 @@ impl Player for WorkerRushAI {
 			let mineral_back = self.mineral_back;
 			let mineral_forward = self.mineral_forward;
 			self.grouped_units.workers.iter().for_each(|u| {
-				let closest = ground_attackers.closest(&u);
+				let closest = ground_attackers.closest(&u).unwrap();
 				if u.shield > Some(5.0) {
 					if !u.on_cooldown() {
 						u.attack(Target::Tag(closest.tag), false);
@@ -74,7 +77,7 @@ impl Player for WorkerRushAI {
 				.filter(|u| !u.is_flying && u.distance_pos_squared(self.enemy_start) < 2025.0);
 			if !ground_structures.is_empty() {
 				self.grouped_units.workers.iter().for_each(|u| {
-					u.attack(Target::Tag(ground_structures.closest(&u).tag), false);
+					u.attack(Target::Tag(ground_structures.closest(&u).unwrap().tag), false);
 				})
 			} else {
 				let mineral_forward = self.mineral_forward;
