@@ -178,8 +178,8 @@ pub struct AbilityData {
 }
 impl TryFromProto<ProtoAbilityData> for AbilityData {
 	fn try_from_proto(a: ProtoAbilityData) -> Option<Self> {
-		AbilityId::from_u32(a.get_ability_id()).map(|id| Self {
-			id,
+		Some(Self {
+			id: AbilityId::from_u32(a.get_ability_id())?,
 			link_name: a.get_link_name().to_string(),
 			link_index: a.get_link_index(),
 			button_name: a.button_name.clone().into_option(),
@@ -235,8 +235,8 @@ impl UnitTypeData {
 }
 impl TryFromProto<ProtoUnitTypeData> for UnitTypeData {
 	fn try_from_proto(u: ProtoUnitTypeData) -> Option<Self> {
-		UnitTypeId::from_u32(u.get_unit_id()).map(|id| Self {
-			id,
+		Some(Self {
+			id: UnitTypeId::from_u32(u.get_unit_id())?,
 			name: u.get_name().to_string(),
 			available: u.get_available(),
 			cargo_size: u.get_cargo_size(),
@@ -277,11 +277,11 @@ impl TryFromProto<ProtoUnitTypeData> for UnitTypeData {
 #[derive(Clone)]
 pub struct UpgradeData {
 	pub id: UpgradeId,
+	pub ability: AbilityId,
 	pub name: String,
 	pub mineral_cost: u32,
 	pub vespene_cost: u32,
 	pub research_time: f32,
-	pub ability: AbilityId,
 }
 impl UpgradeData {
 	pub fn cost(&self) -> Cost {
@@ -295,15 +295,13 @@ impl UpgradeData {
 }
 impl TryFromProto<ProtoUpgradeData> for UpgradeData {
 	fn try_from_proto(u: ProtoUpgradeData) -> Option<Self> {
-		UpgradeId::from_u32(u.get_upgrade_id()).and_then(|id| {
-			AbilityId::from_u32(u.get_ability_id()).map(|ability| Self {
-				id,
-				name: u.get_name().to_string(),
-				mineral_cost: u.get_mineral_cost(),
-				vespene_cost: u.get_vespene_cost(),
-				research_time: u.get_research_time(),
-				ability,
-			})
+		Some(Self {
+			id: UpgradeId::from_u32(u.get_upgrade_id())?,
+			ability: AbilityId::from_u32(u.get_ability_id())?,
+			name: u.get_name().to_string(),
+			mineral_cost: u.get_mineral_cost(),
+			vespene_cost: u.get_vespene_cost(),
+			research_time: u.get_research_time(),
 		})
 	}
 }
@@ -315,8 +313,8 @@ pub struct BuffData {
 }
 impl TryFromProto<ProtoBuffData> for BuffData {
 	fn try_from_proto(b: ProtoBuffData) -> Option<Self> {
-		BuffId::from_u32(b.get_buff_id()).map(|id| Self {
-			id,
+		Some(Self {
+			id: BuffId::from_u32(b.get_buff_id())?,
 			name: b.get_name().to_string(),
 		})
 	}
