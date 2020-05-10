@@ -11,11 +11,11 @@ extern crate maplit;
 #[macro_use]
 extern crate log;
 
+mod api;
 mod client;
 mod debug;
 mod game_info;
 mod paths;
-mod query;
 
 pub mod action;
 pub mod bot;
@@ -51,10 +51,10 @@ impl PlayerSettings {
 
 pub trait Player {
 	fn get_player_settings(&self) -> PlayerSettings;
-	fn on_start(&mut self, _ws: &mut WS) -> SC2Result<()> {
+	fn on_start(&mut self) -> SC2Result<()> {
 		Ok(())
 	}
-	fn on_step(&mut self, _ws: &mut WS, _iteration: usize) -> SC2Result<()> {
+	fn on_step(&mut self, _iteration: usize) -> SC2Result<()> {
 		Ok(())
 	}
 	fn on_end(&self, _result: GameResult) -> SC2Result<()> {

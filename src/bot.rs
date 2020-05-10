@@ -1,5 +1,7 @@
 use crate::{
 	action::{Action, ActionResult, Commander, Target},
+	api::API,
+	client::SC2Result,
 	constants::{RaceValues, RACE_VALUES},
 	debug::{DebugCommand, Debugger},
 	game_data::{Cost, GameData},
@@ -9,20 +11,27 @@ use crate::{
 	ids::{AbilityId, UnitTypeId, UpgradeId},
 	iproduct,
 	player::Race,
-	query::QueryMaster,
 	unit::{DataForUnit, Unit},
 	units::{GroupedUnits, Units},
-	Itertools, WS,
+	FromProto, IntoProto, Itertools,
 };
+use num_traits::ToPrimitive;
 use rand::prelude::{thread_rng, SliceRandom};
+use sc2_proto::{
+	query::{RequestQueryBuildingPlacement, RequestQueryPathing},
+	sc2api::Request,
+};
 use std::{
 	cell::RefCell,
 	collections::{HashMap, HashSet},
+	panic,
+	process::Child,
 	rc::Rc,
 };
 
-#[derive(Clone)]
 pub struct Bot {
+	pub(crate) process: Option<Child>,
+	pub(crate) api: Option<API>,
 	pub game_step: u32,
 	pub race: Race,
 	pub enemy_race: Race,
@@ -31,7 +40,6 @@ pub struct Bot {
 	pub actions: Vec<Action>,
 	pub commander: Rc<RefCell<Commander>>,
 	pub debug: Debugger,
-	pub query: QueryMaster,
 	pub game_info: GameInfo,
 	pub game_data: Rc<GameData>,
 	pub state: GameState,
@@ -65,12 +73,13 @@ impl Bot {
 			game_step: 1,
 			race: Race::Random,
 			enemy_race: Race::Random,
+			process: None,
+			api: None,
 			player_id: Default::default(),
 			opponent_id: Default::default(),
 			actions: Default::default(),
 			commander: Default::default(),
 			debug: Default::default(),
-			query: Default::default(),
 			game_info: Default::default(),
 			game_data: Default::default(),
 			state: Default::default(),
@@ -97,6 +106,10 @@ impl Bot {
 			expansions: Default::default(),
 			max_cooldowns: Default::default(),
 		}
+	}
+	#[inline]
+	pub fn api(&mut self) -> &mut API {
+		self.api.as_mut().expect("API is not initialized")
 	}
 	pub fn get_data_for_unit(&self) -> Rc<DataForUnit> {
 		Rc::clone(&self.data_for_unit)
@@ -153,7 +166,7 @@ impl Bot {
 		});
 	}
 	#[allow(clippy::block_in_if_condition_stmt)]
-	pub fn prepare_start(&mut self, ws: &mut WS) {
+	pub fn prepare_start(&mut self) {
 		self.race = self.game_info.players[&self.player_id].race_actual.unwrap();
 		if self.game_info.players.len() == 2 {
 			self.enemy_race = self.game_info.players[&(3 - self.player_id)].race_requested;
@@ -238,7 +251,7 @@ impl Bot {
 				if center.distance_squared(self.start_location) < 72.25 {
 					Some((self.start_location, center))
 				} else {
-					self.find_placement(ws, self.race_values.start_townhall, center, 8, 1, false, false)
+					self.find_placement(self.race_values.start_townhall, center, 8, 1, false, false)
 						.map(|place| (place, center))
 				}
 			})
@@ -523,19 +536,16 @@ impl Bot {
 		unimplemented!()
 	}
 	*/
-	pub fn can_place(&self, ws: &mut WS, building: UnitTypeId, pos: Point2) -> bool {
-		self.query
-			.placement(
-				ws,
-				vec![(self.game_data.units[&building].ability.unwrap(), pos, None)],
-				false,
-			)
-			.unwrap()[0] == ActionResult::Success
+	pub fn can_place(&mut self, building: UnitTypeId, pos: Point2) -> bool {
+		self.query_placement(
+			vec![(self.game_data.units[&building].ability.unwrap(), pos, None)],
+			false,
+		)
+		.unwrap()[0] == ActionResult::Success
 	}
 	#[allow(clippy::too_many_arguments)]
 	pub fn find_placement(
-		&self,
-		ws: &mut WS,
+		&mut self,
 		building: UnitTypeId,
 		near: Point2,
 		max_distance: isize,
@@ -546,9 +556,7 @@ impl Bot {
 		if let Some(data) = self.game_data.units.get(&building) {
 			if let Some(ability) = data.ability {
 				if self
-					.query
-					.placement(
-						ws,
+					.query_placement(
 						if addon {
 							vec![
 								(ability, near, None),
@@ -577,12 +585,7 @@ impl Bot {
 						})
 						.collect::<Vec<Point2>>();
 					let results = self
-						.query
-						.placement(
-							ws,
-							positions.iter().map(|pos| (ability, *pos, None)).collect(),
-							false,
-						)
+						.query_placement(positions.iter().map(|pos| (ability, *pos, None)).collect(), false)
 						.unwrap();
 
 					let mut valid_positions = positions
@@ -599,9 +602,7 @@ impl Bot {
 
 					if addon {
 						let results = self
-							.query
-							.placement(
-								ws,
+							.query_placement(
 								valid_positions
 									.iter()
 									.map(|pos| {
@@ -641,16 +642,14 @@ impl Bot {
 		}
 		None
 	}
-	pub fn find_gas_placement(&self, ws: &mut WS, base: Point2) -> Option<Unit> {
+	pub fn find_gas_placement(&mut self, base: Point2) -> Option<Unit> {
 		let ability = self.game_data.units[&self.race_values.gas_building]
 			.ability
 			.unwrap();
 
 		let geysers = self.grouped_units.vespene_geysers.closer_pos(11.0, base);
 		let results = self
-			.query
-			.placement(
-				ws,
+			.query_placement(
 				geysers.iter().map(|u| (ability, u.position, None)).collect(),
 				false,
 			)
@@ -674,7 +673,7 @@ impl Bot {
 			Some(valid_geysers[0].clone())
 		}
 	}
-	pub fn get_expansion(&self, ws: &mut WS) -> Option<(Point2, Point2)> {
+	pub fn get_expansion(&mut self) -> Option<(Point2, Point2)> {
 		let expansions = self
 			.expansions
 			.iter()
@@ -687,9 +686,7 @@ impl Bot {
 			.copied()
 			.collect::<Vec<(Point2, Point2)>>();
 		let paths = self
-			.query
-			.pathing(
-				ws,
+			.query_pathing(
 				expansions
 					.iter()
 					.map(|(loc, _)| (Target::Pos(self.start_location), *loc))
@@ -704,7 +701,7 @@ impl Bot {
 			.min_by(|(_, path1), (_, path2)| path1.partial_cmp(&path2).unwrap())
 			.map(|(loc, _path)| *loc)
 	}
-	pub fn get_enemy_expansion(&self, ws: &mut WS) -> Option<(Point2, Point2)> {
+	pub fn get_enemy_expansion(&mut self) -> Option<(Point2, Point2)> {
 		let expansions = self
 			.expansions
 			.iter()
@@ -717,9 +714,7 @@ impl Bot {
 			.copied()
 			.collect::<Vec<(Point2, Point2)>>();
 		let paths = self
-			.query
-			.pathing(
-				ws,
+			.query_pathing(
 				expansions
 					.iter()
 					.map(|(loc, _)| (Target::Pos(self.enemy_start), *loc))
@@ -758,10 +753,85 @@ impl Bot {
 			.copied()
 			.collect()
 	}
+	pub fn query_pathing(&mut self, paths: Vec<(Target, Point2)>) -> SC2Result<Vec<Option<f32>>> {
+		let mut req = Request::new();
+		let req_pathing = req.mut_query().mut_pathing();
+
+		paths.iter().for_each(|(start, goal)| {
+			let mut pathing = RequestQueryPathing::new();
+			match start {
+				Target::Tag(tag) => pathing.set_unit_tag(*tag),
+				Target::Pos(pos) => pathing.set_start_pos(pos.into_proto()),
+				Target::None => panic!("start pos is not specified in query pathing request"),
+			}
+			pathing.set_end_pos(goal.into_proto());
+			req_pathing.push(pathing);
+		});
+
+		let res = self.api.as_mut().expect("API is not initialized").send(req)?;
+		Ok(res
+			.get_query()
+			.get_pathing()
+			.iter()
+			.map(|result| result.distance)
+			.collect())
+	}
+	pub fn query_placement(
+		&mut self,
+		places: Vec<(AbilityId, Point2, Option<u64>)>,
+		check_resources: bool,
+	) -> SC2Result<Vec<ActionResult>> {
+		let mut req = Request::new();
+		let req_query = req.mut_query();
+		req_query.set_ignore_resource_requirements(!check_resources);
+		let req_placement = req_query.mut_placements();
+
+		places.iter().for_each(|(ability, pos, builder)| {
+			let mut placement = RequestQueryBuildingPlacement::new();
+			placement.set_ability_id(ability.to_i32().unwrap());
+			placement.set_target_pos(pos.into_proto());
+			if let Some(tag) = builder {
+				placement.set_placing_unit_tag(*tag);
+			}
+			req_placement.push(placement);
+		});
+
+		let res = self.api.as_mut().expect("API is not initialized").send(req)?;
+		Ok(res
+			.get_query()
+			.get_placements()
+			.iter()
+			.map(|result| ActionResult::from_proto(result.get_result()))
+			.collect())
+	}
 }
 
 impl Default for Bot {
 	fn default() -> Self {
 		Self::new()
+	}
+}
+
+impl Drop for Bot {
+	fn drop(&mut self) {
+		if let Some(api) = &mut self.api {
+			let mut req = Request::new();
+			req.mut_leave_game();
+			if let Err(e) = api.send_request(req) {
+				error!("Request LeaveGame failed: {}", e);
+			}
+
+			let mut req = Request::new();
+			req.mut_quit();
+			if let Err(e) = api.send_request(req) {
+				error!("Request QuitGame failed: {}", e);
+			}
+		}
+
+		if let Some(process) = &mut self.process {
+			if let Err(e) = process.kill() {
+				error!("Can't kill SC2 process: {}", e);
+			}
+		}
 	}
 }

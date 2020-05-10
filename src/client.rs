@@ -1,34 +1,67 @@
 use crate::{
+	api::API,
 	bot::Bot,
-	game_data::GameData,
-	game_info::GameInfo,
 	game_state::GameState,
 	ids::AbilityId,
 	paths::{get_latest_base_version, get_path_to_sc2, get_version_info},
 	player::Computer,
-	FromProto, FromProtoData, IntoProto, IntoSC2, Player, PlayerSettings,
+	FromProtoData, IntoProto, IntoSC2, Player, PlayerSettings,
 };
 use num_traits::FromPrimitive;
-use protobuf::Message;
 use sc2_proto::{
 	query::RequestQueryAvailableAbilities,
-	sc2api::{PlayerSetup, PlayerType, PortSet, Request, RequestCreateGame, Response, Status},
+	sc2api::{PlayerSetup, PlayerType, PortSet, Request, RequestCreateGame, Status},
 };
 use std::{
 	error::Error,
 	fmt, fs,
 	net::TcpListener,
 	ops::{Deref, DerefMut},
+	panic,
 	process::{Child, Command},
 	rc::Rc,
 };
-use tungstenite::{client::AutoStream, connect, Message::Binary, WebSocket};
+use tungstenite::{client::AutoStream, connect, WebSocket};
 use url::Url;
 
 pub type WS = WebSocket<AutoStream>;
 pub type SC2Result<T> = Result<T, Box<dyn Error>>;
 
 const HOST: &str = "127.0.0.1";
+
+#[derive(Default)]
+struct Human {
+	process: Option<Child>,
+	api: Option<API>,
+}
+impl Human {
+	pub fn new() -> Self {
+		Default::default()
+	}
+}
+impl Drop for Human {
+	fn drop(&mut self) {
+		if let Some(api) = &mut self.api {
+			let mut req = Request::new();
+			req.mut_leave_game();
+			if let Err(e) = api.send_request(req) {
+				error!("Request LeaveGame failed: {}", e);
+			}
+
+			let mut req = Request::new();
+			req.mut_quit();
+			if let Err(e) = api.send_request(req) {
+				error!("Request QuitGame failed: {}", e);
+			}
+		}
+
+		if let Some(process) = &mut self.process {
+			if let Err(e) = process.kill() {
+				error!("Can't kill SC2 process: {}", e);
+			}
+		}
+	}
+}
 
 #[derive(Debug)]
 struct ProtoError(String);
@@ -70,64 +103,57 @@ where
 	fs::metadata(&map_path).unwrap_or_else(|_| panic!("Path doesn't exists: {}", map_path));
 	let port = get_unused_port();
 	debug!("Launching SC2 process");
-	let mut process = launch_client(&sc2_path, port, sc2_version)?;
+	bot.process = Some(launch_client(&sc2_path, port, sc2_version)?);
 	debug!("Connecting to websocket");
-	let mut ws = connect_to_websocket(HOST, port)?;
+	bot.api = Some(API(connect_to_websocket(HOST, port)?));
 
-	match {
-		let settings = bot.get_player_settings();
-		debug!("Sending CreateGame request");
-		// Create game
-		let mut req = Request::new();
-		let req_create_game = req.mut_create_game();
+	let settings = bot.get_player_settings();
+	let api = &mut bot.api.as_mut().unwrap();
 
-		req_create_game.mut_local_map().set_map_path(map_path);
-		/*
-		Set Map
-			req.mut_create_game().mut_local_map().set_map_path("");
-		OR
-			req.mut_create_game().set_battlenet_map_name("");
-		*/
-		create_player_setup(&settings, req_create_game);
-		create_computer_setup(computer, req_create_game);
-		// req_create_game.set_disable_fog(bool); // Cheat
-		// req_create_game.set_random_seed(u32);
-		req_create_game.set_realtime(realtime);
+	debug!("Sending CreateGame request");
+	// Create game
+	let mut req = Request::new();
+	let req_create_game = req.mut_create_game();
 
-		let res = send(&mut ws, req)?;
-		let res_create_game = res.get_create_game();
-		if res_create_game.has_error() {
-			terminate(&mut process, &mut ws)?;
-			let err = format!(
-				"{:?}: {}",
-				res_create_game.get_error(),
-				res_create_game.get_error_details()
-			);
-			error!("{}", err);
-			panic!(err);
-		}
+	req_create_game.mut_local_map().set_map_path(map_path);
+	/*
+	Set Map
+		req.mut_create_game().mut_local_map().set_map_path("");
+	OR
+		req.mut_create_game().set_battlenet_map_name("");
+	*/
+	create_player_setup(&settings, req_create_game);
+	create_computer_setup(computer, req_create_game);
+	// req_create_game.set_disable_fog(bool); // Cheat
+	// req_create_game.set_random_seed(u32);
+	req_create_game.set_realtime(realtime);
 
-		debug!("Sending JoinGame request");
-		bot.player_id = join_game(&settings, &mut ws, None)?;
-
-		set_static_data(bot, &mut ws)?;
-
-		debug!("Entered main loop");
-		// Main loop
-		play_first_step(&mut ws, bot, realtime)?;
-		let mut iteration = 0;
-		while play_step(&mut ws, bot, iteration, realtime)? {
-			iteration += 1;
-		}
-		debug!("Game finished");
-		Ok(())
-	} {
-		Ok(()) => terminate(&mut process, &mut ws),
-		err => {
-			terminate(&mut process, &mut ws)?;
-			err
-		}
+	let res = api.send(req)?;
+	let res_create_game = res.get_create_game();
+	if res_create_game.has_error() {
+		let err = format!(
+			"{:?}: {}",
+			res_create_game.get_error(),
+			res_create_game.get_error_details()
+		);
+		error!("{}", err);
+		panic!(err);
 	}
+
+	debug!("Sending JoinGame request");
+	bot.player_id = join_game(&settings, api, None)?;
+
+	set_static_data(bot)?;
+
+	debug!("Entered main loop");
+	// Main loop
+	play_first_step(bot, realtime)?;
+	let mut iteration = 0;
+	while play_step(bot, iteration, realtime)? {
+		iteration += 1;
+	}
+	debug!("Game finished");
+	Ok(())
 }
 
 pub fn run_ladder_game<B>(
@@ -143,7 +169,7 @@ where
 	debug!("Starting ladder game");
 
 	debug!("Connecting to websocket");
-	let mut ws = connect_to_websocket(&host, port.parse()?)?;
+	bot.api = Some(API(connect_to_websocket(&host, port.parse()?)?));
 
 	debug!("Sending JoinGame request");
 
@@ -153,7 +179,7 @@ where
 
 	bot.player_id = join_game(
 		&bot.get_player_settings(),
-		&mut ws,
+		bot.api(),
 		Some(Ports {
 			shared: player_port + 1,
 			server: [player_port + 2, player_port + 3],
@@ -161,13 +187,13 @@ where
 		}),
 	)?;
 
-	set_static_data(bot, &mut ws)?;
+	set_static_data(bot)?;
 
 	debug!("Entered main loop");
 	// Main loop
 	let mut iteration = 0;
-	play_first_step(&mut ws, bot, false)?;
-	while play_step(&mut ws, bot, iteration, false)? {
+	play_first_step(bot, false)?;
+	while play_step(bot, iteration, false)? {
 		iteration += 1;
 	}
 	debug!("Game finished");
@@ -177,7 +203,7 @@ where
 
 pub fn run_vs_human<B>(
 	bot: &mut B,
-	human: PlayerSettings,
+	human_settings: PlayerSettings,
 	map_name: &str,
 	sc2_version: Option<&str>,
 ) -> SC2Result<()>
@@ -187,84 +213,63 @@ where
 	debug!("Starting human vs bot");
 	let ports = get_unused_ports(9);
 	let sc2_path = get_path_to_sc2();
-	let (port_host, port_client) = (ports[0], ports[1]);
+	let (port_human, port_bot) = (ports[0], ports[1]);
+
+	let mut human = Human::new();
 
 	debug!("Launching host SC2 process");
-	let mut process_host = launch_client(&sc2_path, port_host, sc2_version)?;
+	human.process = Some(launch_client(&sc2_path, port_human, sc2_version)?);
 	debug!("Launching client SC2 process");
-	let mut process_client = launch_client(&sc2_path, port_client, sc2_version)?;
+	bot.process = Some(launch_client(&sc2_path, port_bot, sc2_version)?);
 	debug!("Connecting to host websocket");
-	let mut ws_host = connect_to_websocket(HOST, port_host)?;
+	human.api = Some(API(connect_to_websocket(HOST, port_human)?));
 	debug!("Connecting to client websocket");
-	let mut ws_client = connect_to_websocket(HOST, port_client)?;
+	bot.api = Some(API(connect_to_websocket(HOST, port_bot)?));
+	let human_api = &mut human.api.as_mut().unwrap();
 
-	match {
-		debug!("Sending CreateGame request to host process");
-		let mut req = Request::new();
-		let req_create_game = req.mut_create_game();
-		req_create_game
-			.mut_local_map()
-			.set_map_path(format!("{}/Maps/{}.SC2Map", sc2_path, map_name));
-		create_player_setup(&human, req_create_game);
-		create_player_setup(&bot.get_player_settings(), req_create_game);
-		// req_create_game.set_disable_fog(bool); // Cheat
-		// req_create_game.set_random_seed(u32);
-		req_create_game.set_realtime(true);
+	debug!("Sending CreateGame request to host process");
+	let mut req = Request::new();
+	let req_create_game = req.mut_create_game();
+	req_create_game
+		.mut_local_map()
+		.set_map_path(format!("{}/Maps/{}.SC2Map", sc2_path, map_name));
+	create_player_setup(&human_settings, req_create_game);
+	create_player_setup(&bot.get_player_settings(), req_create_game);
+	// req_create_game.set_disable_fog(bool); // Cheat
+	// req_create_game.set_random_seed(u32);
+	req_create_game.set_realtime(true);
 
-		let res = send(&mut ws_host, req)?;
-		let res_create_game = res.get_create_game();
-		if res_create_game.has_error() {
-			terminate_both(
-				&mut process_host,
-				&mut ws_host,
-				&mut process_client,
-				&mut ws_client,
-			)?;
-			let err = format!(
-				"{:?}: {}",
-				res_create_game.get_error(),
-				res_create_game.get_error_details()
-			);
-			error!("{}", err);
-			panic!(err);
-		}
-
-		debug!("Sending JoinGame request to both processes");
-		let ports = Ports {
-			shared: ports[2],
-			server: [ports[3], ports[4]],
-			client: vec![[ports[5], ports[6]], [ports[7], ports[8]]],
-		};
-		join_game(&human, &mut ws_host, Some(ports.clone()))?;
-		bot.player_id = join_game(&bot.get_player_settings(), &mut ws_client, Some(ports))?;
-
-		set_static_data(bot, &mut ws_client)?;
-
-		debug!("Entered main loop");
-		play_first_step(&mut ws_client, bot, true)?;
-		let mut iteration = 0;
-		while play_step(&mut ws_client, bot, iteration, true)? {
-			iteration += 1;
-		}
-		debug!("Game finished");
-		Ok(())
-	} {
-		Ok(()) => terminate_both(
-			&mut process_host,
-			&mut ws_host,
-			&mut process_client,
-			&mut ws_client,
-		),
-		err => {
-			terminate_both(
-				&mut process_host,
-				&mut ws_host,
-				&mut process_client,
-				&mut ws_client,
-			)?;
-			err
-		}
+	let res = human_api.send(req)?;
+	let res_create_game = res.get_create_game();
+	if res_create_game.has_error() {
+		let err = format!(
+			"{:?}: {}",
+			res_create_game.get_error(),
+			res_create_game.get_error_details()
+		);
+		error!("{}", err);
+		panic!(err);
 	}
+
+	debug!("Sending JoinGame request to both processes");
+	let ports = Ports {
+		shared: ports[2],
+		server: [ports[3], ports[4]],
+		client: vec![[ports[5], ports[6]], [ports[7], ports[8]]],
+	};
+	join_game(&human_settings, human_api, Some(ports.clone()))?;
+	bot.player_id = join_game(&bot.get_player_settings(), bot.api(), Some(ports))?;
+
+	set_static_data(bot)?;
+
+	debug!("Entered main loop");
+	play_first_step(bot, true)?;
+	let mut iteration = 0;
+	while play_step(bot, iteration, true)? {
+		iteration += 1;
+	}
+	debug!("Game finished");
+	Ok(())
 }
 
 // Mini Helpers
@@ -289,63 +294,14 @@ fn get_unused_ports(n: usize) -> Vec<i32> {
 	ports
 }
 
-fn send_request(ws: &mut WS, req: Request) -> SC2Result<()> {
-	ws.write_message(Binary(req.write_to_bytes()?))?;
-	ws.read_message()?;
-	Ok(())
-}
+fn set_static_data(bot: &mut Bot) -> SC2Result<()> {
+	let api = &mut bot.api.as_mut().expect("API is not initialized");
 
-pub fn send(ws: &mut WS, req: Request) -> SC2Result<Response> {
-	ws.write_message(Binary(req.write_to_bytes()?))?;
-
-	let msg = ws.read_message()?;
-
-	let mut res = Response::new();
-	res.merge_from_bytes(msg.into_data().as_slice())?;
-	Ok(res)
-}
-
-// Helpers
-fn terminate(process: &mut Child, ws: &mut WS) -> SC2Result<()> {
-	debug!("Sending QuitGame request and terminating SC2 process");
-
-	let mut req = Request::new();
-	req.mut_quit();
-	send_request(ws, req)?;
-
-	process.kill()?;
-	Ok(())
-}
-
-fn terminate_both(
-	process_host: &mut Child,
-	ws_host: &mut WS,
-	process_client: &mut Child,
-	ws_client: &mut WS,
-) -> SC2Result<()> {
-	debug!("Sending LeaveGame and QuitGame requests and terminating both SC2 processes");
-
-	let mut req = Request::new();
-	req.mut_leave_game();
-	send_request(ws_host, req.clone())?;
-	send_request(ws_client, req)?;
-
-	let mut req = Request::new();
-	req.mut_quit();
-	send_request(ws_host, req.clone())?;
-	send_request(ws_client, req)?;
-
-	process_host.kill()?;
-	process_client.kill()?;
-	Ok(())
-}
-
-fn set_static_data(bot: &mut Bot, ws: &mut WS) -> SC2Result<()> {
 	debug!("Requesting GameInfo");
 	let mut req = Request::new();
 	req.mut_game_info();
-	let res = send(ws, req)?;
-	bot.game_info = GameInfo::from_proto(res.get_game_info().clone());
+	let mut res = api.send(req)?;
+	bot.game_info = res.take_game_info().into_sc2();
 
 	debug!("Requesting GameData");
 	let mut req = Request::new();
@@ -355,8 +311,8 @@ fn set_static_data(bot: &mut Bot, ws: &mut WS) -> SC2Result<()> {
 	req_game_data.set_upgrade_id(true);
 	req_game_data.set_buff_id(true);
 	req_game_data.set_effect_id(true);
-	let res = send(ws, req)?;
-	bot.game_data = Rc::new(GameData::from_proto(res.get_data().clone()));
+	let mut res = api.send(req)?;
+	bot.game_data = Rc::new(res.take_data().into_sc2());
 	Ok(())
 }
 
@@ -383,7 +339,7 @@ fn create_computer_setup(computer: Computer, req_create_game: &mut RequestCreate
 	req_create_game.mut_player_setup().push(setup);
 }
 
-fn join_game(settings: &PlayerSettings, ws: &mut WS, ports: Option<Ports>) -> SC2Result<u32> {
+fn join_game(settings: &PlayerSettings, api: &mut API, ports: Option<Ports>) -> SC2Result<u32> {
 	let mut req = Request::new();
 	let req_join_game = req.mut_join_game();
 
@@ -420,7 +376,7 @@ fn join_game(settings: &PlayerSettings, ws: &mut WS, ports: Option<Ports>) -> SC
 		});
 	}
 
-	let res = send(ws, req)?;
+	let res = api.send(req)?;
 	let res_join_game = res.get_join_game();
 	if res_join_game.has_error() {
 		let err = ProtoError::new(res_join_game.get_error(), res_join_game.get_error_details());
@@ -431,20 +387,20 @@ fn join_game(settings: &PlayerSettings, ws: &mut WS, ports: Option<Ports>) -> SC
 	}
 }
 
-fn play_first_step<B>(ws: &mut WS, bot: &mut B, realtime: bool) -> SC2Result<()>
+fn play_first_step<B>(bot: &mut B, realtime: bool) -> SC2Result<()>
 where
 	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
 {
 	let mut req = Request::new();
 	req.mut_observation();
 
-	let res = send(ws, req)?;
+	let res = bot.api().send(req)?;
 
 	bot.init_data_for_unit();
 	bot.state = GameState::from_proto_data(bot.get_data_for_unit(), res.get_observation());
-	bot.prepare_start(ws);
+	bot.prepare_start();
 
-	bot.on_start(ws)?;
+	bot.on_start()?;
 
 	let bot_actions = bot.get_actions();
 	if !bot_actions.is_empty() {
@@ -452,24 +408,23 @@ where
 		let actions = req.mut_action().mut_actions();
 		bot_actions.into_iter().for_each(|a| actions.push(a.into_proto()));
 		bot.clear_actions();
-		send_request(ws, req)?;
+		bot.api().send_request(req)?;
 	}
 	if !realtime {
 		let mut req = Request::new();
 		req.mut_step().set_count(bot.game_step);
-		send_request(ws, req)?;
+		bot.api().send_request(req)?;
 	}
 	Ok(())
 }
 
-fn play_step<B>(ws: &mut WS, bot: &mut B, iteration: usize, realtime: bool) -> SC2Result<bool>
+fn play_step<B>(bot: &mut B, iteration: usize, realtime: bool) -> SC2Result<bool>
 where
 	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
 {
 	let mut req = Request::new();
 	req.mut_observation();
-
-	let res = send(ws, req)?;
+	let res = bot.api().send(req)?;
 
 	if matches!(res.get_status(), Status::ended) {
 		let result = res.get_observation().get_player_result()[bot.player_id as usize]
@@ -492,7 +447,7 @@ where
 		}
 	});
 
-	let res = send(ws, req)?;
+	let res = bot.api().send(req)?;
 	bot.abilities_units = res
 		.get_query()
 		.get_abilities()
@@ -511,7 +466,7 @@ where
 	bot.state = state;
 	bot.prepare_step();
 
-	bot.on_step(ws, iteration)?;
+	bot.on_step(iteration)?;
 
 	let bot_actions = bot.get_actions();
 	if !bot_actions.is_empty() {
@@ -520,9 +475,9 @@ where
 		let actions = req.mut_action().mut_actions();
 		bot_actions.into_iter().for_each(|a| actions.push(a.into_proto()));
 		bot.clear_actions();
-		send_request(ws, req)?;
+		bot.api().send_request(req)?;
 		/*
-		let res = send(ws, req);
+		let res = api.send(req);
 		let results = res.get_action().get_result();
 		if !results.is_empty() {
 			println!("action_results: {:?}", results);
@@ -538,12 +493,12 @@ where
 			.into_iter()
 			.for_each(|cmd| debug_commands.push(cmd.into_proto()));
 		bot.clear_debug_commands();
-		send_request(ws, req)?;
+		bot.api().send_request(req)?;
 	}
 	if !realtime {
 		let mut req = Request::new();
 		req.mut_step().set_count(bot.game_step);
-		send_request(ws, req)?;
+		bot.api().send_request(req)?;
 	}
 	Ok(true)
 }
