@@ -1,13 +1,13 @@
 use dirs::home_dir;
 use regex::Regex;
-use std::{env::var_os, fs::read_to_string, path::Path};
+use std::{env::var_os, fs, path::Path};
 
 pub fn get_path_to_sc2() -> String {
 	match var_os("SC2PATH") {
 		Some(path) => path.to_str().unwrap().to_string(),
 		None => {
 			if cfg!(target_os = "windows") {
-				let file = read_to_string(format!(
+				let file = fs::read_to_string(format!(
 					"{}/Documents/StarCraft II/ExecuteInfo.txt",
 					home_dir().unwrap().to_str().unwrap(),
 				))
@@ -30,6 +30,25 @@ pub fn get_path_to_sc2() -> String {
 			.to_string()
 		}
 	}
+}
+
+pub fn get_map_path(sc2_path: &str, map_name: &str) -> String {
+	let maps = {
+		let path = format!("{}/Maps", sc2_path);
+		if fs::metadata(&path).is_ok() {
+			path
+		} else {
+			let path = format!("{}/maps", sc2_path);
+			if fs::metadata(&path).is_ok() {
+				path
+			} else {
+				panic!("Can't find maps folder in: {}", sc2_path);
+			}
+		}
+	};
+	let map_path = format!("{}/{}.SC2Map", maps, map_name);
+	fs::metadata(&map_path).unwrap_or_else(|_| panic!("Map doesn't exists: {}", map_path));
+	map_path
 }
 
 pub fn get_latest_base_version(sc2_path: &str) -> u32 {

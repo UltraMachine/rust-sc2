@@ -1,11 +1,6 @@
 use crate::{
-	api::API,
-	bot::Bot,
-	game_state::GameState,
-	ids::AbilityId,
-	paths::{get_latest_base_version, get_path_to_sc2, get_version_info},
-	player::Computer,
-	FromProtoData, IntoProto, IntoSC2, Player, PlayerSettings,
+	api::API, bot::Bot, game_state::GameState, ids::AbilityId, paths::*, player::Computer, FromProtoData,
+	IntoProto, IntoSC2, Player, PlayerSettings,
 };
 use num_traits::FromPrimitive;
 use sc2_proto::{
@@ -14,7 +9,7 @@ use sc2_proto::{
 };
 use std::{
 	error::Error,
-	fmt, fs,
+	fmt,
 	net::TcpListener,
 	ops::{Deref, DerefMut},
 	panic,
@@ -98,9 +93,8 @@ where
 	debug!("Starting game vs computer");
 
 	let sc2_path = get_path_to_sc2();
-	let map_path = format!("{}/Maps/{}.SC2Map", sc2_path, map_name);
-	// Check if path exists
-	fs::metadata(&map_path).unwrap_or_else(|_| panic!("Path doesn't exists: {}", map_path));
+	let map_path = get_map_path(&sc2_path, map_name);
+
 	let port = get_unused_port();
 	debug!("Launching SC2 process");
 	bot.process = Some(launch_client(&sc2_path, port, sc2_version)?);
@@ -211,8 +205,10 @@ where
 	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
 {
 	debug!("Starting human vs bot");
-	let ports = get_unused_ports(9);
 	let sc2_path = get_path_to_sc2();
+	let map_path = get_map_path(&sc2_path, map_name);
+
+	let ports = get_unused_ports(9);
 	let (port_human, port_bot) = (ports[0], ports[1]);
 
 	let mut human = Human::new();
@@ -230,9 +226,7 @@ where
 	debug!("Sending CreateGame request to host process");
 	let mut req = Request::new();
 	let req_create_game = req.mut_create_game();
-	req_create_game
-		.mut_local_map()
-		.set_map_path(format!("{}/Maps/{}.SC2Map", sc2_path, map_name));
+	req_create_game.mut_local_map().set_map_path(map_path);
 	create_player_setup(&human_settings, req_create_game);
 	create_player_setup(&bot.get_player_settings(), req_create_game);
 	// req_create_game.set_disable_fog(bool); // Cheat
