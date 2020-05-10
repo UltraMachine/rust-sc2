@@ -6,7 +6,7 @@ use std::{
 		HashMap,
 	},
 	iter::{FromIterator, Sum},
-	ops::Index,
+	ops::{Index, IndexMut},
 };
 
 #[derive(Default, Clone)]
@@ -119,8 +119,8 @@ impl Units {
 	pub fn of_type(&self, u_type: UnitTypeId) -> Self {
 		self.filter(|u| u.type_id == u_type)
 	}
-	pub fn of_types<T: Iterator<Item = UnitTypeId>>(&self, mut types: T) -> Self {
-		self.filter(|u| types.any(|u_type| u.type_id == u_type))
+	pub fn of_types<T: Iterator<Item = UnitTypeId> + Clone>(&self, types: T) -> Self {
+		self.filter(|u| types.clone().any(|u_type| u.type_id == u_type))
 	}
 	pub fn center(&self) -> Point2 {
 		self.sum(|u| u.position) / (self.len() as f32)
@@ -327,6 +327,12 @@ impl Index<u64> for Units {
 	#[inline]
 	fn index(&self, tag: u64) -> &Self::Output {
 		&self.units[&tag]
+	}
+}
+impl IndexMut<u64> for Units {
+	#[inline]
+	fn index_mut(&mut self, tag: u64) -> &mut Self::Output {
+		self.units.get_mut(&tag).unwrap()
 	}
 }
 impl Extend<Unit> for Units {
