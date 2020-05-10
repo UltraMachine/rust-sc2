@@ -19,6 +19,7 @@ pub mod prelude {
 		geometry::Point2,
 		ids::*,
 		player::{AIBuild, Computer, Difficulty, GameResult, Race},
+		sc2_macro::{bot, bot_new},
 		unit::Unit,
 		units::Units,
 		Player, PlayerSettings,
