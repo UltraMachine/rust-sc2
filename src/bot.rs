@@ -9,12 +9,12 @@ use crate::{
 	game_state::{Alliance, GameState},
 	geometry::Point2,
 	ids::{AbilityId, UnitTypeId, UpgradeId},
-	iproduct,
 	player::Race,
 	unit::{DataForUnit, Unit},
 	units::{GroupedUnits, Units},
-	FromProto, IntoProto, Itertools,
+	FromProto, IntoProto,
 };
+use itertools::Itertools;
 use num_traits::ToPrimitive;
 use rand::prelude::{thread_rng, SliceRandom};
 use sc2_proto::{

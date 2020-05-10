@@ -1,9 +1,9 @@
 use crate::client::{SC2Result, WS};
+use protobuf::Message;
 use sc2_proto::sc2api::{Request, Response};
 use tungstenite::Message::Binary;
-use protobuf::Message;
 
-pub struct API(pub(crate) WS);
+pub struct API(pub WS);
 impl API {
 	pub fn send_request(&mut self, req: Request) -> SC2Result<()> {
 		self.0.write_message(Binary(req.write_to_bytes()?))?;

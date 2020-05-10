@@ -11,6 +11,20 @@ extern crate maplit;
 #[macro_use]
 extern crate log;
 
+pub mod prelude {
+	pub use crate::{
+		action::Target,
+		client::{run_ladder_game, run_vs_computer, run_vs_human, SC2Result},
+		constants::TECH_REQUIREMENTS,
+		geometry::Point2,
+		ids::*,
+		player::{AIBuild, Computer, Difficulty, GameResult, Race},
+		unit::Unit,
+		units::Units,
+		Player, PlayerSettings,
+	};
+}
+
 mod api;
 mod client;
 mod debug;
@@ -33,8 +47,7 @@ use player::{GameResult, Race};
 use std::rc::Rc;
 use unit::DataForUnit;
 
-pub use client::{run_ladder_game, run_vs_computer, run_vs_human, SC2Result, WS};
-pub use itertools::{iproduct, Itertools};
+pub use client::{run_ladder_game, run_vs_computer, run_vs_human, SC2Result};
 pub use sc2_macro::{bot, bot_new};
 
 pub type PlayerBox = Box<dyn Player>;
