@@ -3,30 +3,30 @@ extern crate clap;
 
 use rand::prelude::{thread_rng, SliceRandom};
 use rust_sc2::{
-	bot, bot_new,
+	bot,
 	player::{Computer, Difficulty, Race},
-	run_ladder_game, run_vs_computer, run_vs_human, Player, PlayerSettings, SC2Result, WS,
+	run_ladder_game, run_vs_computer, run_vs_human, Player, PlayerSettings, SC2Result,
 };
 
 #[bot]
+#[derive(Default)]
 struct DebugAI {
 	debug_z: f32,
 }
 
 impl DebugAI {
-	#[bot_new]
 	fn new() -> Self {
-		Self { debug_z: 0.0 }
+		Default::default()
 	}
 }
 
 impl Player for DebugAI {
-	fn on_start(&mut self, _ws: &mut WS) -> SC2Result<()> {
+	fn on_start(&mut self) -> SC2Result<()> {
 		self.debug_z = self.grouped_units.townhalls.first().unwrap().position3d.z;
 		Ok(())
 	}
 
-	fn on_step(&mut self, _ws: &mut WS, _iteration: usize) -> SC2Result<()> {
+	fn on_step(&mut self, _iteration: usize) -> SC2Result<()> {
 		// Debug expansion locations
 		let debug_z = self.debug_z;
 		self.expansions.clone().iter().for_each(|(loc, center)| {

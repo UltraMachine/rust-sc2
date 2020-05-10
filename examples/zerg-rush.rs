@@ -4,18 +4,19 @@ extern crate clap;
 use rand::prelude::{thread_rng, SliceRandom};
 use rust_sc2::{
 	action::Target,
-	bot, bot_new,
+	bot,
 	geometry::Point2,
 	ids::{AbilityId, BuffId, UnitTypeId, UpgradeId},
 	player::{Computer, Difficulty, Race},
 	run_ladder_game, run_vs_computer, run_vs_human,
 	unit::Unit,
 	units::Units,
-	Player, PlayerSettings, SC2Result, WS,
+	Player, PlayerSettings, SC2Result,
 };
 use std::cmp::{min, Ordering};
 
 #[bot]
+#[derive(Default)]
 struct ZergRushAI {
 	last_loop_distributed: u32,
 }
@@ -23,11 +24,8 @@ struct ZergRushAI {
 impl ZergRushAI {
 	const DISTRIBUTION_DELAY: u32 = 8;
 
-	#[bot_new]
 	fn new() -> Self {
-		Self {
-			last_loop_distributed: 0,
-		}
+		Default::default()
 	}
 	fn distribute_workers(&mut self) {
 		if self.grouped_units.workers.is_empty() {
@@ -274,7 +272,7 @@ impl ZergRushAI {
 			Some(workers.closest_pos(pos).unwrap().clone())
 		}
 	}
-	fn build(&mut self, ws: &mut WS) {
+	fn build(&mut self) {
 		let mineral_tags = self
 			.grouped_units
 			.mineral_fields
@@ -290,15 +288,8 @@ impl ZergRushAI {
 				.unwrap_or(&0)
 			== 0 && self.can_afford(pool, false)
 		{
-			if let Some(location) = self.find_placement(
-				ws,
-				pool,
-				self.start_location.towards(self.game_info.map_center, 6.0),
-				15,
-				1,
-				false,
-				false,
-			) {
+			let place = self.start_location.towards(self.game_info.map_center, 6.0);
+			if let Some(location) = self.find_placement(pool, place, 15, 1, false, false) {
 				if let Some(builder) = self.get_builder(location, &mineral_tags) {
 					builder.build(pool, location, false);
 					self.substract_resources(pool);
@@ -314,7 +305,8 @@ impl ZergRushAI {
 				.unwrap_or(&0)
 			== 0 && self.can_afford(extractor, false)
 		{
-			if let Some(geyser) = self.find_gas_placement(ws, self.start_location) {
+			let start_location = self.start_location;
+			if let Some(geyser) = self.find_gas_placement(start_location) {
 				if let Some(builder) = self.get_builder(geyser.position, &mineral_tags) {
 					builder.build_gas(geyser.tag, false);
 					self.substract_resources(extractor);
@@ -324,7 +316,7 @@ impl ZergRushAI {
 
 		let hatchery = UnitTypeId::Hatchery;
 		if self.can_afford(hatchery, false) {
-			if let Some((location, _resource_center)) = self.get_expansion(ws) {
+			if let Some((location, _resource_center)) = self.get_expansion() {
 				if let Some(builder) = self.get_builder(location, &mineral_tags) {
 					builder.build(hatchery, location, false);
 					self.substract_resources(hatchery);
@@ -446,7 +438,7 @@ impl ZergRushAI {
 }
 
 impl Player for ZergRushAI {
-	fn on_start(&mut self, _ws: &mut WS) -> SC2Result<()> {
+	fn on_start(&mut self) -> SC2Result<()> {
 		let townhall = self.grouped_units.townhalls.first().unwrap().clone();
 
 		townhall.command(AbilityId::RallyWorkers, Target::Pos(self.start_center), false);
@@ -464,10 +456,10 @@ impl Player for ZergRushAI {
 		Ok(())
 	}
 
-	fn on_step(&mut self, ws: &mut WS, _iteration: usize) -> SC2Result<()> {
+	fn on_step(&mut self, _iteration: usize) -> SC2Result<()> {
 		self.distribute_workers();
 		self.upgrades();
-		self.build(ws);
+		self.build();
 		self.order_units();
 		self.execute_micro();
 		Ok(())

@@ -4,30 +4,26 @@ extern crate clap;
 use rand::prelude::{thread_rng, SliceRandom};
 use rust_sc2::{
 	action::Target,
-	bot, bot_new,
+	bot,
 	ids::UnitTypeId,
 	player::{Computer, Difficulty, Race},
-	run_ladder_game, run_vs_computer, run_vs_human, Player, PlayerSettings, SC2Result, WS,
+	run_ladder_game, run_vs_computer, run_vs_human, Player, PlayerSettings, SC2Result,
 };
 
 #[bot]
+#[derive(Default)]
 struct WorkerRushAI {
 	mineral_forward: u64,
 	mineral_back: u64,
 }
-
 impl WorkerRushAI {
-	#[bot_new]
 	fn new() -> Self {
-		Self {
-			mineral_forward: Default::default(),
-			mineral_back: Default::default(),
-		}
+		Default::default()
 	}
 }
 
 impl Player for WorkerRushAI {
-	fn on_start(&mut self, _ws: &mut WS) -> SC2Result<()> {
+	fn on_start(&mut self) -> SC2Result<()> {
 		self.grouped_units
 			.townhalls
 			.first()
@@ -49,7 +45,7 @@ impl Player for WorkerRushAI {
 		Ok(())
 	}
 
-	fn on_step(&mut self, _ws: &mut WS, _iteration: usize) -> SC2Result<()> {
+	fn on_step(&mut self, _iteration: usize) -> SC2Result<()> {
 		let ground_attackers = self.grouped_units.enemy_units.filter(|u| {
 			!u.is_flying && u.can_attack_ground() && u.distance_pos_squared(self.enemy_start) < 2025.0
 		});

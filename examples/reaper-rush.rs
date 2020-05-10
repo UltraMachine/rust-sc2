@@ -4,18 +4,19 @@ extern crate clap;
 use rand::prelude::{thread_rng, SliceRandom};
 use rust_sc2::{
 	action::Target,
-	bot, bot_new,
+	bot,
 	geometry::Point2,
 	ids::{AbilityId, UnitTypeId},
 	player::{Computer, Difficulty, Race},
 	run_ladder_game, run_vs_computer, run_vs_human,
 	unit::Unit,
 	units::Units,
-	Player, PlayerSettings, SC2Result, WS,
+	Player, PlayerSettings, SC2Result,
 };
 use std::{cmp::Ordering, collections::HashSet};
 
 #[bot]
+#[derive(Default)]
 struct ReaperRushAI {
 	reapers_retreat: HashSet<u64>,
 	last_loop_distributed: u32,
@@ -24,12 +25,8 @@ struct ReaperRushAI {
 impl ReaperRushAI {
 	const DISTRIBUTION_DELAY: u32 = 8;
 
-	#[bot_new]
 	fn new() -> Self {
-		Self {
-			reapers_retreat: HashSet::new(),
-			last_loop_distributed: 0,
-		}
+		Default::default()
 	}
 	fn distribute_workers(&mut self) {
 		if self.grouped_units.workers.is_empty() {
@@ -172,7 +169,7 @@ impl ReaperRushAI {
 			Some(workers.closest_pos(pos).unwrap().clone())
 		}
 	}
-	fn build(&mut self, ws: &mut WS) {
+	fn build(&mut self) {
 		let mineral_tags = self
 			.grouped_units
 			.mineral_fields
@@ -185,7 +182,8 @@ impl ReaperRushAI {
 			&& self.orders.get(&AbilityId::TerranBuildRefinery).unwrap_or(&0) == &0
 			&& self.can_afford(UnitTypeId::Refinery, false)
 		{
-			if let Some(geyser) = self.find_gas_placement(ws, self.start_location) {
+			let start_location = self.start_location;
+			if let Some(geyser) = self.find_gas_placement(start_location) {
 				if let Some(builder) = self.get_builder(geyser.position, &mineral_tags) {
 					builder.build_gas(geyser.tag, false);
 					self.substract_resources(UnitTypeId::Refinery);
@@ -199,7 +197,7 @@ impl ReaperRushAI {
 			&& self.can_afford(UnitTypeId::SupplyDepot, false)
 		{
 			if let Some(location) =
-				self.find_placement(ws, UnitTypeId::SupplyDepot, main_base, 15, 2, false, false)
+				self.find_placement(UnitTypeId::SupplyDepot, main_base, 15, 2, false, false)
 			{
 				if let Some(builder) = self.get_builder(location, &mineral_tags) {
 					builder.build(UnitTypeId::SupplyDepot, location, false);
@@ -213,8 +211,7 @@ impl ReaperRushAI {
 			+ self.orders.get(&AbilityId::TerranBuildBarracks).unwrap_or(&0)
 			< 4 && self.can_afford(UnitTypeId::Barracks, false)
 		{
-			if let Some(location) =
-				self.find_placement(ws, UnitTypeId::Barracks, main_base, 15, 4, false, false)
+			if let Some(location) = self.find_placement(UnitTypeId::Barracks, main_base, 15, 4, false, false)
 			{
 				if let Some(builder) = self.get_builder(location, &mineral_tags) {
 					builder.build(UnitTypeId::Barracks, location, false);
@@ -370,7 +367,7 @@ impl ReaperRushAI {
 }
 
 impl Player for ReaperRushAI {
-	fn on_start(&mut self, _ws: &mut WS) -> SC2Result<()> {
+	fn on_start(&mut self) -> SC2Result<()> {
 		let townhall = self.grouped_units.townhalls.first().unwrap().clone();
 		townhall.smart(Target::Pos(self.start_center), false);
 		townhall.train(UnitTypeId::SCV, false);
@@ -383,9 +380,9 @@ impl Player for ReaperRushAI {
 		Ok(())
 	}
 
-	fn on_step(&mut self, ws: &mut WS, _iteration: usize) -> SC2Result<()> {
+	fn on_step(&mut self, _iteration: usize) -> SC2Result<()> {
 		self.distribute_workers();
-		self.build(ws);
+		self.build();
 		self.train();
 		self.execute_micro();
 		Ok(())
