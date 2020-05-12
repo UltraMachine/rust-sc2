@@ -269,7 +269,7 @@ impl ZergRushAI {
 		if workers.is_empty() {
 			None
 		} else {
-			Some(workers.closest_pos(pos).unwrap().clone())
+			Some(workers.closest(pos).unwrap().clone())
 		}
 	}
 	fn build(&mut self) {
@@ -451,7 +451,7 @@ impl Player for ZergRushAI {
 
 		let minerals_near_base = self.grouped_units.mineral_fields.closer(11.0, &townhall);
 		self.grouped_units.workers.clone().iter().for_each(|u| {
-			u.gather(minerals_near_base.closest(&u).unwrap().tag, false);
+			u.gather(minerals_near_base.closest(u).unwrap().tag, false);
 		});
 		Ok(())
 	}

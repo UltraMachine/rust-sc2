@@ -33,13 +33,13 @@ impl Player for WorkerRushAI {
 		self.mineral_forward = self
 			.grouped_units
 			.mineral_fields
-			.closest_pos(self.enemy_start)
+			.closest(self.enemy_start)
 			.unwrap()
 			.tag;
 		self.mineral_back = self
 			.grouped_units
 			.mineral_fields
-			.closest_pos(self.start_location)
+			.closest(self.start_location)
 			.unwrap()
 			.tag;
 		Ok(())
@@ -47,13 +47,13 @@ impl Player for WorkerRushAI {
 
 	fn on_step(&mut self, _iteration: usize) -> SC2Result<()> {
 		let ground_attackers = self.grouped_units.enemy_units.filter(|u| {
-			!u.is_flying && u.can_attack_ground() && u.distance_pos_squared(self.enemy_start) < 2025.0
+			!u.is_flying && u.can_attack_ground() && u.distance_squared(self.enemy_start) < 2025.0
 		});
 		if !ground_attackers.is_empty() {
 			let mineral_back = self.mineral_back;
 			let mineral_forward = self.mineral_forward;
 			self.grouped_units.workers.iter().for_each(|u| {
-				let closest = ground_attackers.closest(&u).unwrap();
+				let closest = ground_attackers.closest(u).unwrap();
 				if u.shield > Some(5.0) {
 					if !u.on_cooldown() {
 						u.attack(Target::Tag(closest.tag), false);
@@ -70,10 +70,10 @@ impl Player for WorkerRushAI {
 			let ground_structures = self
 				.grouped_units
 				.enemy_structures
-				.filter(|u| !u.is_flying && u.distance_pos_squared(self.enemy_start) < 2025.0);
+				.filter(|u| !u.is_flying && u.distance_squared(self.enemy_start) < 2025.0);
 			if !ground_structures.is_empty() {
 				self.grouped_units.workers.iter().for_each(|u| {
-					u.attack(Target::Tag(ground_structures.closest(&u).unwrap().tag), false);
+					u.attack(Target::Tag(ground_structures.closest(u).unwrap().tag), false);
 				})
 			} else {
 				let mineral_forward = self.mineral_forward;

@@ -90,7 +90,7 @@ def parse_data(data, version=None):
 
 
 def generate():
-	mod = [[], []]
+	mod = [[], [], ["mod impls;"]]
 	enums_latest = parse_data(load((Path.home()/'Documents'/'StarCraft II'/'stableid.json').open()))
 	enums_4_10 = parse_data(
 		load((Path.home()/'Documents'/'StarCraft II'/'stableid_4.10.json').open()),

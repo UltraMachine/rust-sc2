@@ -1,10 +1,14 @@
 use crate::{
 	action::{Commander, Target},
-	constants::{RaceValues, TARGET_AIR, TARGET_GROUND},
+	constants::{
+		RaceValues, OFF_CREEP_SPEED_UPGRADES, SPEED_BUFFS, SPEED_ON_CREEP, SPEED_UPGRADES, TARGET_AIR,
+		TARGET_GROUND, WARPGATE_ABILITIES,
+	},
 	game_data::{Attribute, GameData, TargetType, UnitTypeData, Weapon},
 	game_state::Alliance,
 	geometry::{Point2, Point3},
 	ids::{AbilityId, BuffId, UnitTypeId, UpgradeId},
+	pixel_map::PixelMap,
 	player::Race,
 	FromProto, FromProtoData,
 };
@@ -19,10 +23,12 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 pub struct DataForUnit {
 	pub commander: Rc<RefCell<Commander>>,
 	pub game_data: Rc<GameData>,
-	pub techlab_tags: Rc<Vec<u64>>,
-	pub reactor_tags: Rc<Vec<u64>>,
+	pub techlab_tags: Rc<RefCell<Vec<u64>>>,
+	pub reactor_tags: Rc<RefCell<Vec<u64>>>,
 	pub race_values: Rc<RaceValues>,
 	pub max_cooldowns: Rc<RefCell<HashMap<UnitTypeId, f32>>>,
+	pub upgrades: Rc<Vec<UpgradeId>>,
+	pub creep: Rc<PixelMap>,
 }
 
 #[derive(Clone)]
@@ -82,62 +88,24 @@ pub struct Unit {
 	pub buff_duration_max: Option<u32>, // How long the maximum duration of buff or unit (eg mule, broodling, chronoboost).
 	pub rally_targets: Vec<RallyTarget>,
 }
+
 impl Unit {
 	fn type_data(&self) -> Option<&UnitTypeData> {
 		self.data.game_data.units.get(&self.type_id)
 	}
 	pub fn is_worker(&self) -> bool {
-		matches!(
-			self.type_id,
-			UnitTypeId::SCV | UnitTypeId::Drone | UnitTypeId::Probe
-		)
+		self.type_id.is_worker()
 	}
 	pub fn is_townhall(&self) -> bool {
-		matches!(
-			self.type_id,
-			UnitTypeId::CommandCenter
-				| UnitTypeId::OrbitalCommand
-				| UnitTypeId::PlanetaryFortress
-				| UnitTypeId::CommandCenterFlying
-				| UnitTypeId::OrbitalCommandFlying
-				| UnitTypeId::Hatchery
-				| UnitTypeId::Lair
-				| UnitTypeId::Hive
-				| UnitTypeId::Nexus
-		)
+		self.type_id.is_townhall()
 	}
 	pub fn is_addon(&self) -> bool {
-		matches!(
-			self.type_id,
-			UnitTypeId::TechLab
-				| UnitTypeId::Reactor
-				| UnitTypeId::BarracksTechLab
-				| UnitTypeId::BarracksReactor
-				| UnitTypeId::FactoryTechLab
-				| UnitTypeId::FactoryReactor
-				| UnitTypeId::StarportTechLab
-				| UnitTypeId::StarportReactor
-		)
+		self.type_id.is_addon()
 	}
 	pub fn is_melee(&self) -> bool {
-		matches!(
-			self.type_id,
-			UnitTypeId::SCV
-				| UnitTypeId::Drone
-				| UnitTypeId::DroneBurrowed
-				| UnitTypeId::Probe
-				| UnitTypeId::Zergling
-				| UnitTypeId::ZerglingBurrowed
-				| UnitTypeId::BanelingCocoon
-				| UnitTypeId::Baneling
-				| UnitTypeId::BanelingBurrowed
-				| UnitTypeId::Broodling
-				| UnitTypeId::Zealot
-				| UnitTypeId::DarkTemplar
-				| UnitTypeId::Ultralisk
-				| UnitTypeId::UltraliskBurrowed
-		)
+		self.type_id.is_melee()
 	}
+	#[rustfmt::skip::macros(matches)]
 	pub fn is_detector(&self) -> bool {
 		matches!(
 			self.type_id,
@@ -158,11 +126,11 @@ impl Unit {
 	}
 	pub fn has_techlab(&self) -> bool {
 		self.add_on_tag
-			.map_or(false, |tag| self.data.techlab_tags.contains(&tag))
+			.map_or(false, |tag| self.data.techlab_tags.borrow().contains(&tag))
 	}
 	pub fn has_reactor(&self) -> bool {
 		self.add_on_tag
-			.map_or(false, |tag| self.data.reactor_tags.contains(&tag))
+			.map_or(false, |tag| self.data.reactor_tags.borrow().contains(&tag))
 	}
 	pub fn race(&self) -> Race {
 		self.type_data().map_or(Race::Random, |data| data.race)
@@ -247,6 +215,58 @@ impl Unit {
 	pub fn speed(&self) -> f32 {
 		self.type_data().map_or(0.0, |data| data.movement_speed)
 	}
+	pub fn calculate_speed(&self, upgrades: Option<&Vec<UpgradeId>>) -> f32 {
+		let mut speed = self.speed();
+		let unit_type = self.type_id;
+
+		// ---- Buffs ----
+		// Ultralisk has passive ability "Frenzied" which makes it immune to speed altering buffs
+		if unit_type != UnitTypeId::Ultralisk {
+			for buff in &self.buffs {
+				match buff {
+					BuffId::MedivacSpeedBoost => return speed * 1.7,
+					BuffId::VoidRaySwarmDamageBoost => return speed * 0.75,
+					_ => {
+						if let Some(increase) = SPEED_BUFFS.get(&buff) {
+							speed *= increase;
+						}
+					}
+				}
+			}
+		}
+
+		// ---- Upgrades ----
+		if let Some(upgrades) = upgrades.or_else(|| {
+			if self.is_mine() {
+				Some(&self.data.upgrades)
+			} else {
+				None
+			}
+		}) {
+			if let Some((upgrade_id, increase)) = SPEED_UPGRADES.get(&unit_type) {
+				if upgrades.contains(upgrade_id) {
+					speed *= increase;
+				}
+			}
+		}
+
+		// ---- Creep ----
+		// On creep
+		if self.data.creep[self.position].is_set() {
+			if let Some(increase) = SPEED_ON_CREEP.get(&unit_type) {
+				speed *= increase;
+			}
+		}
+		// Off creep upgrades
+		else if let Some(upgrades) = upgrades {
+			if let Some((upgrade_id, increase)) = OFF_CREEP_SPEED_UPGRADES.get(&unit_type) {
+				if upgrades.contains(upgrade_id) {
+					speed *= increase;
+				}
+			}
+		}
+		speed
+	}
 	pub fn attributes(&self) -> Option<&Vec<Attribute>> {
 		self.type_data().map(|data| &data.attributes)
 	}
@@ -317,38 +337,23 @@ impl Unit {
 	pub fn is_carrying_resource(&self) -> bool {
 		self.is_carrying_minerals() || self.is_carrying_vespene()
 	}
-	pub fn distance(&self, other: &Unit) -> f32 {
-		let dx = self.position.x - other.position.x;
-		let dy = self.position.y - other.position.y;
-		(dx * dx + dy * dy).sqrt()
+	#[inline]
+	pub fn distance<P: Into<Point2>>(&self, other: P) -> f32 {
+		self.position.distance(other)
 	}
-	pub fn distance_pos(&self, other: Point2) -> f32 {
-		let dx = self.position.x - other.x;
-		let dy = self.position.y - other.y;
-		(dx * dx + dy * dy).sqrt()
+	#[inline]
+	pub fn distance_squared<P: Into<Point2>>(&self, other: P) -> f32 {
+		self.position.distance_squared(other)
 	}
-	pub fn distance_squared(&self, other: &Unit) -> f32 {
-		let dx = self.position.x - other.position.x;
-		let dy = self.position.y - other.position.y;
-		dx * dx + dy * dy
-	}
-	pub fn distance_pos_squared(&self, other: Point2) -> f32 {
-		let dx = self.position.x - other.x;
-		let dy = self.position.y - other.y;
-		dx * dx + dy * dy
-	}
-	pub fn is_closer_pos(&self, distance: f32, pos: Point2) -> bool {
-		self.distance_pos_squared(pos) < distance * distance
-	}
-	pub fn is_closer(&self, distance: f32, other: &Unit) -> bool {
+	#[inline]
+	pub fn is_closer<P: Into<Point2>>(&self, distance: f32, other: P) -> bool {
 		self.distance_squared(other) < distance * distance
 	}
-	pub fn is_further_pos(&self, distance: f32, pos: Point2) -> bool {
-		self.distance_pos_squared(pos) > distance * distance
-	}
-	pub fn is_further(&self, distance: f32, other: &Unit) -> bool {
+	#[inline]
+	pub fn is_further<P: Into<Point2>>(&self, distance: f32, other: P) -> bool {
 		self.distance_squared(other) > distance * distance
 	}
+	#[inline]
 	fn weapons(&self) -> Option<Vec<Weapon>> {
 		self.type_data().map(|data| data.weapons.clone())
 	}
@@ -378,6 +383,7 @@ impl Unit {
 			}
 		})
 	}
+	#[rustfmt::skip::macros(matches)]
 	pub fn can_attack(&self) -> bool {
 		matches!(
 			self.type_id,
@@ -392,6 +398,7 @@ impl Unit {
 				| UnitTypeId::Oracle
 		) || self.weapons().map_or(false, |weapons| !weapons.is_empty())
 	}
+	#[rustfmt::skip::macros(matches)]
 	pub fn can_attack_both(&self) -> bool {
 		matches!(
 			self.type_id,
@@ -417,6 +424,7 @@ impl Unit {
 			}) || (ground && air)
 		})
 	}
+	#[rustfmt::skip::macros(matches)]
 	pub fn can_attack_ground(&self) -> bool {
 		matches!(
 			self.type_id,
@@ -433,6 +441,7 @@ impl Unit {
 			weapons.iter().any(|w| TARGET_GROUND.contains(&w.target))
 		})
 	}
+	#[rustfmt::skip::macros(matches)]
 	pub fn can_attack_air(&self) -> bool {
 		matches!(
 			self.type_id,
@@ -449,16 +458,6 @@ impl Unit {
 	pub fn on_cooldown(&self) -> bool {
 		self.weapon_cooldown
 			.map_or_else(|| panic!("Can't get cooldown on enemies"), |cool| cool > 0.0)
-	}
-	// cooldown < 50%
-	pub fn on_half_cooldown(&self) -> bool {
-		self.weapon_cooldown.map_or_else(
-			|| panic!("Can't get cooldown on enemies"),
-			|cool| {
-				self.max_cooldown()
-					.map_or_else(|| !self.on_cooldown(), |max| cool * 2.0 < max)
-			},
-		)
 	}
 	pub fn max_cooldown(&self) -> Option<f32> {
 		self.data.max_cooldowns.borrow().get(&self.type_id).copied()
@@ -547,8 +546,11 @@ impl Unit {
 				return false;
 			}
 		};
-		let distance = self.radius + target.radius + range + gap;
-		self.distance_squared(target) <= distance * distance
+		let total_range = (self.radius + target.radius + range + gap).powi(2);
+		let distance = self.distance_squared(target);
+
+		// Takes into account that Sieged Tank has a minimum range of 2
+		distance <= total_range && (self.type_id != UnitTypeId::SiegeTankSieged || distance > 4.0)
 	}
 	pub fn in_range_of(&self, threat: &Unit, gap: f32) -> bool {
 		threat.in_range(self, gap)
@@ -614,6 +616,7 @@ impl Unit {
 	pub fn is_using_any<A: Iterator<Item = AbilityId>>(&self, mut abilities: A) -> bool {
 		!self.is_idle() && abilities.any(|a| self.orders[0].ability == a)
 	}
+	#[rustfmt::skip::macros(matches)]
 	pub fn is_attacking(&self) -> bool {
 		!self.is_idle()
 			&& matches!(
@@ -743,8 +746,8 @@ impl Unit {
 	pub fn patrol(&self, target: Target, queue: bool) {
 		self.command(AbilityId::Patrol, target, queue)
 	}
-	pub fn repair(&self, target: Target, queue: bool) {
-		self.command(AbilityId::EffectRepair, target, queue)
+	pub fn repair(&self, target: u64, queue: bool) {
+		self.command(AbilityId::EffectRepair, Target::Tag(target), queue)
 	}
 	pub fn cancel_building(&self, queue: bool) {
 		self.command(AbilityId::CancelBuildInProgress, Target::None, queue)
@@ -780,7 +783,25 @@ impl Unit {
 			self.command(type_data.ability, Target::None, queue);
 		}
 	}
+	pub fn warp_in(&self, unit: UnitTypeId, target: Point2) {
+		if let Some(ability) = WARPGATE_ABILITIES.get(&unit) {
+			self.command(*ability, Target::Pos(target), false);
+		}
+	}
 }
+impl From<Unit> for Point2 {
+	#[inline]
+	fn from(u: Unit) -> Self {
+		u.position
+	}
+}
+impl From<&Unit> for Point2 {
+	#[inline]
+	fn from(u: &Unit) -> Self {
+		u.position
+	}
+}
+
 impl FromProtoData<ProtoUnit> for Unit {
 	fn from_proto_data(data: Rc<DataForUnit>, u: ProtoUnit) -> Self {
 		let pos = u.get_pos();

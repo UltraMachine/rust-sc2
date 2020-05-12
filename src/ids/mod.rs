@@ -9,3 +9,5 @@ pub use ability_id::AbilityId;
 pub use upgrade_id::UpgradeId;
 pub use buff_id::BuffId;
 pub use effect_id::EffectId;
+
+mod impls;

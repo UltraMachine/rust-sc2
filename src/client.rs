@@ -10,7 +10,6 @@ use sc2_proto::{
 use std::{
 	error::Error,
 	fmt,
-	net::TcpListener,
 	ops::{Deref, DerefMut},
 	panic,
 	process::{Child, Command},
@@ -23,6 +22,7 @@ pub type WS = WebSocket<AutoStream>;
 pub type SC2Result<T> = Result<T, Box<dyn Error>>;
 
 const HOST: &str = "127.0.0.1";
+const PORT: i32 = 5000;
 
 #[derive(Default)]
 struct Human {
@@ -75,8 +75,8 @@ impl Error for ProtoError {}
 #[derive(Clone)]
 struct Ports {
 	shared: i32,
-	server: [i32; 2],
-	client: Vec<[i32; 2]>,
+	server: (i32, i32),
+	client: Vec<(i32, i32)>,
 }
 
 // Runners
@@ -95,11 +95,11 @@ where
 	let sc2_path = get_path_to_sc2();
 	let map_path = get_map_path(&sc2_path, map_name);
 
-	let port = get_unused_port();
+	// let port = get_unused_port();
 	debug!("Launching SC2 process");
-	bot.process = Some(launch_client(&sc2_path, port, sc2_version)?);
+	bot.process = Some(launch_client(&sc2_path, PORT, sc2_version)?);
 	debug!("Connecting to websocket");
-	bot.api = Some(API(connect_to_websocket(HOST, port)?));
+	bot.api = Some(API(connect_to_websocket(HOST, PORT)?));
 
 	let settings = bot.get_player_settings();
 	let api = &mut bot.api.as_mut().unwrap();
@@ -174,10 +174,10 @@ where
 	bot.player_id = join_game(
 		&bot.get_player_settings(),
 		bot.api(),
-		Some(Ports {
+		Some(&Ports {
 			shared: player_port + 1,
-			server: [player_port + 2, player_port + 3],
-			client: vec![[player_port + 4, player_port + 5]],
+			server: (player_port + 2, player_port + 3),
+			client: vec![(player_port + 4, player_port + 5)],
 		}),
 	)?;
 
@@ -208,8 +208,9 @@ where
 	let sc2_path = get_path_to_sc2();
 	let map_path = get_map_path(&sc2_path, map_name);
 
-	let ports = get_unused_ports(9);
-	let (port_human, port_bot) = (ports[0], ports[1]);
+	// let ports = get_unused_ports(9);
+	// let (port_human, port_bot) = (ports[0], ports[1]);
+	let (port_human, port_bot) = (PORT, PORT + 1);
 
 	let mut human = Human::new();
 
@@ -246,13 +247,18 @@ where
 	}
 
 	debug!("Sending JoinGame request to both processes");
-	let ports = Ports {
+	/*let ports = Ports {
 		shared: ports[2],
-		server: [ports[3], ports[4]],
-		client: vec![[ports[5], ports[6]], [ports[7], ports[8]]],
+		server: (ports[3], ports[4]),
+		client: vec![(ports[5], ports[6]), (ports[7], ports[8])],
+	};*/
+	let ports = Ports {
+		shared: PORT + 2,
+		server: (PORT + 3, PORT + 4),
+		client: vec![(PORT + 5, PORT + 6), (PORT + 7, PORT + 8)],
 	};
-	join_game(&human_settings, human_api, Some(ports.clone()))?;
-	bot.player_id = join_game(&bot.get_player_settings(), bot.api(), Some(ports))?;
+	join_game(&human_settings, human_api, Some(&ports))?;
+	bot.player_id = join_game(&bot.get_player_settings(), bot.api(), Some(&ports))?;
 
 	set_static_data(bot)?;
 
@@ -267,27 +273,28 @@ where
 }
 
 // Mini Helpers
+/*
 fn get_unused_port() -> i32 {
-	(1025..65535)
-		.find(|port| TcpListener::bind(("127.0.0.1", *port)).is_ok())
+	(5000..65535)
+		.find(|port| TcpListener::bind((HOST, *port)).is_ok())
 		.expect("Can't find available port") as i32
 }
 
 fn get_unused_ports(n: usize) -> Vec<i32> {
 	let mut ports = Vec::new();
-	let mut founded = 0;
-	for port in 1025..65535 {
-		if TcpListener::bind(("127.0.0.1", port)).is_ok() {
+	for port in 5000..65535 {
+		if TcpListener::bind((HOST, port)).is_ok() {
 			ports.push(port as i32);
-			founded += 1;
-			if founded >= n {
+			if ports.len() >= n {
 				break;
 			}
 		}
 	}
 	ports
 }
+*/
 
+// Helpers
 fn set_static_data(bot: &mut Bot) -> SC2Result<()> {
 	let api = &mut bot.api.as_mut().expect("API is not initialized");
 
@@ -333,7 +340,7 @@ fn create_computer_setup(computer: Computer, req_create_game: &mut RequestCreate
 	req_create_game.mut_player_setup().push(setup);
 }
 
-fn join_game(settings: &PlayerSettings, api: &mut API, ports: Option<Ports>) -> SC2Result<u32> {
+fn join_game(settings: &PlayerSettings, api: &mut API, ports: Option<&Ports>) -> SC2Result<u32> {
 	let mut req = Request::new();
 	let req_join_game = req.mut_join_game();
 
@@ -354,18 +361,18 @@ fn join_game(settings: &PlayerSettings, api: &mut API, ports: Option<Ports>) -> 
 	}
 
 	if let Some(ports) = ports {
-		// Deprecated
+		// Shared port is deprecated
 		req_join_game.set_shared_port(ports.shared);
 
 		let server_ports = req_join_game.mut_server_ports();
-		server_ports.set_game_port(ports.server[0]);
-		server_ports.set_base_port(ports.server[1]);
+		server_ports.set_game_port(ports.server.0);
+		server_ports.set_base_port(ports.server.1);
 
 		let client_ports = req_join_game.mut_client_ports();
 		ports.client.iter().for_each(|client| {
 			let mut port_set = PortSet::new();
-			port_set.set_game_port(client[0]);
-			port_set.set_base_port(client[1]);
+			port_set.set_game_port(client.0);
+			port_set.set_base_port(client.1);
 			client_ports.push(port_set);
 		});
 	}
@@ -526,8 +533,7 @@ fn launch_client(sc2_path: &str, port: i32, sc2_version: Option<&str>) -> SC2Res
 	if !data_hash.is_empty() {
 		process.arg("-dataVersion").arg(data_hash);
 	}
-	let process = process.spawn().expect("Can't launch SC2 process.");
-	Ok(process)
+	Ok(process.spawn().expect("Can't launch SC2 process."))
 }
 
 fn connect_to_websocket(host: &str, port: i32) -> SC2Result<WS> {

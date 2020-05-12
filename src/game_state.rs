@@ -101,9 +101,9 @@ pub struct RawData {
 	pub psionic_matrix: Vec<PsionicMatrix>,
 	pub camera: Point2,
 	pub units: Units,
-	pub upgrades: Vec<UpgradeId>,
+	pub upgrades: Rc<Vec<UpgradeId>>,
 	pub visibility: VisibilityMap,
-	pub creep: PixelMap,
+	pub creep: Rc<PixelMap>,
 	pub dead_units: Vec<u64>,
 	pub effects: Vec<Effect>,
 	pub radars: Vec<Radar>,
@@ -124,13 +124,15 @@ impl FromProtoData<ObservationRaw> for RawData {
 				.iter()
 				.map(|u| Unit::from_proto_data(Rc::clone(&data), u.clone()))
 				.collect(),
-			upgrades: raw_player
-				.get_upgrade_ids()
-				.iter()
-				.map(|u| UpgradeId::from_u32(*u).unwrap())
-				.collect(),
+			upgrades: Rc::new(
+				raw_player
+					.get_upgrade_ids()
+					.iter()
+					.map(|u| UpgradeId::from_u32(*u).unwrap())
+					.collect(),
+			),
 			visibility: VisibilityMap::from_proto(map_state.get_visibility().clone()),
-			creep: PixelMap::from_proto(map_state.get_creep().clone()),
+			creep: Rc::new(PixelMap::from_proto(map_state.get_creep().clone())),
 			dead_units: raw.get_event().get_dead_units().to_vec(),
 			effects: raw
 				.get_effects()

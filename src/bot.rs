@@ -61,8 +61,8 @@ pub struct Bot {
 	pub enemy_start: Point2,
 	pub start_center: Point2,
 	pub enemy_start_center: Point2,
-	pub techlab_tags: Rc<Vec<u64>>,
-	pub reactor_tags: Rc<Vec<u64>>,
+	pub techlab_tags: Rc<RefCell<Vec<u64>>>,
+	pub reactor_tags: Rc<RefCell<Vec<u64>>>,
 	pub expansions: Vec<(Point2, Point2)>,
 	pub max_cooldowns: Rc<RefCell<HashMap<UnitTypeId, f32>>>,
 }
@@ -163,6 +163,8 @@ impl Bot {
 			reactor_tags: Rc::clone(&self.reactor_tags),
 			race_values: Rc::clone(&self.race_values),
 			max_cooldowns: Rc::clone(&self.max_cooldowns),
+			upgrades: Rc::clone(&self.state.observation.raw.upgrades),
+			creep: Rc::clone(&self.state.observation.raw.creep),
 		});
 	}
 	#[allow(clippy::block_in_if_condition_stmt)]
@@ -181,12 +183,12 @@ impl Bot {
 		self.start_center = self
 			.grouped_units
 			.resources
-			.closer_pos(11.0, self.start_location)
+			.closer(11.0, self.start_location)
 			.center();
 		self.enemy_start_center = self
 			.grouped_units
 			.resources
-			.closer_pos(11.0, self.enemy_start)
+			.closer(11.0, self.enemy_start)
 			.center();
 
 		// Calculating expansion locations
@@ -310,9 +312,12 @@ impl Bot {
 		let mut gas_buildings = Units::new();
 		let mut larvas = Units::new();
 		let mut placeholders = Units::new();
-		let mut techlab_tags = Vec::new();
-		let mut reactor_tags = Vec::new();
+		let mut techlab_tags = self.techlab_tags.borrow_mut();
+		let mut reactor_tags = self.reactor_tags.borrow_mut();
 		let mut max_cooldowns = self.max_cooldowns.borrow_mut();
+
+		techlab_tags.clear();
+		reactor_tags.clear();
 
 		self.state.observation.raw.units.iter().for_each(|u| {
 			let u_type = u.type_id;
@@ -470,17 +475,6 @@ impl Bot {
 			larvas,
 			placeholders,
 		};
-		self.techlab_tags = Rc::new(techlab_tags);
-		self.reactor_tags = Rc::new(reactor_tags);
-
-		self.data_for_unit = Rc::new(DataForUnit {
-			commander: Rc::clone(&self.commander),
-			game_data: Rc::clone(&self.game_data),
-			techlab_tags: Rc::clone(&self.techlab_tags),
-			reactor_tags: Rc::clone(&self.reactor_tags),
-			race_values: Rc::clone(&self.race_values),
-			max_cooldowns: Rc::clone(&self.max_cooldowns),
-		});
 	}
 	pub fn get_unit_api_cost(&self, unit: UnitTypeId) -> Cost {
 		self.game_data
@@ -647,7 +641,7 @@ impl Bot {
 			.ability
 			.unwrap();
 
-		let geysers = self.grouped_units.vespene_geysers.closer_pos(11.0, base);
+		let geysers = self.grouped_units.vespene_geysers.closer(11.0, base);
 		let results = self
 			.query_placement(
 				geysers.iter().map(|u| (ability, u.position, None)).collect(),
@@ -681,7 +675,7 @@ impl Bot {
 				self.grouped_units
 					.townhalls
 					.iter()
-					.all(|t| t.is_further_pos(15.0, *loc))
+					.all(|t| t.is_further(15.0, *loc))
 			})
 			.copied()
 			.collect::<Vec<(Point2, Point2)>>();
@@ -709,7 +703,7 @@ impl Bot {
 				self.grouped_units
 					.enemy_townhalls
 					.iter()
-					.all(|t| t.is_further_pos(15.0, *loc))
+					.all(|t| t.is_further(15.0, *loc))
 			})
 			.copied()
 			.collect::<Vec<(Point2, Point2)>>();
@@ -736,7 +730,7 @@ impl Bot {
 				self.grouped_units
 					.townhalls
 					.iter()
-					.any(|t| t.is_closer_pos(15.0, *loc))
+					.any(|t| t.is_closer(15.0, *loc))
 			})
 			.copied()
 			.collect()
@@ -748,7 +742,7 @@ impl Bot {
 				self.grouped_units
 					.enemy_townhalls
 					.iter()
-					.any(|t| t.is_closer_pos(15.0, *loc))
+					.any(|t| t.is_closer(15.0, *loc))
 			})
 			.copied()
 			.collect()

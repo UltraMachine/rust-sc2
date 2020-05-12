@@ -126,60 +126,34 @@ impl Units {
 		self.sum(|u| u.position) / (self.len() as f32)
 	}
 	// Get closest | furthest
-	pub fn closest(&self, other: &Unit) -> Option<&Unit> {
-		self.partial_min(|u| u.distance_squared(other))
+	pub fn closest<P: Into<Point2> + Copy>(&self, target: P) -> Option<&Unit> {
+		self.partial_min(|u| u.distance_squared(target))
 	}
-	pub fn closest_pos(&self, other: Point2) -> Option<&Unit> {
-		self.partial_min(|u| u.distance_pos_squared(other))
-	}
-	pub fn furthest(&self, other: &Unit) -> Option<&Unit> {
-		self.partial_max(|u| u.distance_squared(other))
-	}
-	pub fn furthest_pos(&self, other: Point2) -> Option<&Unit> {
-		self.partial_max(|u| u.distance_pos_squared(other))
+	pub fn furthest<P: Into<Point2> + Copy>(&self, target: P) -> Option<&Unit> {
+		self.partial_max(|u| u.distance_squared(target))
 	}
 	// Get closest | furthest distance
-	pub fn closest_distance(&self, other: &Unit) -> Option<f32> {
-		self.partial_min_value(|u| u.distance_squared(other))
+	pub fn closest_distance<P: Into<Point2> + Copy>(&self, target: P) -> Option<f32> {
+		self.partial_min_value(|u| u.distance_squared(target))
 			.map(|dist| dist.sqrt())
 	}
-	pub fn closest_distance_pos(&self, other: Point2) -> Option<f32> {
-		self.partial_min_value(|u| u.distance_pos_squared(other))
-			.map(|dist| dist.sqrt())
-	}
-	pub fn furthest_distance(&self, other: &Unit) -> Option<f32> {
-		self.partial_max_value(|u| u.distance_squared(other))
-			.map(|dist| dist.sqrt())
-	}
-	pub fn furthest_distance_pos(&self, other: Point2) -> Option<f32> {
-		self.partial_max_value(|u| u.distance_pos_squared(other))
+	pub fn furthest_distance<P: Into<Point2> + Copy>(&self, target: P) -> Option<f32> {
+		self.partial_max_value(|u| u.distance_squared(target))
 			.map(|dist| dist.sqrt())
 	}
 	// Squared
-	pub fn closest_distance_squared(&self, other: &Unit) -> Option<f32> {
-		self.partial_min_value(|u| u.distance_squared(other))
+	pub fn closest_distance_squared<P: Into<Point2> + Copy>(&self, target: P) -> Option<f32> {
+		self.partial_min_value(|u| u.distance_squared(target))
 	}
-	pub fn closest_distance_pos_squared(&self, other: Point2) -> Option<f32> {
-		self.partial_min_value(|u| u.distance_pos_squared(other))
-	}
-	pub fn furthest_distance_squared(&self, other: &Unit) -> Option<f32> {
-		self.partial_max_value(|u| u.distance_squared(other))
-	}
-	pub fn furthest_distance_pos_squared(&self, other: Point2) -> Option<f32> {
-		self.partial_max_value(|u| u.distance_pos_squared(other))
+	pub fn furthest_distance_squared<P: Into<Point2> + Copy>(&self, target: P) -> Option<f32> {
+		self.partial_max_value(|u| u.distance_squared(target))
 	}
 	// Filter closer | further than distance
-	pub fn closer_pos(&self, distance: f32, pos: Point2) -> Units {
-		self.filter(|u| u.distance_pos_squared(pos) < distance * distance)
+	pub fn closer<P: Into<Point2> + Copy>(&self, distance: f32, target: P) -> Units {
+		self.filter(|u| u.is_closer(distance, target))
 	}
-	pub fn closer(&self, distance: f32, unit: &Unit) -> Units {
-		self.filter(|u| u.distance_squared(unit) < distance * distance)
-	}
-	pub fn further_pos(&self, distance: f32, pos: Point2) -> Units {
-		self.filter(|u| u.distance_pos_squared(pos) > distance * distance)
-	}
-	pub fn further(&self, distance: f32, unit: &Unit) -> Units {
-		self.filter(|u| u.distance_squared(unit) > distance * distance)
+	pub fn further<P: Into<Point2> + Copy>(&self, distance: f32, target: P) -> Units {
+		self.filter(|u| u.is_further(distance, target))
 	}
 
 	pub fn filter<F>(&self, f: F) -> Self

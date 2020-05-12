@@ -164,6 +164,7 @@ pub fn variant_checkers(_attr: TokenStream, item: TokenStream) -> TokenStream {
 		#item
 		impl #name {
 			#(
+				#[inline]
 				pub fn #snake_variants(self) -> bool {
 					matches!(self, Self::#variants)
 				}

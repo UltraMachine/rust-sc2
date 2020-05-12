@@ -39,12 +39,14 @@ impl Point2 {
 	pub fn new(x: f32, y: f32) -> Self {
 		Self { x, y }
 	}
-	pub fn distance(self, other: Self) -> f32 {
+	pub fn distance<P: Into<Point2>>(self, other: P) -> f32 {
+		let other = other.into();
 		let dx = self.x - other.x;
 		let dy = self.y - other.y;
 		(dx * dx + dy * dy).sqrt()
 	}
-	pub fn distance_squared(self, other: Self) -> f32 {
+	pub fn distance_squared<P: Into<Point2>>(self, other: P) -> f32 {
+		let other = other.into();
 		let dx = self.x - other.x;
 		let dy = self.y - other.y;
 		dx * dx + dy * dy
@@ -255,6 +257,12 @@ impl Point3 {
 	}
 	pub fn to2(self) -> Point2 {
 		Point2 { x: self.x, y: self.y }
+	}
+}
+impl From<Point3> for Point2 {
+	#[inline]
+	fn from(p3: Point3) -> Self {
+		p3.to2()
 	}
 }
 impl Add for Point3 {
