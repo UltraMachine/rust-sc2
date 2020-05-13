@@ -407,7 +407,7 @@ fn main() -> SC2Result<()> {
 			(@arg map: -m --map
 				+takes_value
 			)
-			(@arg race: --race
+			(@arg race: -r --race
 				+takes_value
 				"Sets opponent race"
 			)
@@ -430,7 +430,7 @@ fn main() -> SC2Result<()> {
 			(@arg map: -m --map
 				+takes_value
 			)
-			(@arg race: --race *
+			(@arg race: -r --race *
 				+takes_value
 				"Sets human race"
 			)

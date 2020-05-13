@@ -57,7 +57,7 @@ fn main() -> SC2Result<()> {
 		(@arg opponent_id: --OpponentId +takes_value)
 		(@arg host_port: --GamePort +takes_value)
 		(@arg player_port: --StartPort +takes_value)
-		(@arg race: --race
+		(@arg race: -r --race
 			+takes_value
 			"Sets race for debug bot"
 		)
@@ -71,7 +71,7 @@ fn main() -> SC2Result<()> {
 			(@arg map: -m --map
 				+takes_value
 			)
-			(@arg race: --race
+			(@arg race: -r --race
 				+takes_value
 				"Sets opponent race"
 			)
@@ -94,7 +94,7 @@ fn main() -> SC2Result<()> {
 			(@arg map: -m --map
 				+takes_value
 			)
-			(@arg race: --race *
+			(@arg race: -r --race *
 				+takes_value
 				"Sets human race"
 			)
