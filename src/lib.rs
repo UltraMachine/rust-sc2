@@ -57,10 +57,22 @@ pub type PlayerBox = Box<dyn Player>;
 pub struct PlayerSettings {
 	race: Race,
 	name: Option<String>,
+	raw_affects_selection: bool,
 }
 impl PlayerSettings {
 	pub fn new(race: Race, name: Option<String>) -> Self {
-		Self { race, name }
+		Self {
+			race,
+			name,
+			raw_affects_selection: false,
+		}
+	}
+	pub fn configured(race: Race, name: Option<String>, raw_affects_selection: bool) -> Self {
+		Self {
+			race,
+			name,
+			raw_affects_selection,
+		}
 	}
 }
 

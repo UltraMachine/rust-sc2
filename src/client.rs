@@ -354,7 +354,7 @@ fn join_game(settings: &PlayerSettings, api: &mut API, ports: Option<&Ports>) ->
 	options.set_show_cloaked(true);
 	options.set_show_burrowed_shadows(true);
 	options.set_show_placeholders(true);
-	// options.set_raw_affects_selection(bool);
+	options.set_raw_affects_selection(settings.raw_affects_selection);
 	// options.set_raw_crop_to_playable_area(bool);
 	if let Some(name) = &settings.name {
 		req_join_game.set_player_name(name.clone());
