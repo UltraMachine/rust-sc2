@@ -2,17 +2,7 @@
 extern crate clap;
 
 use rand::prelude::{thread_rng, SliceRandom};
-use rust_sc2::{
-	action::Target,
-	bot,
-	geometry::Point2,
-	ids::{AbilityId, UnitTypeId},
-	player::{Computer, Difficulty, Race},
-	run_ladder_game, run_vs_computer, run_vs_human,
-	unit::Unit,
-	units::Units,
-	Player, PlayerSettings, SC2Result,
-};
+use rust_sc2::prelude::*;
 use std::{cmp::Ordering, collections::HashSet};
 
 #[bot]
@@ -197,7 +187,7 @@ impl ReaperRushAI {
 			&& self.can_afford(UnitTypeId::SupplyDepot, false)
 		{
 			if let Some(location) =
-				self.find_placement(UnitTypeId::SupplyDepot, main_base, 15, 2, false, false)
+				self.find_placement(UnitTypeId::SupplyDepot, main_base, Default::default())
 			{
 				if let Some(builder) = self.get_builder(location, &mineral_tags) {
 					builder.build(UnitTypeId::SupplyDepot, location, false);
@@ -211,8 +201,14 @@ impl ReaperRushAI {
 			+ self.orders.get(&AbilityId::TerranBuildBarracks).unwrap_or(&0)
 			< 4 && self.can_afford(UnitTypeId::Barracks, false)
 		{
-			if let Some(location) = self.find_placement(UnitTypeId::Barracks, main_base, 15, 4, false, false)
-			{
+			if let Some(location) = self.find_placement(
+				UnitTypeId::Barracks,
+				main_base,
+				PlacementOptions {
+					step: 4,
+					..Default::default()
+				},
+			) {
 				if let Some(builder) = self.get_builder(location, &mineral_tags) {
 					builder.build(UnitTypeId::Barracks, location, false);
 					self.substract_resources(UnitTypeId::Barracks);

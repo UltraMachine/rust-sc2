@@ -29,6 +29,23 @@ use std::{
 	rc::Rc,
 };
 
+pub struct PlacementOptions {
+	pub max_distance: isize,
+	pub step: isize,
+	pub random: bool,
+	pub addon: bool,
+}
+impl Default for PlacementOptions {
+	fn default() -> Self {
+		Self {
+			max_distance: 15,
+			step: 2,
+			random: false,
+			addon: false,
+		}
+	}
+}
+
 pub struct Bot {
 	pub(crate) process: Option<Child>,
 	pub(crate) api: Option<API>,
@@ -253,8 +270,16 @@ impl Bot {
 				if center.distance_squared(self.start_location) < 72.25 {
 					Some((self.start_location, center))
 				} else {
-					self.find_placement(self.race_values.start_townhall, center, 8, 1, false, false)
-						.map(|place| (place, center))
+					self.find_placement(
+						self.race_values.start_townhall,
+						center,
+						PlacementOptions {
+							max_distance: 8,
+							step: 1,
+							..Default::default()
+						},
+					)
+					.map(|place| (place, center))
 				}
 			})
 			.collect();
@@ -537,18 +562,17 @@ impl Bot {
 		)
 		.unwrap()[0] == ActionResult::Success
 	}
+
 	#[allow(clippy::too_many_arguments)]
 	pub fn find_placement(
 		&mut self,
 		building: UnitTypeId,
 		near: Point2,
-		max_distance: isize,
-		placement_step: isize,
-		random: bool,
-		addon: bool,
+		options: PlacementOptions,
 	) -> Option<Point2> {
 		if let Some(data) = self.game_data.units.get(&building) {
 			if let Some(ability) = data.ability {
+				let addon = options.addon;
 				if self
 					.query_placement(
 						if addon {
@@ -561,12 +585,15 @@ impl Bot {
 						},
 						false,
 					)
-					.unwrap()[0] == ActionResult::Success
+					.unwrap()
+					.iter()
+					.all(|r| matches!(r, ActionResult::Success))
 				{
 					return Some(near);
 				}
 
-				for distance in (placement_step..max_distance).step_by(placement_step as usize) {
+				let placement_step = options.step;
+				for distance in (placement_step..options.max_distance).step_by(placement_step as usize) {
 					let positions = (-distance..=distance)
 						.step_by(placement_step as usize)
 						.flat_map(|offset| {
@@ -586,7 +613,7 @@ impl Bot {
 						.iter()
 						.zip(results.iter())
 						.filter_map(|(pos, res)| {
-							if *res == ActionResult::Success {
+							if matches!(res, ActionResult::Success) {
 								Some(*pos)
 							} else {
 								None
@@ -620,7 +647,7 @@ impl Bot {
 					}
 
 					if !valid_positions.is_empty() {
-						return if random {
+						return if options.random {
 							let mut rng = thread_rng();
 							valid_positions.choose(&mut rng).copied()
 						} else {

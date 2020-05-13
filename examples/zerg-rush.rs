@@ -2,17 +2,7 @@
 extern crate clap;
 
 use rand::prelude::{thread_rng, SliceRandom};
-use rust_sc2::{
-	action::Target,
-	bot,
-	geometry::Point2,
-	ids::{AbilityId, BuffId, UnitTypeId, UpgradeId},
-	player::{Computer, Difficulty, Race},
-	run_ladder_game, run_vs_computer, run_vs_human,
-	unit::Unit,
-	units::Units,
-	Player, PlayerSettings, SC2Result,
-};
+use rust_sc2::prelude::*;
 use std::cmp::{min, Ordering};
 
 #[bot]
@@ -289,7 +279,7 @@ impl ZergRushAI {
 			== 0 && self.can_afford(pool, false)
 		{
 			let place = self.start_location.towards(self.game_info.map_center, 6.0);
-			if let Some(location) = self.find_placement(pool, place, 15, 1, false, false) {
+			if let Some(location) = self.find_placement(pool, place, Default::default()) {
 				if let Some(builder) = self.get_builder(location, &mineral_tags) {
 					builder.build(pool, location, false);
 					self.substract_resources(pool);

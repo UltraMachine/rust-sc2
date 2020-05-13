@@ -2,11 +2,7 @@
 extern crate clap;
 
 use rand::prelude::{thread_rng, SliceRandom};
-use rust_sc2::{
-	bot,
-	player::{Computer, Difficulty, Race},
-	run_ladder_game, run_vs_computer, run_vs_human, Player, PlayerSettings, SC2Result,
-};
+use rust_sc2::prelude::*;
 
 #[bot]
 #[derive(Default)]

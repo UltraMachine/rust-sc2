@@ -14,6 +14,7 @@ extern crate log;
 pub mod prelude {
 	pub use crate::{
 		action::Target,
+		bot::PlacementOptions,
 		client::{run_ladder_game, run_vs_computer, run_vs_human, SC2Result},
 		constants::TECH_REQUIREMENTS,
 		geometry::Point2,
