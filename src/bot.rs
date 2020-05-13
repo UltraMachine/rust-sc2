@@ -128,10 +128,10 @@ impl Bot {
 	pub fn api(&mut self) -> &mut API {
 		self.api.as_mut().expect("API is not initialized")
 	}
-	pub fn get_data_for_unit(&self) -> Rc<DataForUnit> {
+	pub(crate) fn get_data_for_unit(&self) -> Rc<DataForUnit> {
 		Rc::clone(&self.data_for_unit)
 	}
-	pub fn get_actions(&self) -> Vec<Action> {
+	pub(crate) fn get_actions(&self) -> Vec<Action> {
 		let commands = &self.commander.borrow().commands;
 		if !commands.is_empty() {
 			let mut actions = self.actions.clone();
@@ -143,14 +143,14 @@ impl Bot {
 			self.actions.clone()
 		}
 	}
-	pub fn clear_actions(&mut self) {
+	pub(crate) fn clear_actions(&mut self) {
 		self.actions.clear();
 		self.commander.borrow_mut().commands.clear();
 	}
-	pub fn get_debug_commands(&self) -> Vec<DebugCommand> {
+	pub(crate) fn get_debug_commands(&self) -> Vec<DebugCommand> {
 		self.debug.get_commands()
 	}
-	pub fn clear_debug_commands(&mut self) {
+	pub(crate) fn clear_debug_commands(&mut self) {
 		self.debug.clear_commands();
 	}
 	pub fn substract_resources(&mut self, unit: UnitTypeId) {
@@ -172,7 +172,7 @@ impl Bot {
 	pub fn chat_send(&mut self, message: String, team_only: bool) {
 		self.actions.push(Action::Chat(message, team_only));
 	}
-	pub fn init_data_for_unit(&mut self) {
+	pub(crate) fn init_data_for_unit(&mut self) {
 		self.data_for_unit = Rc::new(DataForUnit {
 			commander: Rc::clone(&self.commander),
 			game_data: Rc::clone(&self.game_data),
@@ -185,14 +185,24 @@ impl Bot {
 		});
 	}
 	#[allow(clippy::block_in_if_condition_stmt)]
-	pub fn prepare_start(&mut self) {
+	pub(crate) fn prepare_start(&mut self) {
 		self.race = self.game_info.players[&self.player_id].race_actual.unwrap();
 		if self.game_info.players.len() == 2 {
 			self.enemy_race = self.game_info.players[&(3 - self.player_id)].race_requested;
 		}
 		self.race_values = Rc::new(RACE_VALUES[&self.race].clone());
-
 		self.group_units();
+
+		self.data_for_unit = Rc::new(DataForUnit {
+			commander: Rc::clone(&self.commander),
+			game_data: Rc::clone(&self.game_data),
+			techlab_tags: Rc::clone(&self.techlab_tags),
+			reactor_tags: Rc::clone(&self.reactor_tags),
+			race_values: Rc::clone(&self.race_values),
+			max_cooldowns: Rc::clone(&self.max_cooldowns),
+			upgrades: Rc::clone(&self.state.observation.raw.upgrades),
+			creep: Rc::clone(&self.state.observation.raw.creep),
+		});
 
 		self.start_location = self.grouped_units.townhalls.first().unwrap().position;
 		self.enemy_start = self.game_info.start_locations[0];
@@ -284,7 +294,7 @@ impl Bot {
 			})
 			.collect();
 	}
-	pub fn prepare_step(&mut self) {
+	pub(crate) fn prepare_step(&mut self) {
 		self.group_units();
 		let observation = &self.state.observation;
 		self.time = (observation.game_loop as f32) / 22.4;
@@ -563,7 +573,6 @@ impl Bot {
 		.unwrap()[0] == ActionResult::Success
 	}
 
-	#[allow(clippy::too_many_arguments)]
 	pub fn find_placement(
 		&mut self,
 		building: UnitTypeId,
