@@ -1,4 +1,8 @@
-use crate::{game_data::TargetType, ids::*, player::Race};
+use crate::{
+	game_data::{Attribute, TargetType, Weapon},
+	ids::*,
+	player::Race,
+};
 use std::collections::HashMap;
 
 pub const TARGET_GROUND: [TargetType; 2] = [TargetType::Ground, TargetType::Any];
@@ -23,6 +27,9 @@ impl Default for RaceValues {
 		}
 	}
 }
+
+type BonusesForTarget = HashMap<TargetType, BonusesByAttribute>;
+type BonusesByAttribute = (Option<u32>, HashMap<Attribute, u32>);
 
 lazy_static! {
 	pub static ref RACE_VALUES: HashMap<Race, RaceValues> = hashmap![
@@ -121,6 +128,59 @@ lazy_static! {
 		UnitTypeId::BroodLord => UnitTypeId::GreaterSpire,
 	];
 
+	pub(crate) static ref DAMAGE_BONUS_PER_UPGRADE: HashMap<UnitTypeId, BonusesForTarget> = hashmap![
+		// Protoss
+		UnitTypeId::Probe => hashmap![TargetType::Ground => (Some(0), hashmap![])],
+		UnitTypeId::Adept => hashmap![TargetType::Ground => (None, hashmap![Attribute::Light => 1])],
+		UnitTypeId::Stalker => hashmap![TargetType::Any => (None, hashmap![Attribute::Armored => 1])],
+		UnitTypeId::DarkTemplar => hashmap![TargetType::Ground => (Some(5), hashmap![])],
+		UnitTypeId::Archon => hashmap![TargetType::Any => (Some(3), hashmap![Attribute::Biological => 1])],
+		UnitTypeId::Immortal => hashmap![TargetType::Ground => (Some(2), hashmap![Attribute::Armored => 3])],
+		UnitTypeId::Colossus => hashmap![TargetType::Ground => (None, hashmap![Attribute::Light => 1])],
+		UnitTypeId::Oracle => hashmap![TargetType::Ground => (Some(0), hashmap![])],
+		UnitTypeId::Tempest => hashmap![
+			TargetType::Ground => (Some(4), hashmap![]),
+			TargetType::Air => (Some(3), hashmap![Attribute::Massive => 2]),
+		],
+		// Terran
+		UnitTypeId::SCV => hashmap![TargetType::Ground => (Some(0), hashmap![])],
+		UnitTypeId::Marauder => hashmap![TargetType::Ground => (None, hashmap![Attribute::Armored => 1])],
+		UnitTypeId::Ghost => hashmap![TargetType::Any => (None, hashmap![Attribute::Light => 1])],
+		UnitTypeId::Hellion => hashmap![TargetType::Ground => (None, hashmap![Attribute::Light => 1])],
+		UnitTypeId::HellionTank => hashmap![TargetType::Ground => (Some(2), hashmap![Attribute::Light => 1])],
+		UnitTypeId::Cyclone => hashmap![TargetType::Any => (Some(2), hashmap![])],
+		UnitTypeId::SiegeTank => hashmap![TargetType::Ground => (Some(2), hashmap![Attribute::Armored => 1])],
+		UnitTypeId::SiegeTankSieged => hashmap![TargetType::Ground => (Some(4), hashmap![Attribute::Armored => 1])],
+		UnitTypeId::Thor => hashmap![
+			TargetType::Ground => (Some(3), hashmap![]),
+			TargetType::Air => (None, hashmap![Attribute::Light => 1]),
+		],
+		UnitTypeId::ThorAP => hashmap![
+			TargetType::Ground => (Some(3), hashmap![]),
+			TargetType::Air => (Some(3), hashmap![Attribute::Massive => 1]),
+		],
+		UnitTypeId::VikingAssault => hashmap![TargetType::Ground => (None, hashmap![Attribute::Mechanical => 1])],
+		UnitTypeId::LiberatorAG => hashmap![TargetType::Ground => (Some(5), hashmap![])],
+		// Zerg
+		UnitTypeId::Drone => hashmap![TargetType::Ground => (Some(0), hashmap![])],
+		UnitTypeId::Baneling => hashmap![
+			TargetType::Ground => (Some(2), hashmap![Attribute::Light => 2, Attribute::Structure => 3])
+		],
+		UnitTypeId::BanelingBurrowed => hashmap![
+			TargetType::Ground => (Some(2), hashmap![Attribute::Light => 2, Attribute::Structure => 3])
+		],
+		UnitTypeId::BanelingCocoon => hashmap![
+			TargetType::Ground => (Some(2), hashmap![Attribute::Light => 2, Attribute::Structure => 3])
+		],
+		UnitTypeId::Roach => hashmap![TargetType::Ground => (Some(2), hashmap![])],
+		UnitTypeId::Ravager => hashmap![TargetType::Ground => (Some(2), hashmap![])],
+		UnitTypeId::RavagerCocoon => hashmap![TargetType::Ground => (Some(2), hashmap![])],
+		UnitTypeId::LurkerMPBurrowed => hashmap![TargetType::Ground => (Some(2), hashmap![Attribute::Armored => 1])],
+		UnitTypeId::Ultralisk => hashmap![TargetType::Ground => (Some(3), hashmap![])],
+		UnitTypeId::Corruptor => hashmap![TargetType::Air => (None, hashmap![Attribute::Massive => 1])],
+		UnitTypeId::BroodLord => hashmap![TargetType::Ground => (Some(2), hashmap![])],
+	];
+
 	pub(crate) static ref SPEED_UPGRADES: HashMap<UnitTypeId, (UpgradeId, f32)> = {
 		let mut map = hashmap![
 			// Terran
@@ -187,5 +247,82 @@ lazy_static! {
 		UnitTypeId::DarkTemplar => AbilityId::WarpGateTrainDarkTemplar,
 		UnitTypeId::Sentry => AbilityId::WarpGateTrainSentry,
 		UnitTypeId::Adept => AbilityId::TrainWarpAdept,
+	];
+
+	pub(crate) static ref MISSED_WEAPONS: HashMap<UnitTypeId, Vec<Weapon>> = hashmap![
+		UnitTypeId::Baneling => vec![Weapon {
+			target: TargetType::Ground,
+			damage: 20.0,
+			damage_bonus: vec![(Attribute::Light, 15.0), (Attribute::Structure, 60.0)],
+			attacks: 1,
+			range: 2.2,
+			speed: 1.0,
+		}],
+		UnitTypeId::Battlecruiser => vec![
+			Weapon {
+				target: TargetType::Ground,
+				damage: 8.0,
+				damage_bonus: vec![],
+				attacks: 1,
+				range: 6.0,
+				speed: 0.224,
+			},
+			Weapon {
+				target: TargetType::Air,
+				damage: 5.0,
+				damage_bonus: vec![],
+				attacks: 1,
+				range: 6.0,
+				speed: 0.224,
+			},
+		],
+		UnitTypeId::Sentry => vec![Weapon {
+			target: TargetType::Any,
+			damage: 6.0,
+			damage_bonus: vec![],
+			attacks: 1,
+			range: 5.0,
+			speed: 0.994,
+		}],
+		UnitTypeId::VoidRay => vec![Weapon {
+			target: TargetType::Any,
+			damage: 6.0,
+			damage_bonus: vec![],
+			attacks: 1,
+			range: 6.0,
+			speed: 0.504,
+		}],
+		UnitTypeId::Bunker => vec![Weapon {
+			target: TargetType::Any,
+			damage: 6.0, // Marine damage
+			damage_bonus: vec![],
+			attacks: 4,   // 4 Marines inside
+			range: 6.0,   // Marine range + 1
+			speed: 0.854, // Marine cooldown
+		}],
+		UnitTypeId::Carrier => vec![Weapon {
+			target: TargetType::Any,
+			damage: 5.0,
+			damage_bonus: vec![],
+			attacks: 16,
+			range: 8.0, // Interceptors launch range
+			speed: 2.996,
+		}],
+		UnitTypeId::Oracle => vec![Weapon {
+			target: TargetType::Ground,
+			damage: 15.0,
+			damage_bonus: vec![(Attribute::Light, 7.0)],
+			attacks: 1,
+			range: 4.0,
+			speed: 0.854,
+		}],
+		UnitTypeId::WidowMineBurrowed => vec![Weapon {
+			target: TargetType::Any,
+			damage: 125.0,
+			damage_bonus: vec![],
+			attacks: 1,
+			range: 5.0,
+			speed: 1.0,
+		}],
 	];
 }

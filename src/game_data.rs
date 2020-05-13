@@ -83,7 +83,7 @@ impl FromProto<AbilityData_Target> for AbilityTarget {
 }
 
 #[variant_checkers]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Attribute {
 	Light,
 	Armored,
@@ -220,7 +220,7 @@ pub struct UnitTypeData {
 	pub require_attached: bool,
 	pub attributes: Vec<Attribute>,
 	pub movement_speed: f32,
-	pub armor: f32,
+	pub armor: i32,
 	pub weapons: Vec<Weapon>,
 }
 impl UnitTypeData {
@@ -264,7 +264,7 @@ impl TryFromProto<ProtoUnitTypeData> for UnitTypeData {
 				.map(|&a| Attribute::from_proto(a))
 				.collect(),
 			movement_speed: u.get_movement_speed(),
-			armor: u.get_armor(),
+			armor: u.get_armor() as i32,
 			weapons: u
 				.get_weapons()
 				.iter()

@@ -186,7 +186,7 @@ pub struct Effect {
 	pub radius: f32,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Alliance {
 	Own,
 	Ally,
