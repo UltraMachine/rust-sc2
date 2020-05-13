@@ -229,6 +229,9 @@ impl Unit {
 	pub fn speed(&self) -> f32 {
 		self.type_data().map_or(0.0, |data| data.movement_speed)
 	}
+	pub fn real_speed(&self) -> f32 {
+		self.calculate_speed(None)
+	}
 	pub fn calculate_speed(&self, upgrades: Option<&Vec<UpgradeId>>) -> f32 {
 		let mut speed = self.speed();
 		let unit_type = self.type_id;
@@ -486,6 +489,13 @@ impl Unit {
 		})
 	}
 
+	// Returns (dps, range)
+	pub fn real_weapon_stats(&self) -> (f32, f32) {
+		let (damage, speed, range) =
+			self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Any, None), None);
+		(damage / speed, range)
+	}
+
 	pub fn calculate_weapon_abstract(
 		&self,
 		target_type: TargetType,
@@ -501,6 +511,7 @@ impl Unit {
 		(damage / speed, range)
 	}
 
+	// Returns (damage, cooldown, range)
 	#[allow(clippy::mut_range_bound)]
 	pub fn calculate_weapon_stats(
 		&self,
