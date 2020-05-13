@@ -169,8 +169,8 @@ impl Bot {
 	pub fn has_upgrade(&self, upgrade: UpgradeId) -> bool {
 		self.state.observation.raw.upgrades.contains(&upgrade)
 	}
-	pub fn chat_send(&mut self, message: String, team_only: bool) {
-		self.actions.push(Action::Chat(message, team_only));
+	pub fn chat(&mut self, message: &str, team_only: bool) {
+		self.actions.push(Action::Chat(message.to_string(), team_only));
 	}
 	pub(crate) fn init_data_for_unit(&mut self) {
 		self.data_for_unit = Rc::new(DataForUnit {
@@ -355,12 +355,17 @@ impl Bot {
 		reactor_tags.clear();
 
 		self.state.observation.raw.units.iter().for_each(|u| {
+			macro_rules! add_to {
+				($group:ident) => {{
+					$group.push(u.clone());
+				}};
+			}
+
 			let u_type = u.type_id;
 			match u.alliance {
 				Alliance::Neutral => match u_type {
-					UnitTypeId::XelNagaTower => {
-						watchtowers.push(u.clone());
-					}
+					UnitTypeId::XelNagaTower => add_to!(watchtowers),
+
 					UnitTypeId::RichMineralField
 					| UnitTypeId::RichMineralField750
 					| UnitTypeId::MineralField
@@ -376,8 +381,8 @@ impl Bot {
 					| UnitTypeId::BattleStationMineralField750
 					| UnitTypeId::MineralFieldOpaque
 					| UnitTypeId::MineralFieldOpaque900 => {
-						resources.push(u.clone());
-						mineral_fields.push(u.clone());
+						add_to!(resources);
+						add_to!(mineral_fields);
 					}
 					UnitTypeId::VespeneGeyser
 					| UnitTypeId::SpacePlatformGeyser
@@ -385,20 +390,17 @@ impl Bot {
 					| UnitTypeId::ProtossVespeneGeyser
 					| UnitTypeId::PurifierVespeneGeyser
 					| UnitTypeId::ShakurasVespeneGeyser => {
-						resources.push(u.clone());
-						vespene_geysers.push(u.clone());
+						add_to!(resources);
+						add_to!(vespene_geysers);
 					}
 					UnitTypeId::InhibitorZoneSmall
 					| UnitTypeId::InhibitorZoneMedium
-					| UnitTypeId::InhibitorZoneLarge => {
-						inhibitor_zones.push(u.clone());
-					}
-					_ => {
-						destructables.push(u.clone());
-					}
+					| UnitTypeId::InhibitorZoneLarge => add_to!(inhibitor_zones),
+
+					_ => add_to!(destructables),
 				},
 				Alliance::Own => {
-					owned.push(u.clone());
+					add_to!(owned);
 					if let Some(cooldown) = u.weapon_cooldown {
 						max_cooldowns
 							.entry(u_type)
@@ -411,9 +413,9 @@ impl Bot {
 					}
 					if u.is_structure() {
 						if u.is_placeholder() {
-							placeholders.push(u.clone());
+							add_to!(placeholders);
 						} else {
-							structures.push(u.clone());
+							add_to!(structures);
 							match u_type {
 								UnitTypeId::CommandCenter
 								| UnitTypeId::OrbitalCommand
@@ -423,17 +425,15 @@ impl Bot {
 								| UnitTypeId::Hatchery
 								| UnitTypeId::Lair
 								| UnitTypeId::Hive
-								| UnitTypeId::Nexus => {
-									townhalls.push(u.clone());
-								}
+								| UnitTypeId::Nexus => add_to!(townhalls),
+
 								UnitTypeId::Refinery
 								| UnitTypeId::RefineryRich
 								| UnitTypeId::Assimilator
 								| UnitTypeId::AssimilatorRich
 								| UnitTypeId::Extractor
-								| UnitTypeId::ExtractorRich => {
-									gas_buildings.push(u.clone());
-								}
+								| UnitTypeId::ExtractorRich => add_to!(gas_buildings),
+
 								UnitTypeId::TechLab
 								| UnitTypeId::BarracksTechLab
 								| UnitTypeId::FactoryTechLab
@@ -443,45 +443,30 @@ impl Bot {
 								| UnitTypeId::BarracksReactor
 								| UnitTypeId::FactoryReactor
 								| UnitTypeId::StarportReactor => reactor_tags.push(u.tag),
+
 								_ => {}
 							}
 						}
 					} else {
-						units.push(u.clone());
+						add_to!(units);
 						match u_type {
-							UnitTypeId::SCV | UnitTypeId::Probe | UnitTypeId::Drone => {
-								workers.push(u.clone());
-							}
-							UnitTypeId::Larva => {
-								larvas.push(u.clone());
-							}
+							UnitTypeId::SCV | UnitTypeId::Probe | UnitTypeId::Drone => add_to!(workers),
+							UnitTypeId::Larva => add_to!(larvas),
 							_ => {}
 						}
 					}
 				}
 				Alliance::Enemy => {
-					enemies.push(u.clone());
+					add_to!(enemies);
 					if u.is_structure() {
-						enemy_structures.push(u.clone());
-						if [
-							UnitTypeId::CommandCenter,
-							UnitTypeId::OrbitalCommand,
-							UnitTypeId::PlanetaryFortress,
-							UnitTypeId::CommandCenterFlying,
-							UnitTypeId::OrbitalCommandFlying,
-							UnitTypeId::Hatchery,
-							UnitTypeId::Lair,
-							UnitTypeId::Hive,
-							UnitTypeId::Nexus,
-						]
-						.contains(&u_type)
-						{
-							enemy_townhalls.push(u.clone());
+						add_to!(enemy_structures);
+						if u_type.is_townhall() {
+							add_to!(enemy_townhalls);
 						}
 					} else {
-						enemy_units.push(u.clone());
-						if [UnitTypeId::SCV, UnitTypeId::Probe, UnitTypeId::Drone].contains(&u_type) {
-							enemy_workers.push(u.clone());
+						add_to!(enemy_units);
+						if u_type.is_worker() {
+							add_to!(enemy_workers);
 						}
 					}
 				}
