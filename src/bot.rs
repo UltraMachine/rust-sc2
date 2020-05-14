@@ -658,7 +658,7 @@ impl Bot {
 		None
 	}
 	pub fn find_gas_placement(&mut self, base: Point2) -> Option<Unit> {
-		let ability = self.game_data.units[&self.race_values.gas_building]
+		let ability = self.game_data.units[&self.race_values.gas]
 			.ability
 			.unwrap();
 

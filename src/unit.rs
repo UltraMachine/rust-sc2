@@ -968,7 +968,7 @@ impl Unit {
 	}
 	pub fn build_gas(&self, target: u64, queue: bool) {
 		self.command(
-			self.data.game_data.units[&self.data.race_values.gas_building]
+			self.data.game_data.units[&self.data.race_values.gas]
 				.ability
 				.unwrap(),
 			Target::Tag(target),

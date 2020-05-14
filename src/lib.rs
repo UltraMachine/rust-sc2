@@ -16,7 +16,7 @@ pub mod prelude {
 		action::Target,
 		bot::PlacementOptions,
 		client::{run_ladder_game, run_vs_computer, run_vs_human, LaunchOptions, SC2Result},
-		constants::TECH_REQUIREMENTS,
+		constants::{ALL_PRODUCERS, PRODUCERS, TECH_REQUIREMENTS},
 		geometry::Point2,
 		ids::*,
 		player::{AIBuild, Computer, Difficulty, GameResult, Race},
