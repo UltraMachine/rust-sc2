@@ -57,4 +57,182 @@ impl UnitTypeId {
 			| UnitTypeId::UltraliskBurrowed
 		)
 	}
+	#[rustfmt::skip::macros(matches)]
+	#[inline]
+	pub fn is_structure(self) -> bool {
+		matches!(
+			self,
+			UnitTypeId::CommandCenter
+			| UnitTypeId::CommandCenterFlying
+			| UnitTypeId::PlanetaryFortress
+			| UnitTypeId::OrbitalCommand
+			| UnitTypeId::OrbitalCommandFlying
+			| UnitTypeId::SupplyDepot
+			| UnitTypeId::SupplyDepotLowered
+			| UnitTypeId::SupplyDepotDrop
+			| UnitTypeId::Refinery
+			| UnitTypeId::Barracks
+			| UnitTypeId::BarracksFlying
+			| UnitTypeId::EngineeringBay
+			| UnitTypeId::Bunker
+			| UnitTypeId::SensorTower
+			| UnitTypeId::MissileTurret
+			| UnitTypeId::Factory
+			| UnitTypeId::FactoryFlying
+			| UnitTypeId::GhostAcademy
+			| UnitTypeId::Starport
+			| UnitTypeId::StarportFlying
+			| UnitTypeId::Armory
+			| UnitTypeId::FusionCore
+			| UnitTypeId::TechLab
+			| UnitTypeId::BarracksTechLab
+			| UnitTypeId::FactoryTechLab
+			| UnitTypeId::StarportTechLab
+			| UnitTypeId::Reactor
+			| UnitTypeId::BarracksReactor
+			| UnitTypeId::FactoryReactor
+			| UnitTypeId::StarportReactor
+			| UnitTypeId::Hatchery
+			| UnitTypeId::SpineCrawler
+			| UnitTypeId::SporeCrawler
+			| UnitTypeId::Extractor
+			| UnitTypeId::SpawningPool
+			| UnitTypeId::EvolutionChamber
+			| UnitTypeId::RoachWarren
+			| UnitTypeId::BanelingNest
+			| UnitTypeId::CreepTumor
+			| UnitTypeId::CreepTumorBurrowed
+			| UnitTypeId::CreepTumorQueen
+			| UnitTypeId::CreepTumorMissile
+			| UnitTypeId::Lair
+			| UnitTypeId::HydraliskDen
+			| UnitTypeId::LurkerDen
+			| UnitTypeId::InfestationPit
+			| UnitTypeId::Spire
+			| UnitTypeId::NydusNetwork
+			| UnitTypeId::Hive
+			| UnitTypeId::GreaterSpire
+			| UnitTypeId::UltraliskCavern
+			| UnitTypeId::Nexus
+			| UnitTypeId::Pylon
+			| UnitTypeId::Assimilator
+			| UnitTypeId::Gateway
+			| UnitTypeId::Forge
+			| UnitTypeId::CyberneticsCore
+			| UnitTypeId::PhotonCannon
+			| UnitTypeId::ShieldBattery
+			| UnitTypeId::RoboticsFacility
+			| UnitTypeId::WarpGate
+			| UnitTypeId::Stargate
+			| UnitTypeId::TwilightCouncil
+			| UnitTypeId::RoboticsBay
+			| UnitTypeId::FleetBeacon
+			| UnitTypeId::TemplarArchive
+			| UnitTypeId::DarkShrine
+		)
+	}
+	#[rustfmt::skip::macros(matches)]
+	#[inline]
+	pub fn is_unit(self) -> bool {
+		matches!(
+			self,
+			UnitTypeId::SCV
+			| UnitTypeId::Marine
+			| UnitTypeId::Marauder
+			| UnitTypeId::Reaper
+			| UnitTypeId::Ghost
+			| UnitTypeId::Hellion
+			| UnitTypeId::HellionTank
+			| UnitTypeId::SiegeTank
+			| UnitTypeId::SiegeTankSieged
+			| UnitTypeId::Cyclone
+			| UnitTypeId::WidowMine
+			| UnitTypeId::WidowMineBurrowed
+			| UnitTypeId::Thor
+			| UnitTypeId::ThorAP
+			| UnitTypeId::VikingFighter
+			| UnitTypeId::VikingAssault
+			| UnitTypeId::Medivac
+			| UnitTypeId::Liberator
+			| UnitTypeId::LiberatorAG
+			| UnitTypeId::Raven
+			| UnitTypeId::Banshee
+			| UnitTypeId::Battlecruiser
+			| UnitTypeId::Larva
+			| UnitTypeId::Egg
+			| UnitTypeId::Drone
+			| UnitTypeId::DroneBurrowed
+			| UnitTypeId::Queen
+			| UnitTypeId::QueenBurrowed
+			| UnitTypeId::Zergling
+			| UnitTypeId::ZerglingBurrowed
+			| UnitTypeId::BanelingCocoon
+			| UnitTypeId::Baneling
+			| UnitTypeId::BanelingBurrowed
+			| UnitTypeId::Roach
+			| UnitTypeId::RoachBurrowed
+			| UnitTypeId::RavagerCocoon
+			| UnitTypeId::Ravager
+			| UnitTypeId::RavagerBurrowed
+			| UnitTypeId::Hydralisk
+			| UnitTypeId::HydraliskBurrowed
+			| UnitTypeId::LurkerEgg
+			| UnitTypeId::Lurker
+			| UnitTypeId::LurkerBurrowed
+			| UnitTypeId::LurkerMP
+			| UnitTypeId::LurkerMPBurrowed
+			| UnitTypeId::Infestor
+			| UnitTypeId::InfestorBurrowed
+			| UnitTypeId::SwarmHostMP
+			| UnitTypeId::SwarmHostBurrowedMP
+			| UnitTypeId::Ultralisk
+			| UnitTypeId::UltraliskBurrowed
+			| UnitTypeId::LocustMP
+			| UnitTypeId::LocustMPFlying
+			| UnitTypeId::Broodling
+			| UnitTypeId::Changeling
+			| UnitTypeId::ChangelingZealot
+			| UnitTypeId::ChangelingMarine
+			| UnitTypeId::ChangelingMarineShield
+			| UnitTypeId::ChangelingZergling
+			| UnitTypeId::ChangelingZerglingWings
+			| UnitTypeId::InfestorTerran
+			| UnitTypeId::InfestorTerranBurrowed
+			| UnitTypeId::NydusCanal
+			| UnitTypeId::Overlord
+			| UnitTypeId::OverlordCocoon
+			| UnitTypeId::OverlordTransport
+			| UnitTypeId::TransportOverlordCocoon
+			| UnitTypeId::Overseer
+			| UnitTypeId::OverseerSiegeMode
+			| UnitTypeId::Mutalisk
+			| UnitTypeId::Corruptor
+			| UnitTypeId::BroodLordCocoon
+			| UnitTypeId::BroodLord
+			| UnitTypeId::Viper
+			| UnitTypeId::Probe
+			| UnitTypeId::Zealot
+			| UnitTypeId::Stalker
+			| UnitTypeId::Sentry
+			| UnitTypeId::Adept
+			| UnitTypeId::AdeptPhaseShift
+			| UnitTypeId::HighTemplar
+			| UnitTypeId::DarkTemplar
+			| UnitTypeId::Immortal
+			| UnitTypeId::Colossus
+			| UnitTypeId::Disruptor
+			| UnitTypeId::Archon
+			| UnitTypeId::Observer
+			| UnitTypeId::ObserverSiegeMode
+			| UnitTypeId::WarpPrism
+			| UnitTypeId::WarpPrismPhasing
+			| UnitTypeId::Phoenix
+			| UnitTypeId::VoidRay
+			| UnitTypeId::Oracle
+			| UnitTypeId::Carrier
+			| UnitTypeId::Interceptor
+			| UnitTypeId::Tempest
+			| UnitTypeId::Mothership
+		)
+	}
 }
