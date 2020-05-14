@@ -10,8 +10,11 @@ use sc2_proto::{
 use std::{
 	error::Error,
 	fmt,
+	fs::File,
+	io::Write,
 	ops::{Deref, DerefMut},
 	panic,
+	path::Path,
 	process::{Child, Command},
 	rc::Rc,
 };
@@ -72,23 +75,29 @@ impl fmt::Display for ProtoError {
 }
 impl Error for ProtoError {}
 
-#[derive(Clone)]
 struct Ports {
 	shared: i32,
 	server: (i32, i32),
 	client: Vec<(i32, i32)>,
 }
 
+#[derive(Default)]
+pub struct LaunchOptions<'a, P: AsRef<Path>> {
+	pub sc2_version: Option<&'a str>,
+	pub save_replay_as: Option<P>,
+	pub realtime: bool,
+}
+
 // Runners
-pub fn run_vs_computer<B>(
+pub fn run_vs_computer<B, P>(
 	bot: &mut B,
 	computer: Computer,
 	map_name: &str,
-	sc2_version: Option<&str>,
-	realtime: bool,
+	options: LaunchOptions<P>,
 ) -> SC2Result<()>
 where
 	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
+	P: AsRef<Path>,
 {
 	debug!("Starting game vs computer");
 
@@ -97,7 +106,7 @@ where
 
 	// let port = get_unused_port();
 	debug!("Launching SC2 process");
-	bot.process = Some(launch_client(&sc2_path, PORT, sc2_version)?);
+	bot.process = Some(launch_client(&sc2_path, PORT, options.sc2_version)?);
 	debug!("Connecting to websocket");
 	bot.api = Some(API(connect_to_websocket(HOST, PORT)?));
 
@@ -120,6 +129,7 @@ where
 	create_computer_setup(computer, req_create_game);
 	// req_create_game.set_disable_fog(bool); // Cheat
 	// req_create_game.set_random_seed(u32);
+	let realtime = options.realtime;
 	req_create_game.set_realtime(realtime);
 
 	let res = api.send(req)?;
@@ -147,6 +157,10 @@ where
 		iteration += 1;
 	}
 	debug!("Game finished");
+
+	if let Some(path) = options.save_replay_as {
+		save_replay(bot.api(), path)?;
+	}
 	Ok(())
 }
 
@@ -195,14 +209,15 @@ where
 	Ok(())
 }
 
-pub fn run_vs_human<B>(
+pub fn run_vs_human<B, P>(
 	bot: &mut B,
 	human_settings: PlayerSettings,
 	map_name: &str,
-	sc2_version: Option<&str>,
+	options: LaunchOptions<P>,
 ) -> SC2Result<()>
 where
 	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
+	P: AsRef<Path>,
 {
 	debug!("Starting human vs bot");
 	let sc2_path = get_path_to_sc2();
@@ -214,6 +229,7 @@ where
 
 	let mut human = Human::new();
 
+	let sc2_version = options.sc2_version;
 	debug!("Launching host SC2 process");
 	human.process = Some(launch_client(&sc2_path, port_human, sc2_version)?);
 	debug!("Launching client SC2 process");
@@ -232,7 +248,8 @@ where
 	create_player_setup(&bot.get_player_settings(), req_create_game);
 	// req_create_game.set_disable_fog(bool); // Cheat
 	// req_create_game.set_random_seed(u32);
-	req_create_game.set_realtime(true);
+	let realtime = options.realtime;
+	req_create_game.set_realtime(realtime);
 
 	let res = human_api.send(req)?;
 	let res_create_game = res.get_create_game();
@@ -265,12 +282,16 @@ where
 	set_static_data(bot)?;
 
 	debug!("Entered main loop");
-	play_first_step(bot, true)?;
+	play_first_step(bot, realtime)?;
 	let mut iteration = 0;
-	while play_step(bot, iteration, true)? {
+	while play_step(bot, iteration, realtime)? {
 		iteration += 1;
 	}
 	debug!("Game finished");
+
+	if let Some(path) = options.save_replay_as {
+		save_replay(bot.api(), path)?;
+	}
 	Ok(())
 }
 
@@ -513,6 +534,21 @@ where
 		bot.api().send_request(req)?;
 	}
 	Ok(true)
+}
+
+fn save_replay<P: AsRef<Path>>(api: &mut API, path: P) -> SC2Result<()> {
+	let mut req = Request::new();
+	req.mut_save_replay();
+
+	let res = api.send(req)?;
+
+	let mut path = path.as_ref().to_path_buf();
+	if !path.ends_with(".SC2Replay") {
+		path.push(".SC2Replay");
+	}
+	let mut file = File::create(path)?;
+	file.write_all(res.get_save_replay().get_data())?;
+	Ok(())
 }
 
 fn launch_client(sc2_path: &str, port: i32, sc2_version: Option<&str>) -> SC2Result<Child> {
