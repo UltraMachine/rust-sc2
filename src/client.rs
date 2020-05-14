@@ -556,12 +556,26 @@ fn launch_client(sc2_path: &str, port: i32, sc2_version: Option<&str>) -> SC2Res
 		Some(ver) => get_version_info(ver),
 		None => (get_latest_base_version(sc2_path), ""),
 	};
-	let sc2_binary = if cfg!(target_os = "windows") {
-		"SC2_x64.exe"
-	} else if cfg!(target_os = "linux") {
-		"SC2_x64"
-	} else {
-		panic!("Unsupported OS")
+	let sc2_binary = {
+		if cfg!(target_os = "windows") {
+			if cfg!(target_arch = "x86_64") {
+				"SC2_x64.exe"
+			} else if cfg!(target_arch = "x86") {
+				"SC2.exe"
+			} else {
+				panic!("Unsupported Arch");
+			}
+		} else if cfg!(target_os = "linux") {
+			if cfg!(target_arch = "x86_64") {
+				"SC2_x64"
+			} else if cfg!(target_arch = "x86") {
+				"SC2"
+			} else {
+				panic!("Unsupported Arch");
+			}
+		} else {
+			panic!("Unsupported OS");
+		}
 	};
 
 	let mut process = Command::new(format!(
