@@ -494,6 +494,10 @@ fn main() -> SC2Result<()> {
 				+takes_value
 				"Sets sc2 version"
 			)
+			(@arg save_replay: --("save-replay")
+				+takes_value
+				"Sets path to save replay"
+			)
 			(@arg realtime: --realtime "Enables realtime mode")
 		)
 		(@subcommand human =>
@@ -512,6 +516,10 @@ fn main() -> SC2Result<()> {
 			(@arg sc2_version: --("sc2-version")
 				+takes_value
 				"Sets sc2 version"
+			)
+			(@arg save_replay: --("save-replay")
+				+takes_value
+				"Sets path to save replay"
 			)
 		)
 	)
@@ -567,8 +575,11 @@ fn main() -> SC2Result<()> {
 					.choose(&mut rng)
 					.unwrap()
 				}),
-				sub.value_of("sc2_version"),
-				sub.is_present("realtime"),
+				LaunchOptions {
+					sc2_version: sub.value_of("sc2_version"),
+					realtime: sub.is_present("realtime"),
+					save_replay_as: sub.value_of("save_replay"),
+				},
 			),
 			("human", Some(sub)) => run_vs_human(
 				&mut bot,
@@ -592,7 +603,11 @@ fn main() -> SC2Result<()> {
 					.choose(&mut rng)
 					.unwrap()
 				}),
-				sub.value_of("sc2_version"),
+				LaunchOptions {
+					sc2_version: sub.value_of("sc2_version"),
+					realtime: true,
+					save_replay_as: sub.value_of("save_replay"),
+				},
 			),
 			_ => {
 				println!("Game mode is not specified! Use -h, --help to print help information.");
