@@ -556,20 +556,20 @@ fn launch_client(sc2_path: &str, port: i32, sc2_version: Option<&str>) -> SC2Res
 		Some(ver) => get_version_info(ver),
 		None => (get_latest_base_version(sc2_path), ""),
 	};
-	let sc2_binary = {
+	let (sc2_binary, sc2_support) = {
 		if cfg!(target_os = "windows") {
 			if cfg!(target_arch = "x86_64") {
-				"SC2_x64.exe"
+				("SC2_x64.exe", "Support64")
 			} else if cfg!(target_arch = "x86") {
-				"SC2.exe"
+				("SC2.exe", "Support")
 			} else {
 				panic!("Unsupported Arch");
 			}
 		} else if cfg!(target_os = "linux") {
 			if cfg!(target_arch = "x86_64") {
-				"SC2_x64"
+				("SC2_x64", "Support64")
 			} else if cfg!(target_arch = "x86") {
-				"SC2"
+				("SC2", "Support")
 			} else {
 				panic!("Unsupported Arch");
 			}
@@ -583,7 +583,7 @@ fn launch_client(sc2_path: &str, port: i32, sc2_version: Option<&str>) -> SC2Res
 		sc2_path, base_version, sc2_binary
 	));
 	process
-		.current_dir(format!("{}/Support64", sc2_path))
+		.current_dir(format!("{}/{}", sc2_path, sc2_support))
 		.arg("-listen")
 		.arg(HOST)
 		.arg("-port")
