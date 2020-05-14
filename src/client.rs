@@ -257,8 +257,10 @@ where
 		server: (PORT + 3, PORT + 4),
 		client: vec![(PORT + 5, PORT + 6), (PORT + 7, PORT + 8)],
 	};
-	join_game(&human_settings, human_api, Some(&ports))?;
-	bot.player_id = join_game(&bot.get_player_settings(), bot.api(), Some(&ports))?;
+	join_game2(&human_settings, human_api, Some(&ports))?;
+	join_game2(&bot.get_player_settings(), bot.api(), Some(&ports))?;
+	let _ = wait_join(human_api)?;
+	bot.player_id = wait_join(bot.api())?;
 
 	set_static_data(bot)?;
 
@@ -341,6 +343,10 @@ fn create_computer_setup(computer: Computer, req_create_game: &mut RequestCreate
 }
 
 fn join_game(settings: &PlayerSettings, api: &mut API, ports: Option<&Ports>) -> SC2Result<u32> {
+	join_game2(settings, api, ports)?;
+	wait_join(api)
+}
+fn join_game2(settings: &PlayerSettings, api: &mut API, ports: Option<&Ports>) -> SC2Result<()> {
 	let mut req = Request::new();
 	let req_join_game = req.mut_join_game();
 
@@ -377,7 +383,12 @@ fn join_game(settings: &PlayerSettings, api: &mut API, ports: Option<&Ports>) ->
 		});
 	}
 
-	let res = api.send(req)?;
+	api.send_only(req)?;
+	Ok(())
+}
+fn wait_join(api: &mut API) -> SC2Result<u32> {
+	let res = api.wait_response()?;
+
 	let res_join_game = res.get_join_game();
 	if res_join_game.has_error() {
 		let err = ProtoError::new(res_join_game.get_error(), res_join_game.get_error_details());
@@ -428,7 +439,7 @@ where
 	let res = bot.api().send(req)?;
 
 	if matches!(res.get_status(), Status::ended) {
-		let result = res.get_observation().get_player_result()[bot.player_id as usize]
+		let result = res.get_observation().get_player_result()[bot.player_id as usize - 1]
 			.get_result()
 			.into_sc2();
 		debug!("Result for bot: {:?}", result);
