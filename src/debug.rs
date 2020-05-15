@@ -26,15 +26,15 @@ impl Debugger {
 		self.debug_commands.clear();
 		self.debug_drawings.clear();
 	}
-	pub fn draw_text(&mut self, text: String, pos: DebugPos, color: Option<Color>, size: Option<u32>) {
-		self.debug_drawings.push(DebugDraw::Text(text, pos, color, size));
+	pub fn draw_text(&mut self, text: &str, pos: DebugPos, color: Option<Color>, size: Option<u32>) {
+		self.debug_drawings.push(DebugDraw::Text(text.to_string(), pos, color, size));
 	}
-	pub fn draw_text_world(&mut self, text: String, pos: Point3, color: Option<Color>, size: Option<u32>) {
+	pub fn draw_text_world(&mut self, text: &str, pos: Point3, color: Option<Color>, size: Option<u32>) {
 		self.draw_text(text, DebugPos::World(pos), color, size);
 	}
 	pub fn draw_text_screen(
 		&mut self,
-		text: String,
+		text: &str,
 		pos: Option<ScreenPos>,
 		color: Option<Color>,
 		size: Option<u32>,
