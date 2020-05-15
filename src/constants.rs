@@ -5,6 +5,9 @@ use crate::{
 };
 use std::collections::HashMap;
 
+pub const GAME_SPEED: f32 = 1.4; // Faster
+pub const FRAMES_PER_SECOND: f32 = 22.4; // 16 (default frames per second) * 1.4 (game speed)
+
 pub const TARGET_GROUND: [TargetType; 2] = [TargetType::Ground, TargetType::Any];
 pub const TARGET_AIR: [TargetType; 2] = [TargetType::Air, TargetType::Any];
 
