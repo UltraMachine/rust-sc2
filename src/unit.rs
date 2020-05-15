@@ -111,6 +111,12 @@ impl Unit {
 	pub fn is_melee(&self) -> bool {
 		self.type_id.is_melee()
 	}
+	pub fn is_mineral(&self) -> bool {
+		self.type_data().map_or(false, |data| data.has_minerals)
+	}
+	pub fn is_geyser(&self) -> bool {
+		self.type_data().map_or(false, |data| data.has_vespene)
+	}
 	#[rustfmt::skip::macros(matches)]
 	pub fn is_detector(&self) -> bool {
 		matches!(

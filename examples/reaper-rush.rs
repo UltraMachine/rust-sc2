@@ -110,8 +110,7 @@ impl ReaperRushAI {
 			});
 
 		let minerals_near_base = if idle_workers.len() > deficit_minings.len() + deficit_geysers.len() {
-			let minerals =
-				mineral_fields.filter(|m| bases.iter().any(|base| base.distance_squared(m) < 121.0));
+			let minerals = mineral_fields.filter(|m| bases.iter().any(|base| base.is_closer(11.0, m)));
 			if minerals.is_empty() {
 				None
 			} else {
@@ -248,13 +247,13 @@ impl ReaperRushAI {
 	fn throw_mine(&mut self, reaper: &Unit, target: &Unit) -> bool {
 		self.abilities_units.get(&reaper.tag).map_or(false, |abilities| {
 			if abilities.contains(&AbilityId::KD8ChargeKD8Charge)
-				&& reaper.distance_squared(target)
-					<= (reaper.radius
+				&& reaper.is_closer(
+					reaper.radius
 						+ target.radius + self.game_data.abilities[&AbilityId::KD8ChargeKD8Charge]
 						.cast_range
-						.unwrap())
-					.powi(2)
-			{
+						.unwrap(),
+					target,
+				) {
 				reaper.command(AbilityId::KD8ChargeKD8Charge, Target::Pos(target.position), false);
 				true
 			} else {
@@ -385,7 +384,7 @@ impl Player for ReaperRushAI {
 	}
 
 	fn get_player_settings(&self) -> PlayerSettings {
-		PlayerSettings::new(Race::Terran, Some("RustyReapers".to_string()))
+		PlayerSettings::new(Race::Terran, Some("RustyReapers"))
 	}
 }
 
@@ -517,7 +516,7 @@ fn main() -> SC2Result<()> {
 						.unwrap()
 						.parse()
 						.expect("Can't parse human race"),
-					sub.value_of("name").map(|name| name.to_string()),
+					sub.value_of("name"),
 				),
 				sub.value_of("map").unwrap_or_else(|| {
 					[

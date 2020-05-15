@@ -153,8 +153,7 @@ impl ZergRushAI {
 		}
 
 		let minerals_near_base = if idle_workers.len() > deficit_minings.len() + deficit_geysers.len() {
-			let minerals =
-				mineral_fields.filter(|m| bases.iter().any(|base| base.distance_squared(m) < 121.0));
+			let minerals = mineral_fields.filter(|m| bases.iter().any(|base| base.is_closer(11.0, m)));
 			if minerals.is_empty() {
 				None
 			} else {
@@ -371,8 +370,7 @@ impl ZergRushAI {
 			|| self.grouped_units.structures.iter().any(|s| {
 				s.type_id == UnitTypeId::SpawningPool && !s.is_idle() && {
 					let order = &s.orders[0];
-					order.ability == self.game_data.upgrades[&speed_upgrade].ability
-						&& (order.progress - 0.9).abs() < std::f32::EPSILON
+					order.ability == self.game_data.upgrades[&speed_upgrade].ability && order.progress >= 0.9
 				}
 			});
 
@@ -383,21 +381,16 @@ impl ZergRushAI {
 			} else {
 				self.grouped_units
 					.enemies
-					.filter(|e| hatcheries.iter().any(|h| h.distance_squared(e) < 625.0))
+					.filter(|e| hatcheries.iter().any(|h| h.is_closer(25.0, e)))
 			};
 			if enemies.is_empty() {
 				None
 			} else {
-				let attackers = enemies.filter(|u| !u.is_flying && u.can_attack_ground());
-				if attackers.is_empty() {
-					let ground = enemies.ground();
-					if ground.is_empty() {
-						None
-					} else {
-						Some(ground)
-					}
+				let ground = enemies.ground();
+				if ground.is_empty() {
+					None
 				} else {
-					Some(attackers)
+					Some(ground)
 				}
 			}
 		};
@@ -406,12 +399,12 @@ impl ZergRushAI {
 				let target = {
 					let close_targets = targets.in_range_of(u, 0.0);
 					if !close_targets.is_empty() {
-						close_targets.partial_min(|t| t.hits()).unwrap().tag
+						close_targets.partial_min(|t| t.hits()).unwrap().position
 					} else {
-						targets.closest(u).unwrap().tag
+						targets.closest(u).unwrap().position
 					}
 				};
-				u.attack(Target::Tag(target), false);
+				u.attack(Target::Pos(target), false);
 			}),
 			None => {
 				let target = if speed_upgrade_is_almost_ready {
@@ -456,7 +449,7 @@ impl Player for ZergRushAI {
 	}
 
 	fn get_player_settings(&self) -> PlayerSettings {
-		PlayerSettings::new(Race::Zerg, Some("RustyLings".to_string()))
+		PlayerSettings::new(Race::Zerg, Some("RustyLings"))
 	}
 }
 
@@ -588,7 +581,7 @@ fn main() -> SC2Result<()> {
 						.unwrap()
 						.parse()
 						.expect("Can't parse human race"),
-					sub.value_of("name").map(|name| name.to_string()),
+					sub.value_of("name"),
 				),
 				sub.value_of("map").unwrap_or_else(|| {
 					[

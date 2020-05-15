@@ -12,22 +12,16 @@ use crate::{
 	player::Race,
 	unit::{DataForUnit, Unit},
 	units::{GroupedUnits, Units},
+	utils::{dbscan, range_query},
 	FromProto, IntoProto,
 };
-use itertools::Itertools;
 use num_traits::ToPrimitive;
 use rand::prelude::{thread_rng, SliceRandom};
 use sc2_proto::{
 	query::{RequestQueryBuildingPlacement, RequestQueryPathing},
 	sc2api::Request,
 };
-use std::{
-	cell::RefCell,
-	collections::{HashMap, HashSet},
-	panic,
-	process::Child,
-	rc::Rc,
-};
+use std::{cell::RefCell, collections::HashMap, panic, process::Child, rc::Rc};
 
 pub struct PlacementOptions {
 	pub max_distance: isize,
@@ -169,8 +163,11 @@ impl Bot {
 	pub fn has_upgrade(&self, upgrade: UpgradeId) -> bool {
 		self.state.observation.raw.upgrades.contains(&upgrade)
 	}
-	pub fn chat(&mut self, message: &str, team_only: bool) {
-		self.actions.push(Action::Chat(message.to_string(), team_only));
+	pub fn chat(&mut self, message: &str) {
+		self.actions.push(Action::Chat(message.to_string(), false));
+	}
+	pub fn get_z_height(&self, pos: Point2) -> f32 {
+		self.game_info.terrain_height[pos] as f32 * 32.0 / 255.0 - 16.0
 	}
 	pub(crate) fn init_data_for_unit(&mut self) {
 		self.data_for_unit = Rc::new(DataForUnit {
@@ -209,89 +206,83 @@ impl Bot {
 		self.start_location = self.grouped_units.townhalls.first().unwrap().position;
 		self.enemy_start = self.game_info.start_locations[0];
 
-		self.start_center = self
-			.grouped_units
-			.resources
-			.closer(11.0, self.start_location)
-			.center();
-		self.enemy_start_center = self
-			.grouped_units
-			.resources
-			.closer(11.0, self.enemy_start)
-			.center();
+		let resources = self.grouped_units.resources.closer(11.0, self.start_location);
+		self.start_center =
+			(resources.sum(|r| r.position) + self.start_location) / (resources.len() + 1) as f32;
+
+		let resources = self.grouped_units.resources.closer(11.0, self.enemy_start);
+		self.enemy_start_center =
+			(resources.sum(|r| r.position) + self.enemy_start) / (resources.len() + 1) as f32;
 
 		// Calculating expansion locations
+		// dbscan, range_query
+
+		const RESOURCE_SPREAD: f32 = 8.5;
+		const RESOURCE_SPREAD_SQUARED: f32 = RESOURCE_SPREAD * RESOURCE_SPREAD;
+
 		let all_resources = self
 			.grouped_units
 			.resources
 			.filter(|r| r.type_id != UnitTypeId::MineralField450);
 
-		let mut resource_groups: Vec<HashSet<u64>> = Vec::new();
-		all_resources.iter().for_each(|r| {
-			if !resource_groups.iter_mut().any(|res| {
-				if res
-					.iter()
-					.any(|other_r| all_resources.find_tag(*other_r).unwrap().distance_squared(r) < 72.25)
-				{
-					res.insert(r.tag);
-					true
-				} else {
-					false
-				}
-			}) {
-				let mut set = HashSet::new();
-				set.insert(r.tag);
-				resource_groups.push(set);
-			}
-		});
+		let positions = all_resources
+			.iter()
+			.map(|r| (r.position, r.tag))
+			.collect::<Vec<(Point2, u64)>>();
 
-		loop {
-			let mut unioned = resource_groups
-				.clone()
-				.iter()
-				.combinations(2)
-				.filter_map(|res| {
-					let res1 = res[0];
-					let res2 = res[1];
-					if !res1.is_disjoint(&res2)
-						|| iproduct!(res1, res2)
-							.any(|(r1, r2)| all_resources[*r1].distance_squared(&all_resources[*r2]) < 72.25)
-					{
-						if let Some(i) = resource_groups.iter().position(|r| r == res1) {
-							resource_groups.remove(i);
-						}
-						if let Some(i) = resource_groups.iter().position(|r| r == res2) {
-							resource_groups.remove(i);
-						}
-						Some(res1.union(&res2).copied().collect())
-					} else {
-						None
-					}
-				})
-				.collect::<Vec<HashSet<u64>>>();
-			if unioned.is_empty() {
-				break;
-			}
-			resource_groups.append(&mut unioned);
+		let resource_groups = dbscan(
+			&positions,
+			range_query(
+				&positions,
+				|(p1, _), (p2, _)| p1.distance_squared(*p2),
+				RESOURCE_SPREAD_SQUARED,
+			),
+			4,
+		)
+		.0;
+
+		const OFFSET: isize = 7;
+		lazy_static! {
+			static ref OFFSETS: Vec<(isize, isize)> = iproduct!((-OFFSET..=OFFSET), (-OFFSET..=OFFSET))
+				.filter(|(x, y)| x * x + y * y <= 64)
+				.collect();
 		}
 
 		self.expansions = resource_groups
 			.iter()
-			.filter_map(|res| {
-				let center = all_resources.find_tags(res.iter().copied()).center();
-				if center.distance_squared(self.start_location) < 72.25 {
-					Some((self.start_location, center))
+			.map(|group| {
+				let resources = all_resources.find_tags(group.iter().map(|(_, tag)| *tag));
+				let center = resources.center().round() + 0.5;
+
+				if center.distance_squared(self.start_center) < 16.0 {
+					(self.start_location, self.start_center)
+				} else if center.distance_squared(self.enemy_start_center) < 16.0 {
+					(self.enemy_start, self.enemy_start_center)
 				} else {
-					self.find_placement(
-						self.race_values.start_townhall,
-						center,
-						PlacementOptions {
-							max_distance: 8,
-							step: 1,
-							..Default::default()
-						},
+					let location = OFFSETS
+						.iter()
+						.filter_map(|(x, y)| {
+							let pos = center.offset(*x as f32, *y as f32);
+							if self.game_info.placement_grid[pos].is_empty() {
+								let mut distance_sum = 0_f32;
+								if resources.iter().all(|r| {
+									let dist = pos.distance_squared(r);
+									distance_sum += dist;
+									dist > if r.is_geyser() { 49.0 } else { 36.0 }
+								}) {
+									return Some((pos, distance_sum));
+								}
+							}
+							None
+						})
+						.min_by(|(_, d1), (_, d2)| d1.partial_cmp(d2).unwrap())
+						.expect("Can't detect right position for expansion")
+						.0;
+
+					(
+						location,
+						(resources.sum(|r| r.position) + location) / (resources.len() + 1) as f32,
 					)
-					.map(|place| (place, center))
 				}
 			})
 			.collect();
@@ -360,7 +351,7 @@ impl Bot {
 			macro_rules! add_to {
 				($group:ident) => {{
 					$group.push(u.clone());
-				}};
+					}};
 			}
 
 			let u_type = u.type_id;

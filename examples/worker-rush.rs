@@ -40,9 +40,10 @@ impl Player for WorkerRushAI {
 	}
 
 	fn on_step(&mut self, _iteration: usize) -> SC2Result<()> {
-		let ground_attackers = self.grouped_units.enemy_units.filter(|u| {
-			!u.is_flying && u.can_attack_ground() && u.distance_squared(self.enemy_start) < 2025.0
-		});
+		let ground_attackers = self
+			.grouped_units
+			.enemy_units
+			.filter(|u| !u.is_flying && u.can_attack_ground() && u.is_closer(45.0, self.enemy_start));
 		if !ground_attackers.is_empty() {
 			let mineral_back = self.mineral_back;
 			let mineral_forward = self.mineral_forward;
@@ -64,7 +65,7 @@ impl Player for WorkerRushAI {
 			let ground_structures = self
 				.grouped_units
 				.enemy_structures
-				.filter(|u| !u.is_flying && u.distance_squared(self.enemy_start) < 2025.0);
+				.filter(|u| !u.is_flying && u.is_closer(45.0, self.enemy_start));
 			if !ground_structures.is_empty() {
 				self.grouped_units.workers.iter().for_each(|u| {
 					u.attack(Target::Tag(ground_structures.closest(u).unwrap().tag), false);
@@ -80,7 +81,7 @@ impl Player for WorkerRushAI {
 	}
 
 	fn get_player_settings(&self) -> PlayerSettings {
-		PlayerSettings::new(Race::Protoss, Some("RustyWorkers".to_string()))
+		PlayerSettings::new(Race::Protoss, Some("RustyWorkers"))
 	}
 }
 
@@ -212,7 +213,7 @@ fn main() -> SC2Result<()> {
 						.unwrap()
 						.parse()
 						.expect("Can't parse human race"),
-					sub.value_of("name").map(|name| name.to_string()),
+					sub.value_of("name"),
 				),
 				sub.value_of("map").unwrap_or_else(|| {
 					[

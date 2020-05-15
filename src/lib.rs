@@ -44,6 +44,7 @@ pub mod pixel_map;
 pub mod player;
 pub mod unit;
 pub mod units;
+pub mod utils;
 
 use player::{GameResult, Race};
 use std::rc::Rc;
@@ -60,17 +61,17 @@ pub struct PlayerSettings {
 	raw_affects_selection: bool,
 }
 impl PlayerSettings {
-	pub fn new(race: Race, name: Option<String>) -> Self {
+	pub fn new(race: Race, name: Option<&str>) -> Self {
 		Self {
 			race,
-			name,
+			name: name.map(|n| n.to_string()),
 			raw_affects_selection: false,
 		}
 	}
-	pub fn configured(race: Race, name: Option<String>, raw_affects_selection: bool) -> Self {
+	pub fn configured(race: Race, name: Option<&str>, raw_affects_selection: bool) -> Self {
 		Self {
 			race,
-			name,
+			name: name.map(|n| n.to_string()),
 			raw_affects_selection,
 		}
 	}

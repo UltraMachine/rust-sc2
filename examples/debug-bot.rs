@@ -6,10 +6,7 @@ use rust_sc2::prelude::*;
 
 #[bot]
 #[derive(Default)]
-struct DebugAI {
-	debug_z: f32,
-}
-
+struct DebugAI;
 impl DebugAI {
 	fn new() -> Self {
 		Default::default()
@@ -17,25 +14,19 @@ impl DebugAI {
 }
 
 impl Player for DebugAI {
-	fn on_start(&mut self) -> SC2Result<()> {
-		self.debug_z = self.grouped_units.townhalls.first().unwrap().position3d.z;
-		Ok(())
-	}
-
 	fn on_step(&mut self, _iteration: usize) -> SC2Result<()> {
 		// Debug expansion locations
-		let debug_z = self.debug_z;
 		self.expansions.clone().iter().for_each(|(loc, center)| {
-			self.debug
-				.draw_sphere(loc.to3(debug_z), 0.6, Some((255, 128, 255)));
-			self.debug
-				.draw_sphere(center.to3(debug_z), 0.5, Some((255, 128, 64)));
+			let z = self.get_z_height(*loc) + 1.5;
+			self.debug.draw_sphere(loc.to3(z), 0.6, Some((255, 128, 255)));
+			let z = self.get_z_height(*center) + 1.5;
+			self.debug.draw_sphere(center.to3(z), 0.5, Some((255, 128, 64)));
 		});
 
 		// Debug unit types
 		self.state.observation.raw.units.clone().iter().for_each(|u| {
 			self.debug.draw_text_world(
-				format!("{:?}", u.type_id),
+				&format!("{:?}", u.type_id),
 				u.position3d,
 				Some((255, 128, 128)),
 				None,
@@ -187,7 +178,7 @@ fn main() -> SC2Result<()> {
 						.unwrap()
 						.parse()
 						.expect("Can't parse human race"),
-					sub.value_of("name").map(|name| name.to_string()),
+					sub.value_of("name"),
 				),
 				sub.value_of("map").unwrap_or_else(|| {
 					[
