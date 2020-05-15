@@ -182,6 +182,7 @@ impl Bot {
 			max_cooldowns: Rc::clone(&self.max_cooldowns),
 			upgrades: Rc::clone(&self.state.observation.raw.upgrades),
 			creep: Rc::clone(&self.state.observation.raw.creep),
+			game_step: self.game_step,
 		});
 	}
 	#[allow(clippy::block_in_if_condition_stmt)]
@@ -202,6 +203,7 @@ impl Bot {
 			max_cooldowns: Rc::clone(&self.max_cooldowns),
 			upgrades: Rc::clone(&self.state.observation.raw.upgrades),
 			creep: Rc::clone(&self.state.observation.raw.creep),
+			game_step: self.game_step,
 		});
 
 		self.start_location = self.grouped_units.townhalls.first().unwrap().position;
@@ -658,9 +660,7 @@ impl Bot {
 		None
 	}
 	pub fn find_gas_placement(&mut self, base: Point2) -> Option<Unit> {
-		let ability = self.game_data.units[&self.race_values.gas]
-			.ability
-			.unwrap();
+		let ability = self.game_data.units[&self.race_values.gas].ability.unwrap();
 
 		let geysers = self.grouped_units.vespene_geysers.closer(11.0, base);
 		let results = self

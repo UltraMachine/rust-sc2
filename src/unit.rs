@@ -1,8 +1,8 @@
 use crate::{
 	action::{Commander, Target},
 	constants::{
-		RaceValues, DAMAGE_BONUS_PER_UPGRADE, MISSED_WEAPONS, OFF_CREEP_SPEED_UPGRADES, SPEED_BUFFS,
-		SPEED_ON_CREEP, SPEED_UPGRADES, TARGET_AIR, TARGET_GROUND, WARPGATE_ABILITIES,
+		RaceValues, DAMAGE_BONUS_PER_UPGRADE, FRAMES_PER_SECOND, MISSED_WEAPONS, OFF_CREEP_SPEED_UPGRADES,
+		SPEED_BUFFS, SPEED_ON_CREEP, SPEED_UPGRADES, TARGET_AIR, TARGET_GROUND, WARPGATE_ABILITIES,
 	},
 	game_data::{Attribute, GameData, TargetType, UnitTypeData, Weapon},
 	game_state::Alliance,
@@ -29,6 +29,7 @@ pub struct DataForUnit {
 	pub max_cooldowns: Rc<RefCell<HashMap<UnitTypeId, f32>>>,
 	pub upgrades: Rc<Vec<UpgradeId>>,
 	pub creep: Rc<PixelMap>,
+	pub game_step: u32,
 }
 
 pub enum CalcTarget<'a> {
@@ -285,6 +286,14 @@ impl Unit {
 			}
 		}
 		speed
+	}
+	// Distance unit can travel per one "on_step" iteration
+	pub fn distance_per_step(&self) -> f32 {
+		self.real_speed() / FRAMES_PER_SECOND * self.data.game_step as f32
+	}
+	// Distance unit can travel until weapons be ready to fire
+	pub fn distance_to_weapon_ready(&self) -> f32 {
+		self.real_speed() / FRAMES_PER_SECOND * self.weapon_cooldown.unwrap_or(0.0)
 	}
 	pub fn attributes(&self) -> Option<&Vec<Attribute>> {
 		self.type_data().map(|data| &data.attributes)
