@@ -166,8 +166,8 @@ impl Bot {
 	pub fn chat(&mut self, message: &str) {
 		self.actions.push(Action::Chat(message.to_string(), false));
 	}
-	pub fn get_z_height(&self, pos: Point2) -> f32 {
-		self.game_info.terrain_height[pos] as f32 * 32.0 / 255.0 - 16.0
+	pub fn get_z_height<P: Into<(usize, usize)>>(&self, pos: P) -> f32 {
+		self.game_info.terrain_height[pos.into()] as f32 * 32.0 / 255.0 - 16.0
 	}
 	pub(crate) fn init_data_for_unit(&mut self) {
 		self.data_for_unit = Rc::new(DataForUnit {

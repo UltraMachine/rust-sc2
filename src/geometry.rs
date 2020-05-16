@@ -118,6 +118,12 @@ impl Hash for Point2 {
 		((self.y + 0.5) as u32).hash(state);
 	}
 }
+impl From<Point2> for (usize, usize) {
+	#[inline]
+	fn from(p: Point2) -> Self {
+		((p.x + 0.5) as usize, (p.y + 0.5) as usize)
+	}
+}
 impl Add for Point2 {
 	type Output = Self;
 
