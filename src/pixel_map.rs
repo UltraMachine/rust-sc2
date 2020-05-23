@@ -13,13 +13,13 @@ impl<T> Index<Point2> for Array2<T> {
 
 	#[inline]
 	fn index(&self, pos: Point2) -> &Self::Output {
-		&self[((pos.x + 0.5) as usize, (pos.y + 0.5) as usize)]
+		&self[<(usize, usize)>::from(pos)]
 	}
 }
 impl<T> IndexMut<Point2> for Array2<T> {
 	#[inline]
 	fn index_mut(&mut self, pos: Point2) -> &mut Self::Output {
-		&mut self[((pos.x + 0.5) as usize, (pos.y + 0.5) as usize)]
+		&mut self[<(usize, usize)>::from(pos)]
 	}
 }
 

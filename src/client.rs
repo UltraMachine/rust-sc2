@@ -14,7 +14,6 @@ use std::{
 	io::Write,
 	ops::{Deref, DerefMut},
 	panic,
-	path::Path,
 	process::{Child, Command},
 	rc::Rc,
 };
@@ -82,22 +81,21 @@ struct Ports {
 }
 
 #[derive(Default)]
-pub struct LaunchOptions<'a, P: AsRef<Path>> {
+pub struct LaunchOptions<'a> {
 	pub sc2_version: Option<&'a str>,
-	pub save_replay_as: Option<P>,
+	pub save_replay_as: Option<&'a str>,
 	pub realtime: bool,
 }
 
 // Runners
-pub fn run_vs_computer<B, P>(
+pub fn run_vs_computer<B>(
 	bot: &mut B,
 	computer: Computer,
 	map_name: &str,
-	options: LaunchOptions<P>,
+	options: LaunchOptions,
 ) -> SC2Result<()>
 where
 	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
-	P: AsRef<Path>,
 {
 	debug!("Starting game vs computer");
 
@@ -209,15 +207,14 @@ where
 	Ok(())
 }
 
-pub fn run_vs_human<B, P>(
+pub fn run_vs_human<B>(
 	bot: &mut B,
 	human_settings: PlayerSettings,
 	map_name: &str,
-	options: LaunchOptions<P>,
+	options: LaunchOptions,
 ) -> SC2Result<()>
 where
 	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
-	P: AsRef<Path>,
 {
 	debug!("Starting human vs bot");
 	let sc2_path = get_path_to_sc2();
@@ -536,15 +533,15 @@ where
 	Ok(true)
 }
 
-fn save_replay<P: AsRef<Path>>(api: &mut API, path: P) -> SC2Result<()> {
+fn save_replay(api: &mut API, path: &str) -> SC2Result<()> {
 	let mut req = Request::new();
 	req.mut_save_replay();
 
 	let res = api.send(req)?;
 
-	let mut path = path.as_ref().to_path_buf();
+	let mut path = path.to_string();
 	if !path.ends_with(".SC2Replay") {
-		path.push(".SC2Replay");
+		path.push_str(".SC2Replay");
 	}
 	let mut file = File::create(path)?;
 	file.write_all(res.get_save_replay().get_data())?;

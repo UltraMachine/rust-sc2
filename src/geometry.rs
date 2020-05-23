@@ -3,7 +3,7 @@ use sc2_proto::common::{Point, Point2D};
 use std::{
 	hash::{Hash, Hasher},
 	iter::Sum,
-	ops::{Add, Div, Mul, Sub},
+	ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
 #[derive(Debug, Default, Copy, Clone)]
@@ -35,6 +35,8 @@ pub struct Point2 {
 	pub x: f32,
 	pub y: f32,
 }
+
+#[allow(clippy::len_without_is_empty)]
 impl Point2 {
 	pub fn new(x: f32, y: f32) -> Self {
 		Self { x, y }
@@ -54,16 +56,57 @@ impl Point2 {
 	pub fn towards(self, other: Self, offset: f32) -> Self {
 		self + (other - self) / self.distance(other) * offset
 	}
+	pub fn towards_angle(self, angle: f32, offset: f32) -> Self {
+		self.offset(offset * angle.cos(), offset * angle.sin())
+	}
 	pub fn offset(self, x: f32, y: f32) -> Self {
 		Self {
 			x: self.x + x,
 			y: self.y + y,
 		}
 	}
+
+	// Vector operations
+	pub fn len(self) -> f32 {
+		(self.x.powi(2) + self.y.powi(2)).sqrt()
+	}
+	pub fn normalize(self) -> Self {
+		self / self.len()
+	}
+	pub fn rotate(self, angle: f32) -> Self {
+		let (s, c) = angle.sin_cos();
+		let (x, y) = (self.x, self.y);
+		Self {
+			x: c * x - s * y,
+			y: s * x + c * y,
+		}
+	}
+	pub fn rotate90(self, clockwise: bool) -> Self {
+		let (x, y) = if clockwise {
+			(self.y, -self.x)
+		} else {
+			(-self.y, self.x)
+		};
+		Self { x, y }
+	}
+
+	// Other
 	pub fn round(self) -> Self {
 		Self {
 			x: (self.x + 0.5) as u32 as f32,
 			y: (self.y + 0.5) as u32 as f32,
+		}
+	}
+	pub fn floor(self) -> Self {
+		Self {
+			x: self.x as u32 as f32,
+			y: self.y as u32 as f32,
+		}
+	}
+	pub fn ceil(self) -> Self {
+		Self {
+			x: (self.x + 1.0) as u32 as f32,
+			y: (self.y + 1.0) as u32 as f32,
 		}
 	}
 	pub fn neighbors4(self) -> [Self; 4] {
@@ -164,6 +207,30 @@ impl Div for Point2 {
 		}
 	}
 }
+impl AddAssign for Point2 {
+	fn add_assign(&mut self, other: Self) {
+		self.x += other.x;
+		self.y += other.y;
+	}
+}
+impl SubAssign for Point2 {
+	fn sub_assign(&mut self, other: Self) {
+		self.x -= other.x;
+		self.y -= other.y;
+	}
+}
+impl MulAssign for Point2 {
+	fn mul_assign(&mut self, other: Self) {
+		self.x *= other.x;
+		self.y *= other.y;
+	}
+}
+impl DivAssign for Point2 {
+	fn div_assign(&mut self, other: Self) {
+		self.x /= other.x;
+		self.y /= other.y;
+	}
+}
 impl Add<f32> for Point2 {
 	type Output = Self;
 
@@ -201,6 +268,40 @@ impl Div<f32> for Point2 {
 		Self {
 			x: self.x / other,
 			y: self.y / other,
+		}
+	}
+}
+impl AddAssign<f32> for Point2 {
+	fn add_assign(&mut self, other: f32) {
+		self.x += other;
+		self.y += other;
+	}
+}
+impl SubAssign<f32> for Point2 {
+	fn sub_assign(&mut self, other: f32) {
+		self.x -= other;
+		self.y -= other;
+	}
+}
+impl MulAssign<f32> for Point2 {
+	fn mul_assign(&mut self, other: f32) {
+		self.x *= other;
+		self.y *= other;
+	}
+}
+impl DivAssign<f32> for Point2 {
+	fn div_assign(&mut self, other: f32) {
+		self.x /= other;
+		self.y /= other;
+	}
+}
+impl Neg for Point2 {
+	type Output = Self;
+
+	fn neg(self) -> Self {
+		Self {
+			x: -self.x,
+			y: -self.y,
 		}
 	}
 }

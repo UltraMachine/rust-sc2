@@ -19,10 +19,10 @@ impl ReaperRushAI {
 		Default::default()
 	}
 	fn distribute_workers(&mut self) {
-		if self.grouped_units.workers.is_empty() {
+		if self.units.my.workers.is_empty() {
 			return;
 		}
-		let mut idle_workers = self.grouped_units.workers.idle();
+		let mut idle_workers = self.units.my.workers.idle();
 
 		// Check distribution delay if there aren't any idle workers
 		let game_loop = self.state.observation.game_loop;
@@ -33,16 +33,17 @@ impl ReaperRushAI {
 		*last_loop = game_loop;
 
 		// Distribute
-		let mineral_fields = &self.grouped_units.mineral_fields;
+		let mineral_fields = &self.units.mineral_fields;
 		if mineral_fields.is_empty() {
 			return;
 		}
-		let bases = self.grouped_units.townhalls.ready();
+		let bases = self.units.my.townhalls.ready();
 		if bases.is_empty() {
 			return;
 		}
 		let gas_buildings = self
-			.grouped_units
+			.units
+			.my
 			.gas_buildings
 			.filter(|g| g.is_ready() && g.vespene_contents.map_or(false, |vespene| vespene > 0));
 
@@ -54,7 +55,7 @@ impl ReaperRushAI {
 				Ordering::Equal => {}
 				Ordering::Greater => {
 					let local_minerals = self
-						.grouped_units
+						.units
 						.mineral_fields
 						.closer(11.0, base)
 						.iter()
@@ -62,7 +63,8 @@ impl ReaperRushAI {
 						.collect::<Vec<u64>>();
 
 					idle_workers.extend(
-						self.grouped_units
+						self.units
+							.my
 							.workers
 							.filter(|u| {
 								u.target_tag().map_or(false, |target_tag| {
@@ -89,7 +91,8 @@ impl ReaperRushAI {
 				Ordering::Equal => {}
 				Ordering::Greater => {
 					idle_workers.extend(
-						self.grouped_units
+						self.units
+							.my
 							.workers
 							.filter(|u| {
 								u.target_tag().map_or(false, |target_tag| {
@@ -146,7 +149,7 @@ impl ReaperRushAI {
 	}
 
 	fn get_builder(&self, pos: Point2, mineral_tags: &[u64]) -> Option<Unit> {
-		let workers = self.grouped_units.workers.filter(|u| {
+		let workers = self.units.my.workers.filter(|u| {
 			!u.is_constructing()
 				&& (!u.is_gathering() || u.target_tag().map_or(false, |tag| mineral_tags.contains(&tag)))
 				&& !u.is_returning()
@@ -160,7 +163,7 @@ impl ReaperRushAI {
 	}
 	fn build(&mut self) {
 		let mineral_tags = self
-			.grouped_units
+			.units
 			.mineral_fields
 			.iter()
 			.map(|u| u.tag)
@@ -218,7 +221,7 @@ impl ReaperRushAI {
 
 	fn train(&mut self) {
 		if self.supply_workers < 22 && self.can_afford(UnitTypeId::SCV, true) {
-			let townhalls = &self.grouped_units.townhalls;
+			let townhalls = &self.units.my.townhalls;
 			if !townhalls.is_empty() {
 				let ccs = townhalls.filter(|u| u.is_ready() && u.is_almost_idle());
 				if !ccs.is_empty() {
@@ -229,7 +232,7 @@ impl ReaperRushAI {
 		}
 
 		if self.can_afford(UnitTypeId::Reaper, true) {
-			let structures = &self.grouped_units.structures;
+			let structures = &self.units.my.structures;
 			if !structures.is_empty() {
 				let barracks = structures
 					.filter(|u| u.type_id == UnitTypeId::Barracks && u.is_ready() && u.is_almost_idle());
@@ -241,9 +244,6 @@ impl ReaperRushAI {
 		}
 	}
 
-	fn is_pathable(&self, pos: Point2) -> bool {
-		self.game_info.pathing_grid[pos].is_empty()
-	}
 	fn throw_mine(&mut self, reaper: &Unit, target: &Unit) -> bool {
 		self.abilities_units.get(&reaper.tag).map_or(false, |abilities| {
 			if abilities.contains(&AbilityId::KD8ChargeKD8Charge)
@@ -263,24 +263,26 @@ impl ReaperRushAI {
 	}
 	fn execute_micro(&mut self) {
 		// Lower ready depots
-		self.grouped_units
+		self.units
+			.my
 			.structures
 			.filter(|s| s.type_id == UnitTypeId::SupplyDepot && s.is_ready())
 			.iter()
 			.for_each(|s| (s.use_ability(AbilityId::MorphSupplyDepotLower, false)));
 
 		// Reapers micro
-		let reapers = self.grouped_units.units.of_type(UnitTypeId::Reaper);
+		let reapers = self.units.my.units.of_type(UnitTypeId::Reaper);
 		if reapers.is_empty() {
 			return;
 		}
 		let targets = Some(
-			self.grouped_units
-				.enemies
+			self.units
+				.enemy
+				.all
 				.filter(|u| !u.is_flying && u.can_attack_ground()),
 		)
 		.filter(|attackers| !attackers.is_empty())
-		.or_else(|| Some(self.grouped_units.enemies.ground()).filter(|ground| !ground.is_empty()));
+		.or_else(|| Some(self.units.enemy.all.ground()).filter(|ground| !ground.is_empty()));
 
 		reapers.iter().for_each(|u| {
 			let is_retreating = self.reapers_retreat.contains(&u.tag);
@@ -363,13 +365,13 @@ impl ReaperRushAI {
 
 impl Player for ReaperRushAI {
 	fn on_start(&mut self) -> SC2Result<()> {
-		let townhall = self.grouped_units.townhalls.first().unwrap().clone();
+		let townhall = self.units.my.townhalls.first().unwrap().clone();
 		townhall.smart(Target::Pos(self.start_center), false);
 		townhall.train(UnitTypeId::SCV, false);
 		self.substract_resources(UnitTypeId::SCV);
 
-		let minerals_near_base = self.grouped_units.mineral_fields.closer(11.0, &townhall);
-		self.grouped_units.workers.clone().iter().for_each(|u| {
+		let minerals_near_base = self.units.mineral_fields.closer(11.0, &townhall);
+		self.units.my.workers.clone().iter().for_each(|u| {
 			u.gather(minerals_near_base.closest(u).unwrap().tag, false);
 		});
 		Ok(())

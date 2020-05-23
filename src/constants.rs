@@ -11,6 +11,22 @@ pub const FRAMES_PER_SECOND: f32 = 22.4; // 16 (default frames per second) * 1.4
 pub const TARGET_GROUND: [TargetType; 2] = [TargetType::Ground, TargetType::Any];
 pub const TARGET_AIR: [TargetType; 2] = [TargetType::Air, TargetType::Any];
 
+#[cfg(windows)]
+pub(crate) const INHIBITOR_IDS: [UnitTypeId; 6] = [
+	UnitTypeId::InhibitorZoneSmall,
+	UnitTypeId::InhibitorZoneMedium,
+	UnitTypeId::InhibitorZoneLarge,
+	UnitTypeId::InhibitorZoneFlyingSmall,
+	UnitTypeId::InhibitorZoneFlyingMedium,
+	UnitTypeId::InhibitorZoneFlyingLarge,
+];
+#[cfg(unix)]
+pub(crate) const INHIBITOR_IDS: [UnitTypeId; 3] = [
+	UnitTypeId::InhibitorZoneSmall,
+	UnitTypeId::InhibitorZoneMedium,
+	UnitTypeId::InhibitorZoneLarge,
+];
+
 #[derive(Clone)]
 pub struct RaceValues {
 	pub start_townhall: UnitTypeId,
@@ -362,6 +378,104 @@ lazy_static! {
 		UnitTypeId::Zealot => vec![UnitTypeId::Gateway, UnitTypeId::WarpGate],
 		UnitTypeId::Zergling => vec![UnitTypeId::Larva],
 	];
+	pub static ref RESEARCHERS: HashMap<UpgradeId, UnitTypeId> = hashmap![
+		UpgradeId::AdeptPiercingAttack => UnitTypeId::TwilightCouncil,
+		UpgradeId::AnabolicSynthesis => UnitTypeId::UltraliskCavern,
+		UpgradeId::BansheeCloak => UnitTypeId::StarportTechLab,
+		UpgradeId::BansheeSpeed => UnitTypeId::StarportTechLab,
+		UpgradeId::BattlecruiserEnableSpecializations => UnitTypeId::FusionCore,
+		UpgradeId::BlinkTech => UnitTypeId::TwilightCouncil,
+		UpgradeId::Burrow => UnitTypeId::Hive,
+		UpgradeId::Charge => UnitTypeId::TwilightCouncil,
+		UpgradeId::ChitinousPlating => UnitTypeId::UltraliskCavern,
+		UpgradeId::CycloneLockOnDamageUpgrade => UnitTypeId::FactoryTechLab,
+		UpgradeId::DarkTemplarBlinkUpgrade => UnitTypeId::DarkShrine,
+		UpgradeId::DiggingClaws => UnitTypeId::LurkerDenMP,
+		UpgradeId::DrillClaws => UnitTypeId::FactoryTechLab,
+		UpgradeId::EnhancedShockwaves => UnitTypeId::GhostAcademy,
+		UpgradeId::EvolveGroovedSpines => UnitTypeId::HydraliskDen,
+		UpgradeId::EvolveMuscularAugments => UnitTypeId::HydraliskDen,
+		UpgradeId::ExtendedThermalLance => UnitTypeId::RoboticsBay,
+		UpgradeId::GraviticDrive => UnitTypeId::RoboticsBay,
+		UpgradeId::HighCapacityBarrels => UnitTypeId::FactoryTechLab,
+		UpgradeId::HiSecAutoTracking => UnitTypeId::EngineeringBay,
+		UpgradeId::InfestorEnergyUpgrade => UnitTypeId::InfestationPit,
+		UpgradeId::LiberatorMorph => UnitTypeId::StarportTechLab,
+		UpgradeId::MedivacIncreaseSpeedBoost => UnitTypeId::StarportTechLab,
+		UpgradeId::NeuralParasite => UnitTypeId::InfestationPit,
+		UpgradeId::ObserverGraviticBooster => UnitTypeId::RoboticsBay,
+		UpgradeId::Overlordspeed => UnitTypeId::Hive,
+		UpgradeId::PersonalCloaking => UnitTypeId::GhostAcademy,
+		UpgradeId::PhoenixRangeUpgrade => UnitTypeId::FleetBeacon,
+		UpgradeId::ProtossAirArmorsLevel1 => UnitTypeId::CyberneticsCore,
+		UpgradeId::ProtossAirArmorsLevel2 => UnitTypeId::CyberneticsCore,
+		UpgradeId::ProtossAirArmorsLevel3 => UnitTypeId::CyberneticsCore,
+		UpgradeId::ProtossAirWeaponsLevel1 => UnitTypeId::CyberneticsCore,
+		UpgradeId::ProtossAirWeaponsLevel2 => UnitTypeId::CyberneticsCore,
+		UpgradeId::ProtossAirWeaponsLevel3 => UnitTypeId::CyberneticsCore,
+		UpgradeId::ProtossGroundArmorsLevel1 => UnitTypeId::Forge,
+		UpgradeId::ProtossGroundArmorsLevel2 => UnitTypeId::Forge,
+		UpgradeId::ProtossGroundArmorsLevel3 => UnitTypeId::Forge,
+		UpgradeId::ProtossGroundWeaponsLevel1 => UnitTypeId::Forge,
+		UpgradeId::ProtossGroundWeaponsLevel2 => UnitTypeId::Forge,
+		UpgradeId::ProtossGroundWeaponsLevel3 => UnitTypeId::Forge,
+		UpgradeId::ProtossShieldsLevel1 => UnitTypeId::Forge,
+		UpgradeId::ProtossShieldsLevel2 => UnitTypeId::Forge,
+		UpgradeId::ProtossShieldsLevel3 => UnitTypeId::Forge,
+		UpgradeId::PsiStormTech => UnitTypeId::TemplarArchive,
+		UpgradeId::PunisherGrenades => UnitTypeId::BarracksTechLab,
+		UpgradeId::RavenCorvidReactor => UnitTypeId::StarportTechLab,
+		UpgradeId::ShieldWall => UnitTypeId::BarracksTechLab,
+		UpgradeId::SmartServos => UnitTypeId::FactoryTechLab,
+		UpgradeId::Stimpack => UnitTypeId::BarracksTechLab,
+		UpgradeId::TerranBuildingArmor => UnitTypeId::EngineeringBay,
+		UpgradeId::TerranInfantryArmorsLevel1 => UnitTypeId::EngineeringBay,
+		UpgradeId::TerranInfantryArmorsLevel2 => UnitTypeId::EngineeringBay,
+		UpgradeId::TerranInfantryArmorsLevel3 => UnitTypeId::EngineeringBay,
+		UpgradeId::TerranInfantryWeaponsLevel1 => UnitTypeId::EngineeringBay,
+		UpgradeId::TerranInfantryWeaponsLevel2 => UnitTypeId::EngineeringBay,
+		UpgradeId::TerranInfantryWeaponsLevel3 => UnitTypeId::EngineeringBay,
+		UpgradeId::TerranShipWeaponsLevel1 => UnitTypeId::Armory,
+		UpgradeId::TerranShipWeaponsLevel2 => UnitTypeId::Armory,
+		UpgradeId::TerranShipWeaponsLevel3 => UnitTypeId::Armory,
+		UpgradeId::TerranVehicleWeaponsLevel1 => UnitTypeId::Armory,
+		UpgradeId::TerranVehicleWeaponsLevel2 => UnitTypeId::Armory,
+		UpgradeId::TerranVehicleWeaponsLevel3 => UnitTypeId::Armory,
+		UpgradeId::TerranVehicleAndShipArmorsLevel1 => UnitTypeId::Armory,
+		UpgradeId::TerranVehicleAndShipArmorsLevel2 => UnitTypeId::Armory,
+		UpgradeId::TerranVehicleAndShipArmorsLevel3 => UnitTypeId::Armory,
+		UpgradeId::WarpGateResearch => UnitTypeId::CyberneticsCore,
+		UpgradeId::ZergFlyerArmorsLevel1 => UnitTypeId::GreaterSpire,
+		UpgradeId::ZergFlyerArmorsLevel2 => UnitTypeId::GreaterSpire,
+		UpgradeId::ZergFlyerArmorsLevel3 => UnitTypeId::GreaterSpire,
+		UpgradeId::ZergFlyerWeaponsLevel1 => UnitTypeId::GreaterSpire,
+		UpgradeId::ZergFlyerWeaponsLevel2 => UnitTypeId::GreaterSpire,
+		UpgradeId::ZergFlyerWeaponsLevel3 => UnitTypeId::GreaterSpire,
+		UpgradeId::ZergGroundArmorsLevel1 => UnitTypeId::EvolutionChamber,
+		UpgradeId::ZergGroundArmorsLevel2 => UnitTypeId::EvolutionChamber,
+		UpgradeId::ZergGroundArmorsLevel3 => UnitTypeId::EvolutionChamber,
+		UpgradeId::Zerglingattackspeed => UnitTypeId::SpawningPool,
+		UpgradeId::Zerglingmovementspeed => UnitTypeId::SpawningPool,
+		UpgradeId::ZergMeleeWeaponsLevel1 => UnitTypeId::EvolutionChamber,
+		UpgradeId::ZergMeleeWeaponsLevel2 => UnitTypeId::EvolutionChamber,
+		UpgradeId::ZergMeleeWeaponsLevel3 => UnitTypeId::EvolutionChamber,
+		UpgradeId::ZergMissileWeaponsLevel1 => UnitTypeId::EvolutionChamber,
+		UpgradeId::ZergMissileWeaponsLevel2 => UnitTypeId::EvolutionChamber,
+		UpgradeId::ZergMissileWeaponsLevel3 => UnitTypeId::EvolutionChamber,
+	];
+	pub static ref INHIBITOR_ZONE_RADIUS: HashMap<UnitTypeId, f32> = {
+		let mut map = hashmap![
+			UnitTypeId::InhibitorZoneSmall => 4.0,
+			UnitTypeId::InhibitorZoneMedium => 5.0,
+			UnitTypeId::InhibitorZoneLarge => 6.0,
+		];
+		if cfg!(windows) {
+			map.insert(UnitTypeId::InhibitorZoneFlyingSmall, 4.0);
+			map.insert(UnitTypeId::InhibitorZoneFlyingMedium, 5.0);
+			map.insert(UnitTypeId::InhibitorZoneFlyingLarge, 6.0);
+		}
+		map
+	};
 
 	pub(crate) static ref DAMAGE_BONUS_PER_UPGRADE: HashMap<UnitTypeId, BonusesForTarget> = hashmap![
 		// Protoss

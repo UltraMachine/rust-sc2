@@ -1,6 +1,6 @@
 [package]
 name = "rust-sc2"
-version = "0.5.2"
+version = "0.6.0"
 authors = ["Armageddon <lunyx1337@gmail.com>"]
 edition = "2018"
 
@@ -20,6 +20,7 @@ lazy_static = "^1.4.0"
 maplit = "^1.0.2"
 rand = "^0.7.3"
 log = "^0.4.8"
+rustc-hash = "^1.1.0"
 
 [dev-dependencies]
 clap = "^2.33.0"

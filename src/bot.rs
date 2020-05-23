@@ -2,7 +2,7 @@ use crate::{
 	action::{Action, ActionResult, Commander, Target},
 	api::API,
 	client::SC2Result,
-	constants::{RaceValues, RACE_VALUES},
+	constants::{RaceValues, INHIBITOR_IDS, RACE_VALUES},
 	debug::{DebugCommand, Debugger},
 	game_data::{Cost, GameData},
 	game_info::GameInfo,
@@ -11,7 +11,7 @@ use crate::{
 	ids::{AbilityId, UnitTypeId, UpgradeId},
 	player::Race,
 	unit::{DataForUnit, Unit},
-	units::{GroupedUnits, Units},
+	units::AllUnits,
 	utils::{dbscan, range_query},
 	FromProto, IntoProto,
 };
@@ -56,7 +56,7 @@ pub struct Bot {
 	pub state: GameState,
 	pub race_values: Rc<RaceValues>,
 	pub data_for_unit: Rc<DataForUnit>,
-	pub grouped_units: GroupedUnits,
+	pub units: AllUnits,
 	pub abilities_units: HashMap<u64, Vec<AbilityId>>,
 	pub orders: HashMap<AbilityId, usize>,
 	pub current_units: HashMap<UnitTypeId, usize>,
@@ -96,7 +96,7 @@ impl Bot {
 			state: Default::default(),
 			race_values: Default::default(),
 			data_for_unit: Default::default(),
-			grouped_units: Default::default(),
+			units: Default::default(),
 			abilities_units: Default::default(),
 			orders: Default::default(),
 			current_units: Default::default(),
@@ -146,348 +146,6 @@ impl Bot {
 	}
 	pub(crate) fn clear_debug_commands(&mut self) {
 		self.debug.clear_commands();
-	}
-	pub fn substract_resources(&mut self, unit: UnitTypeId) {
-		let cost = self.game_data.units[&unit].cost();
-		self.minerals = self.minerals.saturating_sub(cost.minerals);
-		self.vespene = self.vespene.saturating_sub(cost.vespene);
-		let supply_cost = cost.supply as u32;
-		self.supply_used += supply_cost;
-		self.supply_left = self.supply_left.saturating_sub(supply_cost);
-	}
-	pub fn substract_upgrade_cost(&mut self, upgrade: UpgradeId) {
-		let cost = self.game_data.upgrades[&upgrade].cost();
-		self.minerals = self.minerals.saturating_sub(cost.minerals);
-		self.vespene = self.vespene.saturating_sub(cost.vespene);
-	}
-	pub fn has_upgrade(&self, upgrade: UpgradeId) -> bool {
-		self.state.observation.raw.upgrades.contains(&upgrade)
-	}
-	pub fn chat(&mut self, message: &str) {
-		self.actions.push(Action::Chat(message.to_string(), false));
-	}
-	pub fn get_z_height<P: Into<(usize, usize)>>(&self, pos: P) -> f32 {
-		self.game_info.terrain_height[pos.into()] as f32 * 32.0 / 255.0 - 16.0
-	}
-	pub(crate) fn init_data_for_unit(&mut self) {
-		self.data_for_unit = Rc::new(DataForUnit {
-			commander: Rc::clone(&self.commander),
-			game_data: Rc::clone(&self.game_data),
-			techlab_tags: Rc::clone(&self.techlab_tags),
-			reactor_tags: Rc::clone(&self.reactor_tags),
-			race_values: Rc::clone(&self.race_values),
-			max_cooldowns: Rc::clone(&self.max_cooldowns),
-			upgrades: Rc::clone(&self.state.observation.raw.upgrades),
-			creep: Rc::clone(&self.state.observation.raw.creep),
-			game_step: self.game_step,
-		});
-	}
-	#[allow(clippy::block_in_if_condition_stmt)]
-	pub(crate) fn prepare_start(&mut self) {
-		self.race = self.game_info.players[&self.player_id].race_actual.unwrap();
-		if self.game_info.players.len() == 2 {
-			self.enemy_race = self.game_info.players[&(3 - self.player_id)].race_requested;
-		}
-		self.race_values = Rc::new(RACE_VALUES[&self.race].clone());
-		self.group_units();
-
-		self.data_for_unit = Rc::new(DataForUnit {
-			commander: Rc::clone(&self.commander),
-			game_data: Rc::clone(&self.game_data),
-			techlab_tags: Rc::clone(&self.techlab_tags),
-			reactor_tags: Rc::clone(&self.reactor_tags),
-			race_values: Rc::clone(&self.race_values),
-			max_cooldowns: Rc::clone(&self.max_cooldowns),
-			upgrades: Rc::clone(&self.state.observation.raw.upgrades),
-			creep: Rc::clone(&self.state.observation.raw.creep),
-			game_step: self.game_step,
-		});
-
-		self.start_location = self.grouped_units.townhalls.first().unwrap().position;
-		self.enemy_start = self.game_info.start_locations[0];
-
-		let resources = self.grouped_units.resources.closer(11.0, self.start_location);
-		self.start_center =
-			(resources.sum(|r| r.position) + self.start_location) / (resources.len() + 1) as f32;
-
-		let resources = self.grouped_units.resources.closer(11.0, self.enemy_start);
-		self.enemy_start_center =
-			(resources.sum(|r| r.position) + self.enemy_start) / (resources.len() + 1) as f32;
-
-		// Calculating expansion locations
-		// dbscan, range_query
-
-		const RESOURCE_SPREAD: f32 = 8.5;
-		const RESOURCE_SPREAD_SQUARED: f32 = RESOURCE_SPREAD * RESOURCE_SPREAD;
-
-		let all_resources = self
-			.grouped_units
-			.resources
-			.filter(|r| r.type_id != UnitTypeId::MineralField450);
-
-		let positions = all_resources
-			.iter()
-			.map(|r| (r.position, r.tag))
-			.collect::<Vec<(Point2, u64)>>();
-
-		let resource_groups = dbscan(
-			&positions,
-			range_query(
-				&positions,
-				|(p1, _), (p2, _)| p1.distance_squared(*p2),
-				RESOURCE_SPREAD_SQUARED,
-			),
-			4,
-		)
-		.0;
-
-		const OFFSET: isize = 7;
-		lazy_static! {
-			static ref OFFSETS: Vec<(isize, isize)> = iproduct!((-OFFSET..=OFFSET), (-OFFSET..=OFFSET))
-				.filter(|(x, y)| x * x + y * y <= 64)
-				.collect();
-		}
-
-		self.expansions = resource_groups
-			.iter()
-			.map(|group| {
-				let resources = all_resources.find_tags(group.iter().map(|(_, tag)| *tag));
-				let center = resources.center().round() + 0.5;
-
-				if center.distance_squared(self.start_center) < 16.0 {
-					(self.start_location, self.start_center)
-				} else if center.distance_squared(self.enemy_start_center) < 16.0 {
-					(self.enemy_start, self.enemy_start_center)
-				} else {
-					let location = OFFSETS
-						.iter()
-						.filter_map(|(x, y)| {
-							let pos = center.offset(*x as f32, *y as f32);
-							if self.game_info.placement_grid[pos].is_empty() {
-								let mut distance_sum = 0_f32;
-								if resources.iter().all(|r| {
-									let dist = pos.distance_squared(r);
-									distance_sum += dist;
-									dist > if r.is_geyser() { 49.0 } else { 36.0 }
-								}) {
-									return Some((pos, distance_sum));
-								}
-							}
-							None
-						})
-						.min_by(|(_, d1), (_, d2)| d1.partial_cmp(d2).unwrap())
-						.expect("Can't detect right position for expansion")
-						.0;
-
-					(
-						location,
-						(resources.sum(|r| r.position) + location) / (resources.len() + 1) as f32,
-					)
-				}
-			})
-			.collect();
-	}
-	pub(crate) fn prepare_step(&mut self) {
-		self.group_units();
-		let observation = &self.state.observation;
-		self.time = (observation.game_loop as f32) / 22.4;
-		let common = &observation.common;
-		self.minerals = common.minerals;
-		self.vespene = common.vespene;
-		self.supply_army = common.food_army;
-		self.supply_workers = common.food_workers;
-		self.supply_cap = common.food_cap;
-		self.supply_used = common.food_used;
-		self.supply_left = self.supply_cap - self.supply_used;
-
-		// Counting units and orders
-		self.current_units.clear();
-		self.orders.clear();
-		self.grouped_units.owned.clone().iter().for_each(|u| {
-			u.orders
-				.iter()
-				.for_each(|order| *self.orders.entry(order.ability).or_default() += 1);
-			if !u.is_ready() {
-				if u.race() != Race::Terran || !u.is_structure() {
-					if let Some(data) = self.game_data.units.get(&u.type_id) {
-						if let Some(ability) = data.ability {
-							*self.orders.entry(ability).or_default() += 1;
-						}
-					}
-				}
-			} else {
-				*self.current_units.entry(u.type_id).or_default() += 1;
-			}
-		});
-	}
-	fn group_units(&mut self) {
-		let mut owned = Units::new();
-		let mut units = Units::new();
-		let mut structures = Units::new();
-		let mut townhalls = Units::new();
-		let mut workers = Units::new();
-		let mut enemies = Units::new();
-		let mut enemy_units = Units::new();
-		let mut enemy_structures = Units::new();
-		let mut enemy_townhalls = Units::new();
-		let mut enemy_workers = Units::new();
-		let mut mineral_fields = Units::new();
-		let mut vespene_geysers = Units::new();
-		let mut resources = Units::new();
-		let mut destructables = Units::new();
-		let mut watchtowers = Units::new();
-		let mut inhibitor_zones = Units::new();
-		let mut gas_buildings = Units::new();
-		let mut larvas = Units::new();
-		let mut placeholders = Units::new();
-		let mut techlab_tags = self.techlab_tags.borrow_mut();
-		let mut reactor_tags = self.reactor_tags.borrow_mut();
-		let mut max_cooldowns = self.max_cooldowns.borrow_mut();
-
-		techlab_tags.clear();
-		reactor_tags.clear();
-
-		self.state.observation.raw.units.iter().for_each(|u| {
-			macro_rules! add_to {
-				($group:ident) => {{
-					$group.push(u.clone());
-					}};
-			}
-
-			let u_type = u.type_id;
-			match u.alliance {
-				Alliance::Neutral => match u_type {
-					UnitTypeId::XelNagaTower => add_to!(watchtowers),
-
-					UnitTypeId::RichMineralField
-					| UnitTypeId::RichMineralField750
-					| UnitTypeId::MineralField
-					| UnitTypeId::MineralField450
-					| UnitTypeId::MineralField750
-					| UnitTypeId::LabMineralField
-					| UnitTypeId::LabMineralField750
-					| UnitTypeId::PurifierRichMineralField
-					| UnitTypeId::PurifierRichMineralField750
-					| UnitTypeId::PurifierMineralField
-					| UnitTypeId::PurifierMineralField750
-					| UnitTypeId::BattleStationMineralField
-					| UnitTypeId::BattleStationMineralField750
-					| UnitTypeId::MineralFieldOpaque
-					| UnitTypeId::MineralFieldOpaque900 => {
-						add_to!(resources);
-						add_to!(mineral_fields);
-					}
-					UnitTypeId::VespeneGeyser
-					| UnitTypeId::SpacePlatformGeyser
-					| UnitTypeId::RichVespeneGeyser
-					| UnitTypeId::ProtossVespeneGeyser
-					| UnitTypeId::PurifierVespeneGeyser
-					| UnitTypeId::ShakurasVespeneGeyser => {
-						add_to!(resources);
-						add_to!(vespene_geysers);
-					}
-					UnitTypeId::InhibitorZoneSmall
-					| UnitTypeId::InhibitorZoneMedium
-					| UnitTypeId::InhibitorZoneLarge => add_to!(inhibitor_zones),
-
-					_ => add_to!(destructables),
-				},
-				Alliance::Own => {
-					add_to!(owned);
-					if let Some(cooldown) = u.weapon_cooldown {
-						max_cooldowns
-							.entry(u_type)
-							.and_modify(|max| {
-								if cooldown > *max {
-									*max = cooldown;
-								}
-							})
-							.or_insert(cooldown);
-					}
-					if u.is_structure() {
-						if u.is_placeholder() {
-							add_to!(placeholders);
-						} else {
-							add_to!(structures);
-							match u_type {
-								UnitTypeId::CommandCenter
-								| UnitTypeId::OrbitalCommand
-								| UnitTypeId::PlanetaryFortress
-								| UnitTypeId::CommandCenterFlying
-								| UnitTypeId::OrbitalCommandFlying
-								| UnitTypeId::Hatchery
-								| UnitTypeId::Lair
-								| UnitTypeId::Hive
-								| UnitTypeId::Nexus => add_to!(townhalls),
-
-								UnitTypeId::Refinery
-								| UnitTypeId::RefineryRich
-								| UnitTypeId::Assimilator
-								| UnitTypeId::AssimilatorRich
-								| UnitTypeId::Extractor
-								| UnitTypeId::ExtractorRich => add_to!(gas_buildings),
-
-								UnitTypeId::TechLab
-								| UnitTypeId::BarracksTechLab
-								| UnitTypeId::FactoryTechLab
-								| UnitTypeId::StarportTechLab => techlab_tags.push(u.tag),
-
-								UnitTypeId::Reactor
-								| UnitTypeId::BarracksReactor
-								| UnitTypeId::FactoryReactor
-								| UnitTypeId::StarportReactor => reactor_tags.push(u.tag),
-
-								_ => {}
-							}
-						}
-					} else {
-						add_to!(units);
-						match u_type {
-							UnitTypeId::SCV | UnitTypeId::Probe | UnitTypeId::Drone => add_to!(workers),
-							UnitTypeId::Larva => add_to!(larvas),
-							_ => {}
-						}
-					}
-				}
-				Alliance::Enemy => {
-					add_to!(enemies);
-					if u.is_structure() {
-						add_to!(enemy_structures);
-						if u_type.is_townhall() {
-							add_to!(enemy_townhalls);
-						}
-					} else {
-						add_to!(enemy_units);
-						if u_type.is_worker() {
-							add_to!(enemy_workers);
-						}
-					}
-				}
-				_ => {}
-			}
-		});
-
-		self.grouped_units = GroupedUnits {
-			owned,
-			units,
-			structures,
-			townhalls,
-			workers,
-			enemies,
-			enemy_units,
-			enemy_structures,
-			enemy_townhalls,
-			enemy_workers,
-			mineral_fields,
-			vespene_geysers,
-			resources,
-			destructables,
-			watchtowers,
-			inhibitor_zones,
-			gas_buildings,
-			larvas,
-			placeholders,
-		};
 	}
 	pub fn get_unit_api_cost(&self, unit: UnitTypeId) -> Cost {
 		self.game_data
@@ -543,6 +201,333 @@ impl Bot {
 		unimplemented!()
 	}
 	*/
+	pub fn substract_resources(&mut self, unit: UnitTypeId) {
+		let cost = self.get_unit_cost(unit);
+		self.minerals = self.minerals.saturating_sub(cost.minerals);
+		self.vespene = self.vespene.saturating_sub(cost.vespene);
+		let supply_cost = cost.supply as u32;
+		self.supply_used += supply_cost;
+		self.supply_left = self.supply_left.saturating_sub(supply_cost);
+	}
+	pub fn substract_upgrade_cost(&mut self, upgrade: UpgradeId) {
+		let cost = self.get_upgrade_cost(upgrade);
+		self.minerals = self.minerals.saturating_sub(cost.minerals);
+		self.vespene = self.vespene.saturating_sub(cost.vespene);
+	}
+	pub fn has_upgrade(&self, upgrade: UpgradeId) -> bool {
+		self.state.observation.raw.upgrades.contains(&upgrade)
+	}
+	pub fn chat(&mut self, message: &str) {
+		self.actions.push(Action::Chat(message.to_string(), false));
+	}
+	pub fn get_z_height<P: Into<(usize, usize)>>(&self, pos: P) -> f32 {
+		self.game_info.terrain_height[pos.into()] as f32 * 32.0 / 255.0 - 16.0
+	}
+	pub fn get_height<P: Into<(usize, usize)>>(&self, pos: P) -> u8 {
+		self.game_info.terrain_height[pos.into()]
+	}
+	pub fn is_placeable<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
+		self.game_info.placement_grid[pos.into()].is_empty()
+	}
+	pub fn is_pathable<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
+		self.game_info.pathing_grid[pos.into()].is_empty()
+	}
+	pub fn is_hidden<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
+		self.state.observation.raw.visibility[pos.into()].is_hidden()
+	}
+	pub fn is_fogged<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
+		self.state.observation.raw.visibility[pos.into()].is_fogged()
+	}
+	pub fn is_visible<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
+		self.state.observation.raw.visibility[pos.into()].is_visible()
+	}
+	pub fn is_full_hidden<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
+		self.state.observation.raw.visibility[pos.into()].is_full_hidden()
+	}
+	pub fn is_explored<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
+		self.state.observation.raw.visibility[pos.into()].is_explored()
+	}
+	pub fn has_creep<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
+		self.state.observation.raw.creep[pos.into()].is_empty()
+	}
+	pub(crate) fn init_data_for_unit(&mut self) {
+		self.data_for_unit = Rc::new(DataForUnit {
+			commander: Rc::clone(&self.commander),
+			game_data: Rc::clone(&self.game_data),
+			techlab_tags: Rc::clone(&self.techlab_tags),
+			reactor_tags: Rc::clone(&self.reactor_tags),
+			race_values: Rc::clone(&self.race_values),
+			max_cooldowns: Rc::clone(&self.max_cooldowns),
+			upgrades: Rc::clone(&self.state.observation.raw.upgrades),
+			creep: Rc::clone(&self.state.observation.raw.creep),
+			game_step: self.game_step,
+		});
+	}
+	#[allow(clippy::block_in_if_condition_stmt)]
+	pub(crate) fn prepare_start(&mut self) {
+		self.race = self.game_info.players[&self.player_id].race_actual.unwrap();
+		if self.game_info.players.len() == 2 {
+			self.enemy_race = self.game_info.players[&(3 - self.player_id)].race_requested;
+		}
+		self.race_values = Rc::new(RACE_VALUES[&self.race].clone());
+		self.update_units();
+
+		self.data_for_unit = Rc::new(DataForUnit {
+			commander: Rc::clone(&self.commander),
+			game_data: Rc::clone(&self.game_data),
+			techlab_tags: Rc::clone(&self.techlab_tags),
+			reactor_tags: Rc::clone(&self.reactor_tags),
+			race_values: Rc::clone(&self.race_values),
+			max_cooldowns: Rc::clone(&self.max_cooldowns),
+			upgrades: Rc::clone(&self.state.observation.raw.upgrades),
+			creep: Rc::clone(&self.state.observation.raw.creep),
+			game_step: self.game_step,
+		});
+
+		self.start_location = self.units.my.townhalls.first().unwrap().position;
+		self.enemy_start = self.game_info.start_locations[0];
+
+		let resources = self.units.resources.closer(11.0, self.start_location);
+		self.start_center =
+			(resources.sum(|r| r.position) + self.start_location) / (resources.len() + 1) as f32;
+
+		let resources = self.units.resources.closer(11.0, self.enemy_start);
+		self.enemy_start_center =
+			(resources.sum(|r| r.position) + self.enemy_start) / (resources.len() + 1) as f32;
+
+		// Calculating expansion locations
+		// dbscan, range_query
+
+		const RESOURCE_SPREAD: f32 = 8.5;
+		const RESOURCE_SPREAD_SQUARED: f32 = RESOURCE_SPREAD * RESOURCE_SPREAD;
+
+		let all_resources = self
+			.units
+			.resources
+			.filter(|r| r.type_id != UnitTypeId::MineralField450);
+
+		let positions = all_resources
+			.iter()
+			.map(|r| (r.position, r.tag))
+			.collect::<Vec<(Point2, u64)>>();
+
+		let resource_groups = dbscan(
+			&positions,
+			range_query(
+				&positions,
+				|(p1, _), (p2, _)| p1.distance_squared(*p2),
+				RESOURCE_SPREAD_SQUARED,
+			),
+			4,
+		)
+		.0;
+
+		const OFFSET: isize = 7;
+		lazy_static! {
+			static ref OFFSETS: Vec<(isize, isize)> = iproduct!((-OFFSET..=OFFSET), (-OFFSET..=OFFSET))
+				.filter(|(x, y)| x * x + y * y <= 64)
+				.collect();
+		}
+
+		self.expansions = resource_groups
+			.iter()
+			.map(|group| {
+				let resources = all_resources.find_tags(group.iter().map(|(_, tag)| *tag));
+				let center = resources.center().floor() + 0.5;
+
+				if center.distance_squared(self.start_center) < 16.0 {
+					(self.start_location, self.start_center)
+				} else if center.distance_squared(self.enemy_start_center) < 16.0 {
+					(self.enemy_start, self.enemy_start_center)
+				} else {
+					let location = OFFSETS
+						.iter()
+						.filter_map(|(x, y)| {
+							let pos = center.offset(*x as f32, *y as f32);
+							if self.game_info.placement_grid[pos].is_empty() {
+								let mut distance_sum = 0_f32;
+								if resources.iter().all(|r| {
+									let dist = pos.distance_squared(r);
+									distance_sum += dist;
+									dist > if r.is_geyser() { 49.0 } else { 36.0 }
+								}) {
+									return Some((pos, distance_sum));
+								}
+							}
+							None
+						})
+						.min_by(|(_, d1), (_, d2)| d1.partial_cmp(d2).unwrap())
+						.expect("Can't detect right position for expansion")
+						.0;
+
+					(
+						location,
+						(resources.sum(|r| r.position) + location) / (resources.len() + 1) as f32,
+					)
+				}
+			})
+			.collect();
+	}
+	pub(crate) fn prepare_step(&mut self) {
+		self.update_units();
+		let observation = &self.state.observation;
+		self.time = (observation.game_loop as f32) / 22.4;
+		let common = &observation.common;
+		self.minerals = common.minerals;
+		self.vespene = common.vespene;
+		self.supply_army = common.food_army;
+		self.supply_workers = common.food_workers;
+		self.supply_cap = common.food_cap;
+		self.supply_used = common.food_used;
+		self.supply_left = self.supply_cap - self.supply_used;
+
+		// Counting units and orders
+		self.current_units.clear();
+		self.orders.clear();
+		self.units.my.all.clone().iter().for_each(|u| {
+			u.orders
+				.iter()
+				.for_each(|order| *self.orders.entry(order.ability).or_default() += 1);
+			if u.is_ready() {
+				*self.current_units.entry(u.type_id).or_default() += 1;
+			} else if u.race() != Race::Terran || !u.is_structure() {
+				if let Some(data) = self.game_data.units.get(&u.type_id) {
+					if let Some(ability) = data.ability {
+						*self.orders.entry(ability).or_default() += 1;
+					}
+				}
+			}
+		});
+	}
+	fn update_units(&mut self) {
+		self.units.clear();
+		let mut techlab_tags = self.techlab_tags.borrow_mut();
+		let mut reactor_tags = self.reactor_tags.borrow_mut();
+		let mut max_cooldowns = self.max_cooldowns.borrow_mut();
+
+		techlab_tags.clear();
+		reactor_tags.clear();
+
+		let units = &mut self.units;
+		self.state.observation.raw.units.iter().for_each(|u| {
+			macro_rules! add_to {
+				($group:expr) => {{
+					$group.push(u.clone());
+					}};
+			}
+
+			let u_type = u.type_id;
+			match u.alliance {
+				Alliance::Neutral => match u_type {
+					UnitTypeId::XelNagaTower => add_to!(units.watchtowers),
+
+					UnitTypeId::RichMineralField
+					| UnitTypeId::RichMineralField750
+					| UnitTypeId::MineralField
+					| UnitTypeId::MineralField450
+					| UnitTypeId::MineralField750
+					| UnitTypeId::LabMineralField
+					| UnitTypeId::LabMineralField750
+					| UnitTypeId::PurifierRichMineralField
+					| UnitTypeId::PurifierRichMineralField750
+					| UnitTypeId::PurifierMineralField
+					| UnitTypeId::PurifierMineralField750
+					| UnitTypeId::BattleStationMineralField
+					| UnitTypeId::BattleStationMineralField750
+					| UnitTypeId::MineralFieldOpaque
+					| UnitTypeId::MineralFieldOpaque900 => {
+						add_to!(units.resources);
+						add_to!(units.mineral_fields);
+					}
+					UnitTypeId::VespeneGeyser
+					| UnitTypeId::SpacePlatformGeyser
+					| UnitTypeId::RichVespeneGeyser
+					| UnitTypeId::ProtossVespeneGeyser
+					| UnitTypeId::PurifierVespeneGeyser
+					| UnitTypeId::ShakurasVespeneGeyser => {
+						add_to!(units.resources);
+						add_to!(units.vespene_geysers);
+					}
+					id if INHIBITOR_IDS.contains(&id) => add_to!(units.inhibitor_zones),
+
+					_ => add_to!(units.destructables),
+				},
+				alliance @ Alliance::Own | alliance @ Alliance::Enemy => {
+					let units = if alliance.is_mine() {
+						&mut units.my
+					} else {
+						&mut units.enemy
+					};
+					add_to!(units.all);
+					if alliance.is_mine() {
+						if let Some(cooldown) = u.weapon_cooldown {
+							max_cooldowns
+								.entry(u_type)
+								.and_modify(|max| {
+									if cooldown > *max {
+										*max = cooldown;
+									}
+								})
+								.or_insert(cooldown);
+						}
+					}
+					if u.is_structure() {
+						if u.is_placeholder() {
+							add_to!(units.placeholders);
+						} else {
+							add_to!(units.structures);
+							match u_type {
+								UnitTypeId::CommandCenter
+								| UnitTypeId::OrbitalCommand
+								| UnitTypeId::PlanetaryFortress
+								| UnitTypeId::CommandCenterFlying
+								| UnitTypeId::OrbitalCommandFlying
+								| UnitTypeId::Hatchery
+								| UnitTypeId::Lair
+								| UnitTypeId::Hive
+								| UnitTypeId::Nexus => add_to!(units.townhalls),
+
+								UnitTypeId::Refinery
+								| UnitTypeId::RefineryRich
+								| UnitTypeId::Assimilator
+								| UnitTypeId::AssimilatorRich
+								| UnitTypeId::Extractor
+								| UnitTypeId::ExtractorRich => add_to!(units.gas_buildings),
+
+								UnitTypeId::TechLab
+								| UnitTypeId::BarracksTechLab
+								| UnitTypeId::FactoryTechLab
+								| UnitTypeId::StarportTechLab
+									if alliance.is_mine() =>
+								{
+									techlab_tags.push(u.tag)
+								}
+
+								UnitTypeId::Reactor
+								| UnitTypeId::BarracksReactor
+								| UnitTypeId::FactoryReactor
+								| UnitTypeId::StarportReactor
+									if alliance.is_mine() =>
+								{
+									reactor_tags.push(u.tag)
+								}
+
+								_ => {}
+							}
+						}
+					} else {
+						add_to!(units.units);
+						match u_type {
+							UnitTypeId::SCV | UnitTypeId::Probe | UnitTypeId::Drone => add_to!(units.workers),
+							UnitTypeId::Larva => add_to!(units.larvas),
+							_ => {}
+						}
+					}
+				}
+				_ => {}
+			}
+		});
+	}
 	pub fn can_place(&mut self, building: UnitTypeId, pos: Point2) -> bool {
 		self.query_placement(
 			vec![(self.game_data.units[&building].ability.unwrap(), pos, None)],
@@ -653,7 +638,7 @@ impl Bot {
 	pub fn find_gas_placement(&mut self, base: Point2) -> Option<Unit> {
 		let ability = self.game_data.units[&self.race_values.gas].ability.unwrap();
 
-		let geysers = self.grouped_units.vespene_geysers.closer(11.0, base);
+		let geysers = self.units.vespene_geysers.closer(11.0, base);
 		let results = self
 			.query_placement(
 				geysers.iter().map(|u| (ability, u.position, None)).collect(),
@@ -683,12 +668,7 @@ impl Bot {
 		let expansions = self
 			.expansions
 			.iter()
-			.filter(|(loc, _)| {
-				self.grouped_units
-					.townhalls
-					.iter()
-					.all(|t| t.is_further(15.0, *loc))
-			})
+			.filter(|(loc, _)| self.units.my.townhalls.iter().all(|t| t.is_further(15.0, *loc)))
 			.copied()
 			.collect::<Vec<(Point2, Point2)>>();
 		let paths = self
@@ -712,8 +692,9 @@ impl Bot {
 			.expansions
 			.iter()
 			.filter(|(loc, _)| {
-				self.grouped_units
-					.enemy_townhalls
+				self.units
+					.enemy
+					.townhalls
 					.iter()
 					.all(|t| t.is_further(15.0, *loc))
 			})
@@ -738,23 +719,28 @@ impl Bot {
 	pub fn owned_expansions(&self) -> Vec<(Point2, Point2)> {
 		self.expansions
 			.iter()
-			.filter(|(loc, _)| {
-				self.grouped_units
-					.townhalls
-					.iter()
-					.any(|t| t.is_closer(15.0, *loc))
-			})
+			.filter(|(loc, _)| self.units.my.townhalls.iter().any(|t| t.is_closer(15.0, *loc)))
 			.copied()
 			.collect()
 	}
 	pub fn enemy_expansions(&self) -> Vec<(Point2, Point2)> {
 		self.expansions
 			.iter()
+			.filter(|(loc, _)| self.units.enemy.townhalls.iter().any(|t| t.is_closer(15.0, *loc)))
+			.copied()
+			.collect()
+	}
+	pub fn free_expansions(&self) -> Vec<(Point2, Point2)> {
+		self.expansions
+			.iter()
 			.filter(|(loc, _)| {
-				self.grouped_units
-					.enemy_townhalls
-					.iter()
-					.any(|t| t.is_closer(15.0, *loc))
+				self.units.my.townhalls.iter().all(|t| t.is_further(15.0, *loc))
+					&& self
+						.units
+						.enemy
+						.townhalls
+						.iter()
+						.all(|t| t.is_further(15.0, *loc))
 			})
 			.copied()
 			.collect()

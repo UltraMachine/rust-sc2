@@ -18,11 +18,11 @@ impl ZergRushAI {
 		Default::default()
 	}
 	fn distribute_workers(&mut self) {
-		if self.grouped_units.workers.is_empty() {
+		if self.units.my.workers.is_empty() {
 			return;
 		}
-		let mut idle_workers = self.grouped_units.workers.idle();
-		let bases = self.grouped_units.townhalls.ready();
+		let mut idle_workers = self.units.my.workers.idle();
+		let bases = self.units.my.townhalls.ready();
 
 		// Check distribution delay if there aren't any idle workers
 		let game_loop = self.state.observation.game_loop;
@@ -33,14 +33,14 @@ impl ZergRushAI {
 		*last_loop = game_loop;
 
 		// Distribute
-		let mineral_fields = &self.grouped_units.mineral_fields;
+		let mineral_fields = &self.units.mineral_fields;
 		if mineral_fields.is_empty() {
 			return;
 		}
 		if bases.is_empty() {
 			return;
 		}
-		let gas_buildings = self.grouped_units.gas_buildings.ready();
+		let gas_buildings = self.units.my.gas_buildings.ready();
 
 		let mut deficit_minings = Units::new();
 		let mut deficit_geysers = Units::new();
@@ -60,7 +60,7 @@ impl ZergRushAI {
 				Ordering::Equal => {}
 				Ordering::Greater => {
 					let local_minerals = self
-						.grouped_units
+						.units
 						.mineral_fields
 						.closer(11.0, base)
 						.iter()
@@ -68,7 +68,8 @@ impl ZergRushAI {
 						.collect::<Vec<u64>>();
 
 					idle_workers.extend(
-						self.grouped_units
+						self.units
+							.my
 							.workers
 							.filter(|u| {
 								u.target_tag().map_or(false, |target_tag| {
@@ -94,7 +95,8 @@ impl ZergRushAI {
 			gas_buildings.iter().for_each(|gas| {
 				if let Ordering::Greater = gas.assigned_harvesters.cmp(&Some(0)) {
 					idle_workers.extend(
-						self.grouped_units
+						self.units
+							.my
 							.workers
 							.filter(|u| {
 								u.target_tag().map_or(false, |target_tag| {
@@ -115,7 +117,8 @@ impl ZergRushAI {
 					Ordering::Equal => {}
 					Ordering::Greater => {
 						idle_workers.extend(
-							self.grouped_units
+							self.units
+								.my
 								.workers
 								.filter(|u| {
 									u.target_tag().map_or(false, |target_tag| {
@@ -134,7 +137,8 @@ impl ZergRushAI {
 					}
 					Ordering::Less => {
 						idle_workers.extend(
-							self.grouped_units
+							self.units
+								.my
 								.workers
 								.filter(|u| {
 									u.target_tag()
@@ -189,7 +193,7 @@ impl ZergRushAI {
 	}
 
 	fn order_units(&mut self) {
-		if self.grouped_units.larvas.is_empty() {
+		if self.units.my.larvas.is_empty() {
 			return;
 		}
 
@@ -202,7 +206,7 @@ impl ZergRushAI {
 				.unwrap_or(&0) == &0
 			&& self.can_afford(over, false)
 		{
-			if let Some(larva) = self.grouped_units.larvas.pop() {
+			if let Some(larva) = self.units.my.larvas.pop() {
 				larva.train(over, false);
 				self.substract_resources(over);
 			}
@@ -217,7 +221,7 @@ impl ZergRushAI {
 					.map_or(0, |n| n * 16),
 			) && self.can_afford(drone, true)
 		{
-			if let Some(larva) = self.grouped_units.larvas.pop() {
+			if let Some(larva) = self.units.my.larvas.pop() {
 				larva.train(drone, false);
 				self.substract_resources(drone);
 			}
@@ -229,10 +233,10 @@ impl ZergRushAI {
 				.orders
 				.get(&self.game_data.units[&queen].ability.unwrap())
 				.unwrap_or(&0)
-			< self.grouped_units.townhalls.len()
+			< self.units.my.townhalls.len()
 			&& self.can_afford(queen, true)
 		{
-			let townhalls = self.grouped_units.townhalls.clone();
+			let townhalls = self.units.my.townhalls.clone();
 			if !townhalls.is_empty() {
 				townhalls.first().unwrap().train(queen, false);
 				self.substract_resources(queen);
@@ -241,7 +245,7 @@ impl ZergRushAI {
 
 		let zergling = UnitTypeId::Zergling;
 		if self.can_afford(zergling, true) {
-			if let Some(larva) = self.grouped_units.larvas.pop() {
+			if let Some(larva) = self.units.my.larvas.pop() {
 				larva.train(zergling, false);
 				self.substract_resources(zergling);
 			}
@@ -249,7 +253,7 @@ impl ZergRushAI {
 	}
 
 	fn get_builder(&self, pos: Point2, mineral_tags: &[u64]) -> Option<Unit> {
-		let workers = self.grouped_units.workers.filter(|u| {
+		let workers = self.units.my.workers.filter(|u| {
 			!u.is_constructing()
 				&& (!u.is_gathering() || u.target_tag().map_or(false, |tag| mineral_tags.contains(&tag)))
 				&& !u.is_returning()
@@ -263,7 +267,7 @@ impl ZergRushAI {
 	}
 	fn build(&mut self) {
 		let mineral_tags = self
-			.grouped_units
+			.units
 			.mineral_fields
 			.iter()
 			.map(|u| u.tag)
@@ -323,7 +327,7 @@ impl ZergRushAI {
 				.unwrap_or(&0) == &0
 			&& self.can_afford_upgrade(speed_upgrade)
 		{
-			let pool = self.grouped_units.structures.of_type(UnitTypeId::SpawningPool);
+			let pool = self.units.my.structures.of_type(UnitTypeId::SpawningPool);
 			if !pool.is_empty() {
 				pool.first().unwrap().research(speed_upgrade, false);
 				self.substract_upgrade_cost(speed_upgrade);
@@ -333,14 +337,14 @@ impl ZergRushAI {
 
 	fn execute_micro(&mut self) {
 		// Injecting Larva
-		let hatcheries = self.grouped_units.townhalls.clone();
+		let hatcheries = self.units.my.townhalls.clone();
 		if !hatcheries.is_empty() {
 			let not_injected = hatcheries.filter(|h| {
 				!h.has_buff(BuffId::QueenSpawnLarvaTimer)
 					|| h.buff_duration_remain.unwrap() * 20 > h.buff_duration_max.unwrap()
 			});
 			if !not_injected.is_empty() {
-				let mut queens = self.grouped_units.units.filter(|u| {
+				let mut queens = self.units.my.units.filter(|u| {
 					u.type_id == UnitTypeId::Queen
 						&& !u.is_using(AbilityId::EffectInjectLarva)
 						&& self.abilities_units.get(&u.tag).map_or(false, |abilities| {
@@ -358,7 +362,7 @@ impl ZergRushAI {
 			}
 		}
 
-		let zerglings = self.grouped_units.units.of_type(UnitTypeId::Zergling);
+		let zerglings = self.units.my.units.of_type(UnitTypeId::Zergling);
 		if zerglings.is_empty() {
 			return;
 		}
@@ -367,7 +371,7 @@ impl ZergRushAI {
 		let speed_upgrade = UpgradeId::Zerglingmovementspeed;
 
 		let speed_upgrade_is_almost_ready = self.has_upgrade(speed_upgrade)
-			|| self.grouped_units.structures.iter().any(|s| {
+			|| self.units.my.structures.iter().any(|s| {
 				s.type_id == UnitTypeId::SpawningPool && !s.is_idle() && {
 					let order = &s.orders[0];
 					order.ability == self.game_data.upgrades[&speed_upgrade].ability && order.progress >= 0.9
@@ -377,10 +381,11 @@ impl ZergRushAI {
 		// Attacking with zerglings or defending our locations
 		let targets = {
 			let enemies = if speed_upgrade_is_almost_ready {
-				self.grouped_units.enemies.clone()
+				self.units.enemy.all.clone()
 			} else {
-				self.grouped_units
-					.enemies
+				self.units
+					.enemy
+					.all
 					.filter(|e| hatcheries.iter().any(|h| h.is_closer(25.0, e)))
 			};
 			if enemies.is_empty() {
@@ -422,18 +427,19 @@ impl ZergRushAI {
 
 impl Player for ZergRushAI {
 	fn on_start(&mut self) -> SC2Result<()> {
-		let townhall = self.grouped_units.townhalls.first().unwrap().clone();
+		let townhall = self.units.my.townhalls.first().unwrap().clone();
 
 		townhall.command(AbilityId::RallyWorkers, Target::Pos(self.start_center), false);
-		self.grouped_units
+		self.units
+			.my
 			.larvas
 			.first()
 			.unwrap()
 			.train(UnitTypeId::Drone, false);
 		self.substract_resources(UnitTypeId::Drone);
 
-		let minerals_near_base = self.grouped_units.mineral_fields.closer(11.0, &townhall);
-		self.grouped_units.workers.clone().iter().for_each(|u| {
+		let minerals_near_base = self.units.mineral_fields.closer(11.0, &townhall);
+		self.units.my.workers.clone().iter().for_each(|u| {
 			u.gather(minerals_near_base.closest(u).unwrap().tag, false);
 		});
 		Ok(())

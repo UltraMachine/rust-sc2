@@ -1,120 +1,134 @@
 use crate::{geometry::Point2, ids::UnitTypeId, unit::Unit};
 use itertools::Itertools;
+use rustc_hash::FxHashMap;
 use std::{
-	collections::{
-		hash_map::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut},
-		HashMap,
-	},
+	collections::hash_map::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut},
 	iter::{FromIterator, Sum},
 	ops::{Index, IndexMut},
 };
 
 #[derive(Default, Clone)]
-pub struct GroupedUnits {
-	pub owned: Units,
-	pub units: Units,
-	pub structures: Units,
-	pub townhalls: Units,
-	pub workers: Units,
-	pub enemies: Units,
-	pub enemy_units: Units,
-	pub enemy_structures: Units,
-	pub enemy_townhalls: Units,
-	pub enemy_workers: Units,
+pub struct AllUnits {
+	pub my: PlayerUnits,
+	pub enemy: PlayerUnits,
 	pub mineral_fields: Units,
 	pub vespene_geysers: Units,
 	pub resources: Units,
 	pub destructables: Units,
 	pub watchtowers: Units,
 	pub inhibitor_zones: Units,
+}
+impl AllUnits {
+	pub(crate) fn clear(&mut self) {
+		self.my.clear();
+		self.enemy.clear();
+		self.mineral_fields.clear();
+		self.vespene_geysers.clear();
+		self.resources.clear();
+		self.destructables.clear();
+		self.watchtowers.clear();
+		self.inhibitor_zones.clear();
+	}
+}
+#[derive(Default, Clone)]
+pub struct PlayerUnits {
+	pub all: Units,
+	pub units: Units,
+	pub structures: Units,
+	pub townhalls: Units,
+	pub workers: Units,
 	pub gas_buildings: Units,
 	pub larvas: Units,
 	pub placeholders: Units,
 }
+impl PlayerUnits {
+	pub(crate) fn clear(&mut self) {
+		self.all.clear();
+		self.units.clear();
+		self.structures.clear();
+		self.townhalls.clear();
+		self.workers.clear();
+		self.gas_buildings.clear();
+		self.larvas.clear();
+		self.placeholders.clear();
+	}
+}
 
 #[derive(Default, Clone)]
-pub struct Units {
-	units: HashMap<u64, Unit>,
-}
+pub struct Units(FxHashMap<u64, Unit>);
 impl Units {
 	// HashMap methods
 	#[inline]
 	pub fn new() -> Self {
-		Units {
-			units: HashMap::new(),
-		}
+		Units(FxHashMap::default())
 	}
 
 	#[inline]
 	pub fn first(&self) -> Option<&Unit> {
-		self.units.values().next()
+		self.0.values().next()
 	}
 
 	#[inline]
 	pub fn push(&mut self, u: Unit) -> Option<Unit> {
-		self.units.insert(u.tag, u)
+		self.0.insert(u.tag, u)
 	}
 
 	#[inline]
 	pub fn pop(&mut self) -> Option<Unit> {
-		self.units
-			.keys()
-			.next()
-			.copied()
-			.and_then(|u| self.units.remove(&u))
+		self.0.keys().next().copied().and_then(|u| self.0.remove(&u))
 	}
 
 	#[inline]
 	pub fn remove(&mut self, u: u64) -> Option<Unit> {
-		self.units.remove(&u)
+		self.0.remove(&u)
 	}
 
 	#[inline]
 	pub fn iter(&self) -> Values<u64, Unit> {
-		self.units.values()
+		self.0.values()
 	}
 
 	#[inline]
 	pub fn iter_mut(&mut self) -> ValuesMut<u64, Unit> {
-		self.units.values_mut()
+		self.0.values_mut()
 	}
 
 	#[inline]
 	pub fn pairs(&self) -> Iter<u64, Unit> {
-		self.units.iter()
+		self.0.iter()
 	}
 
 	#[inline]
 	pub fn pairs_mut(&mut self) -> IterMut<u64, Unit> {
-		self.units.iter_mut()
+		self.0.iter_mut()
 	}
 
 	#[inline]
 	pub fn tags(&self) -> Keys<u64, Unit> {
-		self.units.keys()
+		self.0.keys()
 	}
 
 	#[inline]
 	pub fn is_empty(&self) -> bool {
-		self.units.is_empty()
+		self.0.is_empty()
 	}
 
 	#[inline]
 	pub fn len(&self) -> usize {
-		self.units.len()
+		self.0.len()
 	}
 
 	#[inline]
 	pub fn clear(&mut self) {
-		self.units.clear()
+		self.0.clear()
 	}
 
 	// Units methods
 	pub fn find_tag(&self, tag: u64) -> Option<&Unit> {
-		self.units.get(&tag)
+		self.0.get(&tag)
 	}
 	pub fn find_tags<T: Iterator<Item = u64>>(&self, tags: T) -> Self {
-		tags.filter_map(|tag| self.units.get(&tag).cloned()).collect()
+		tags.filter_map(|tag| self.0.get(&tag).cloned()).collect()
 	}
 	pub fn of_type(&self, u_type: UnitTypeId) -> Self {
 		self.filter(|u| u.type_id == u_type)
@@ -158,11 +172,9 @@ impl Units {
 
 	pub fn filter<F>(&self, f: F) -> Self
 	where
-		F: for<'r> FnMut(&'r Unit) -> bool,
+		F: Fn(&Unit) -> bool,
 	{
-		Self {
-			units: self.iter().cloned().filter(f).map(|u| (u.tag, u)).collect(),
-		}
+		Self(self.iter().cloned().filter(f).map(|u| (u.tag, u)).collect())
 	}
 	pub fn ground(&self) -> Self {
 		self.filter(|u| !u.is_flying)
@@ -200,90 +212,106 @@ impl Units {
 	pub fn sum<T, F>(&self, f: F) -> T
 	where
 		T: Sum,
-		F: FnMut(&Unit) -> T,
+		F: Fn(&Unit) -> T,
 	{
 		self.iter().map(f).sum::<T>()
 	}
 	pub fn min<T, F>(&self, f: F) -> Option<&Unit>
 	where
 		T: Ord,
-		F: for<'r> FnMut(&'r &Unit) -> T,
+		F: Fn(&&Unit) -> T,
 	{
 		self.iter().min_by_key(f)
 	}
-	pub fn partial_min<T, F>(&self, mut f: F) -> Option<&Unit>
+	pub fn partial_min<T, F>(&self, f: F) -> Option<&Unit>
 	where
 		T: PartialOrd,
-		F: for<'r> FnMut(&'r &Unit) -> T,
+		F: Fn(&Unit) -> T,
 	{
 		self.iter().min_by(|u1, u2| f(u1).partial_cmp(&f(u2)).unwrap())
 	}
 	pub fn min_value<T, F>(&self, f: F) -> Option<T>
 	where
 		T: Ord,
-		F: FnMut(&Unit) -> T,
+		F: Fn(&Unit) -> T,
 	{
 		self.iter().map(f).min()
 	}
 	pub fn partial_min_value<T, F>(&self, f: F) -> Option<T>
 	where
 		T: PartialOrd,
-		F: FnMut(&Unit) -> T,
+		F: Fn(&Unit) -> T,
 	{
 		self.iter().map(f).min_by(|a, b| a.partial_cmp(&b).unwrap())
 	}
 	pub fn max<T, F>(&self, f: F) -> Option<&Unit>
 	where
 		T: Ord,
-		F: for<'r> FnMut(&'r &Unit) -> T,
+		F: Fn(&&Unit) -> T,
 	{
 		self.iter().max_by_key(f)
 	}
-	pub fn partial_max<T, F>(&self, mut f: F) -> Option<&Unit>
+	pub fn partial_max<T, F>(&self, f: F) -> Option<&Unit>
 	where
 		T: PartialOrd,
-		F: for<'r> FnMut(&'r &Unit) -> T,
+		F: Fn(&Unit) -> T,
 	{
 		self.iter().max_by(|u1, u2| f(u1).partial_cmp(&f(u2)).unwrap())
 	}
 	pub fn max_value<T, F>(&self, f: F) -> Option<T>
 	where
 		T: Ord,
-		F: FnMut(&Unit) -> T,
+		F: Fn(&Unit) -> T,
 	{
 		self.iter().map(f).max()
 	}
 	pub fn partial_max_value<T, F>(&self, f: F) -> Option<T>
 	where
 		T: PartialOrd,
-		F: FnMut(&Unit) -> T,
+		F: Fn(&Unit) -> T,
 	{
 		self.iter().map(f).max_by(|a, b| a.partial_cmp(&b).unwrap())
 	}
 	pub fn sort<T, F>(&self, f: F) -> Self
 	where
 		T: Ord,
-		F: for<'r> FnMut(&'r &Unit) -> T,
+		F: Fn(&&Unit) -> T,
 	{
 		self.iter().sorted_by_key(f).cloned().collect()
 	}
-	pub fn partial_sort<T, F>(&self, mut f: F) -> Self
+	pub fn partial_sort<T, F>(&self, f: F) -> Self
 	where
 		T: PartialOrd,
-		F: for<'r> FnMut(&'r &Unit) -> T,
+		F: Fn(&Unit) -> T,
 	{
 		self.iter()
 			.sorted_by(|u1, u2| f(u1).partial_cmp(&f(u2)).unwrap())
 			.cloned()
 			.collect()
 	}
+	pub fn sort_unstable<T, F>(&self, f: F) -> Self
+	where
+		T: Ord,
+		F: Fn(&&Unit) -> T,
+	{
+		let mut v = Vec::from_iter(self.iter());
+		v.sort_unstable_by_key(f);
+		v.into_iter().cloned().collect()
+	}
+	pub fn partial_sort_unstable<T, F>(&self, f: F) -> Self
+	where
+		T: PartialOrd,
+		F: Fn(&Unit) -> T,
+	{
+		let mut v = Vec::from_iter(self.iter());
+		v.sort_unstable_by(|u1, u2| f(u1).partial_cmp(&f(u2)).unwrap());
+		v.into_iter().cloned().collect()
+	}
 }
 impl FromIterator<Unit> for Units {
 	#[inline]
 	fn from_iter<I: IntoIterator<Item = Unit>>(iter: I) -> Self {
-		Units {
-			units: iter.into_iter().map(|u| (u.tag, u)).collect(),
-		}
+		Units(iter.into_iter().map(|u| (u.tag, u)).collect())
 	}
 }
 impl IntoIterator for Units {
@@ -292,7 +320,7 @@ impl IntoIterator for Units {
 
 	#[inline]
 	fn into_iter(self) -> Self::IntoIter {
-		self.units.into_iter()
+		self.0.into_iter()
 	}
 }
 impl Index<u64> for Units {
@@ -300,13 +328,13 @@ impl Index<u64> for Units {
 
 	#[inline]
 	fn index(&self, tag: u64) -> &Self::Output {
-		&self.units[&tag]
+		&self.0[&tag]
 	}
 }
 impl IndexMut<u64> for Units {
 	#[inline]
 	fn index_mut(&mut self, tag: u64) -> &mut Self::Output {
-		self.units.get_mut(&tag).unwrap()
+		self.0.get_mut(&tag).unwrap()
 	}
 }
 impl Extend<Unit> for Units {

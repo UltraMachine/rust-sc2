@@ -82,7 +82,7 @@ pub struct Unit {
 
 	// Not populated for enemies
 	pub orders: Vec<UnitOrder>,
-	pub add_on_tag: Option<u64>,
+	pub addon_tag: Option<u64>,
 	pub passengers: Vec<PassengerUnit>,
 	pub cargo_space_taken: Option<u32>,
 	pub cargo_space_max: Option<u32>,
@@ -133,15 +133,15 @@ impl Unit {
 	pub fn is_ready(&self) -> bool {
 		(self.build_progress - 1.0).abs() < std::f32::EPSILON
 	}
-	pub fn has_add_on(&self) -> bool {
-		self.add_on_tag.is_some()
+	pub fn has_addon(&self) -> bool {
+		self.addon_tag.is_some()
 	}
 	pub fn has_techlab(&self) -> bool {
-		self.add_on_tag
+		self.addon_tag
 			.map_or(false, |tag| self.data.techlab_tags.borrow().contains(&tag))
 	}
 	pub fn has_reactor(&self) -> bool {
-		self.add_on_tag
+		self.addon_tag
 			.map_or(false, |tag| self.data.reactor_tags.borrow().contains(&tag))
 	}
 	pub fn race(&self) -> Race {
@@ -391,6 +391,7 @@ impl Unit {
 	fn weapons(&self) -> Option<Vec<Weapon>> {
 		self.type_data()
 			.map(|data| data.weapons.clone())
+			.filter(|weapons| !weapons.is_empty())
 			.or_else(|| match self.type_id {
 				UnitTypeId::BanelingBurrowed | UnitTypeId::BanelingCocoon => {
 					MISSED_WEAPONS.get(&UnitTypeId::Baneling).cloned()
@@ -508,6 +509,16 @@ impl Unit {
 	pub fn real_weapon_stats(&self) -> (f32, f32) {
 		let (damage, speed, range) =
 			self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Any, None), None);
+		(damage / speed, range)
+	}
+	pub fn calculate_ground_weapon(&self) -> (f32, f32) {
+		let (damage, speed, range) =
+			self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Ground, None), None);
+		(damage / speed, range)
+	}
+	pub fn calculate_air_weapon(&self) -> (f32, f32) {
+		let (damage, speed, range) =
+			self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Air, None), None);
 		(damage / speed, range)
 	}
 
@@ -819,7 +830,7 @@ impl Unit {
 		self.orders.is_empty()
 	}
 	pub fn is_almost_idle(&self) -> bool {
-		self.is_idle() || self.orders[0].progress >= 0.95
+		self.is_idle() || (self.orders.len() == 1 && self.orders[0].progress >= 0.95)
 	}
 	pub fn is_unused(&self) -> bool {
 		if self.has_reactor() {
@@ -831,7 +842,7 @@ impl Unit {
 	pub fn is_almost_unused(&self) -> bool {
 		if self.has_reactor() {
 			self.orders.len() < 2
-				|| (self.orders.len() < 4 && self.orders.iter().take(2).any(|order| order.progress >= 0.95))
+				|| (self.orders.len() == 2 && self.orders.iter().any(|order| order.progress >= 0.95))
 		} else {
 			self.is_almost_idle()
 		}
@@ -934,7 +945,7 @@ impl Unit {
 	}
 	// Actions
 	pub fn command(&self, ability: AbilityId, target: Target, queue: bool) {
-		if !queue && !self.allow_spam && !self.is_idle() {
+		if !(queue || self.allow_spam || self.is_idle()) {
 			let last_order = &self.orders[0];
 			if ability == last_order.ability && target == last_order.target {
 				return;
@@ -1088,7 +1099,7 @@ impl FromProtoData<ProtoUnit> for Unit {
 					progress: order.get_progress(),
 				})
 				.collect(),
-			add_on_tag: u.add_on_tag,
+			addon_tag: u.add_on_tag,
 			passengers: u
 				.get_passengers()
 				.iter()
