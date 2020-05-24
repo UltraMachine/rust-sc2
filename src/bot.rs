@@ -160,6 +160,9 @@ impl Bot {
 			.map_or_else(Default::default, |data| {
 				let mut cost = data.cost();
 				match unit {
+					UnitTypeId::OrbitalCommand => {
+						cost.minerals = 150;
+					}
 					UnitTypeId::Reactor => {
 						cost.minerals = 50;
 						cost.vespene = 50;

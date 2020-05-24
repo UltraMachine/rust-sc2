@@ -137,12 +137,12 @@ impl Unit {
 		self.addon_tag.is_some()
 	}
 	pub fn has_techlab(&self) -> bool {
-		self.addon_tag
-			.map_or(false, |tag| self.data.techlab_tags.borrow().contains(&tag))
+		let techlab_tags = self.data.techlab_tags.borrow();
+		self.addon_tag.map_or(false, |tag| techlab_tags.contains(&tag))
 	}
 	pub fn has_reactor(&self) -> bool {
-		self.addon_tag
-			.map_or(false, |tag| self.data.reactor_tags.borrow().contains(&tag))
+		let reactor_tags = self.data.reactor_tags.borrow();
+		self.addon_tag.map_or(false, |tag| reactor_tags.contains(&tag))
 	}
 	pub fn race(&self) -> Race {
 		self.type_data().map_or(Race::Random, |data| data.race)
@@ -466,8 +466,7 @@ impl Unit {
 		})
 	}
 	pub fn on_cooldown(&self) -> bool {
-		self.weapon_cooldown
-			.map_or_else(|| panic!("Can't get cooldown on enemies"), |cool| cool > 0.0)
+		self.weapon_cooldown.map_or(false, |cool| cool > 0.0)
 	}
 	pub fn max_cooldown(&self) -> Option<f32> {
 		self.data.max_cooldowns.borrow().get(&self.type_id).copied()
@@ -571,11 +570,17 @@ impl Unit {
 
 				target.buffs.iter().for_each(|buff| match buff {
 					BuffId::GuardianShield => target_has_guardian_shield = true,
-					BuffId::RavenShredderMissileTint => {
-						enemy_armor -= 3;
-						enemy_shield_armor -= 3;
+					_ => {
+						if *buff
+							== if cfg!(windows) {
+								BuffId::RavenShredderMissileArmorReductionUISubtruct
+							} else {
+								BuffId::RavenShredderMissileArmorReduction
+							} {
+							enemy_armor -= 3;
+							enemy_shield_armor -= 3;
+						}
 					}
-					_ => {}
 				});
 
 				if let Some(target_upgrades) = target_upgrades {
@@ -1016,8 +1021,19 @@ impl Unit {
 		}
 	}
 	pub fn research(&self, upgrade: UpgradeId, queue: bool) {
-		if let Some(type_data) = self.data.game_data.upgrades.get(&upgrade) {
-			self.command(type_data.ability, Target::None, queue);
+		match upgrade {
+			UpgradeId::TerranVehicleAndShipArmorsLevel1
+			| UpgradeId::TerranVehicleAndShipArmorsLevel2
+			| UpgradeId::TerranVehicleAndShipArmorsLevel3 => self.command(
+				AbilityId::ResearchTerranVehicleAndShipPlating,
+				Target::None,
+				queue,
+			),
+			_ => {
+				if let Some(type_data) = self.data.game_data.upgrades.get(&upgrade) {
+					self.command(type_data.ability, Target::None, queue);
+				}
+			}
 		}
 	}
 	pub fn warp_in(&self, unit: UnitTypeId, target: Point2) {
@@ -1042,13 +1058,14 @@ impl From<&Unit> for Point2 {
 impl FromProtoData<ProtoUnit> for Unit {
 	fn from_proto_data(data: Rc<DataForUnit>, u: ProtoUnit) -> Self {
 		let pos = u.get_pos();
+		let type_id = UnitTypeId::from_u32(u.get_unit_type()).unwrap();
 		Self {
 			data,
 			allow_spam: false,
 			display_type: DisplayType::from_proto(u.get_display_type()),
 			alliance: Alliance::from_proto(u.get_alliance()),
 			tag: u.get_tag(),
-			type_id: UnitTypeId::from_u32(u.get_unit_type()).unwrap(),
+			type_id,
 			owner: u.get_owner() as u32,
 			position: Point2::from_proto(pos.clone()),
 			position3d: Point3::from_proto(pos.clone()),
@@ -1061,7 +1078,11 @@ impl FromProtoData<ProtoUnit> for Unit {
 				.iter()
 				.map(|b| BuffId::from_u32(*b).unwrap())
 				.collect(),
-			detect_range: u.get_detect_range(),
+			detect_range: match type_id {
+				UnitTypeId::Observer => 11.0,
+				UnitTypeId::ObserverSiegeMode => 13.75,
+				_ => u.get_detect_range(),
+			},
 			radar_range: u.get_radar_range(),
 			is_selected: u.get_is_selected(),
 			is_on_screen: u.get_is_on_screen(),
