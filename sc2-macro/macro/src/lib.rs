@@ -89,7 +89,7 @@ pub fn enum_from_str_derive(input: TokenStream) -> TokenStream {
 	if let Data::Enum(data) = item.data {
 		let name = item.ident;
 		let variants = data.variants.iter().map(|v| &v.ident);
-		let variants2 = variants.clone().map(|v| format!("{}::{}", name, v));
+		// let variants2 = variants.clone().map(|v| format!("{}::{}", name, v));
 
 		#[allow(clippy::block_in_if_condition_stmt)]
 		let other_cases = if item.attrs.iter().any(|a| {
@@ -129,7 +129,7 @@ pub fn enum_from_str_derive(input: TokenStream) -> TokenStream {
 					Ok(match s {
 						#(
 							stringify!(#variants) => Self::#variants,
-							#variants2 => Self::#variants,
+							// #variants2 => Self::#variants,
 
 						)*
 						#other_cases,

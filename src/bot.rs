@@ -55,7 +55,7 @@ pub struct Bot {
 	pub game_data: Rc<GameData>,
 	pub state: GameState,
 	pub race_values: Rc<RaceValues>,
-	pub data_for_unit: Rc<DataForUnit>,
+	data_for_unit: Rc<DataForUnit>,
 	pub units: AllUnits,
 	pub abilities_units: HashMap<u64, Vec<AbilityId>>,
 	pub orders: HashMap<AbilityId, usize>,
@@ -72,10 +72,10 @@ pub struct Bot {
 	pub enemy_start: Point2,
 	pub start_center: Point2,
 	pub enemy_start_center: Point2,
-	pub techlab_tags: Rc<RefCell<Vec<u64>>>,
-	pub reactor_tags: Rc<RefCell<Vec<u64>>>,
+	techlab_tags: Rc<RefCell<Vec<u64>>>,
+	reactor_tags: Rc<RefCell<Vec<u64>>>,
 	pub expansions: Vec<(Point2, Point2)>,
-	pub max_cooldowns: Rc<RefCell<HashMap<UnitTypeId, f32>>>,
+	max_cooldowns: Rc<RefCell<HashMap<UnitTypeId, f32>>>,
 }
 
 impl Bot {
@@ -261,8 +261,8 @@ impl Bot {
 			reactor_tags: Rc::clone(&self.reactor_tags),
 			race_values: Rc::clone(&self.race_values),
 			max_cooldowns: Rc::clone(&self.max_cooldowns),
-			upgrades: Rc::clone(&self.state.observation.raw.upgrades),
-			creep: Rc::clone(&self.state.observation.raw.creep),
+			upgrades: Rc::new(self.state.observation.raw.upgrades.clone()),
+			creep: Rc::new(self.state.observation.raw.creep.clone()),
 			game_step: self.game_step,
 		});
 	}
@@ -282,8 +282,8 @@ impl Bot {
 			reactor_tags: Rc::clone(&self.reactor_tags),
 			race_values: Rc::clone(&self.race_values),
 			max_cooldowns: Rc::clone(&self.max_cooldowns),
-			upgrades: Rc::clone(&self.state.observation.raw.upgrades),
-			creep: Rc::clone(&self.state.observation.raw.creep),
+			upgrades: Rc::new(self.state.observation.raw.upgrades.clone()),
+			creep: Rc::new(self.state.observation.raw.creep.clone()),
 			game_step: self.game_step,
 		});
 
@@ -383,6 +383,18 @@ impl Bot {
 		self.supply_cap = common.food_cap;
 		self.supply_used = common.food_used;
 		self.supply_left = self.supply_cap - self.supply_used;
+
+		self.data_for_unit = Rc::new(DataForUnit {
+			commander: Rc::clone(&self.commander),
+			game_data: Rc::clone(&self.game_data),
+			techlab_tags: Rc::clone(&self.techlab_tags),
+			reactor_tags: Rc::clone(&self.reactor_tags),
+			race_values: Rc::clone(&self.race_values),
+			max_cooldowns: Rc::clone(&self.max_cooldowns),
+			upgrades: Rc::new(self.state.observation.raw.upgrades.clone()),
+			creep: Rc::new(self.state.observation.raw.creep.clone()),
+			game_step: self.game_step,
+		});
 
 		// Counting units and orders
 		self.current_units.clear();

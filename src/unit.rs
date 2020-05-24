@@ -508,17 +508,17 @@ impl Unit {
 	pub fn real_weapon_stats(&self) -> (f32, f32) {
 		let (damage, speed, range) =
 			self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Any, None), None);
-		(damage / speed, range)
+		(if speed == 0.0 { 0.0 } else { damage / speed }, range)
 	}
 	pub fn calculate_ground_weapon(&self) -> (f32, f32) {
 		let (damage, speed, range) =
 			self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Ground, None), None);
-		(damage / speed, range)
+		(if speed == 0.0 { 0.0 } else { damage / speed }, range)
 	}
 	pub fn calculate_air_weapon(&self) -> (f32, f32) {
 		let (damage, speed, range) =
 			self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Air, None), None);
-		(damage / speed, range)
+		(if speed == 0.0 { 0.0 } else { damage / speed }, range)
 	}
 
 	pub fn calculate_weapon_abstract(
@@ -529,11 +529,11 @@ impl Unit {
 	) -> (f32, f32) {
 		let (damage, speed, range) =
 			self.calculate_weapon_stats(CalcTarget::Abstract(target_type, attributes), upgrades);
-		(damage / speed, range)
+		(if speed == 0.0 { 0.0 } else { damage / speed }, range)
 	}
 	pub fn calculate_weapon_vs(&self, target: &Unit, upgrades: Option<&Vec<UpgradeId>>) -> (f32, f32) {
 		let (damage, speed, range) = self.calculate_weapon_stats(CalcTarget::Unit(target), upgrades);
-		(damage / speed, range)
+		(if speed == 0.0 { 0.0 } else { damage / speed }, range)
 	}
 
 	// Returns (damage, cooldown, range)
