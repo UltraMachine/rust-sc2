@@ -995,7 +995,15 @@ impl Unit {
 		self.command(AbilityId::CancelBuildInProgress, Target::None, queue)
 	}
 	pub fn cancel_queue(&self, queue: bool) {
-		self.command(AbilityId::CancelQueue5, Target::None, queue)
+		self.command(
+			if self.is_townhall() {
+				AbilityId::CancelQueueCancelToSelection
+			} else {
+				AbilityId::CancelQueue5
+			},
+			Target::None,
+			queue,
+		)
 	}
 	pub fn build_gas(&self, target: u64, queue: bool) {
 		self.command(

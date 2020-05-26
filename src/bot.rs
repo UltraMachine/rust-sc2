@@ -400,16 +400,27 @@ impl Bot {
 		self.current_units.clear();
 		self.orders.clear();
 		self.units.my.all.clone().iter().for_each(|u| {
-			u.orders
-				.iter()
-				.for_each(|order| *self.orders.entry(order.ability).or_default() += 1);
+			u.orders.iter().for_each(|order| match order.ability {
+				AbilityId::TerranBuildCommandCenter
+				| AbilityId::TerranBuildSupplyDepot
+				| AbilityId::TerranBuildRefinery
+				| AbilityId::TerranBuildBarracks
+				| AbilityId::TerranBuildEngineeringBay
+				| AbilityId::TerranBuildMissileTurret
+				| AbilityId::TerranBuildBunker
+				| AbilityId::TerranBuildSensorTower
+				| AbilityId::TerranBuildGhostAcademy
+				| AbilityId::TerranBuildFactory
+				| AbilityId::TerranBuildStarport
+				| AbilityId::TerranBuildArmory
+				| AbilityId::TerranBuildFusionCore => {}
+				ability => *self.orders.entry(ability).or_default() += 1,
+			});
 			if u.is_ready() {
 				*self.current_units.entry(u.type_id).or_default() += 1;
-			} else if u.race() != Race::Terran || !u.is_structure() {
-				if let Some(data) = self.game_data.units.get(&u.type_id) {
-					if let Some(ability) = data.ability {
-						*self.orders.entry(ability).or_default() += 1;
-					}
+			} else if let Some(data) = self.game_data.units.get(&u.type_id) {
+				if let Some(ability) = data.ability {
+					*self.orders.entry(ability).or_default() += 1;
 				}
 			}
 		});
