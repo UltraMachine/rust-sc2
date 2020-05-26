@@ -397,33 +397,25 @@ impl Bot {
 		});
 
 		// Counting units and orders
-		self.current_units.clear();
-		self.orders.clear();
-		self.units.my.all.clone().iter().for_each(|u| {
-			u.orders.iter().for_each(|order| match order.ability {
-				AbilityId::TerranBuildCommandCenter
-				| AbilityId::TerranBuildSupplyDepot
-				| AbilityId::TerranBuildRefinery
-				| AbilityId::TerranBuildBarracks
-				| AbilityId::TerranBuildEngineeringBay
-				| AbilityId::TerranBuildMissileTurret
-				| AbilityId::TerranBuildBunker
-				| AbilityId::TerranBuildSensorTower
-				| AbilityId::TerranBuildGhostAcademy
-				| AbilityId::TerranBuildFactory
-				| AbilityId::TerranBuildStarport
-				| AbilityId::TerranBuildArmory
-				| AbilityId::TerranBuildFusionCore => {}
-				ability => *self.orders.entry(ability).or_default() += 1,
+		let mut current_units = HashMap::new();
+		let mut orders = HashMap::new();
+		self.units.my.all.iter().for_each(|u| {
+			u.orders.iter().for_each(|order| {
+				if !order.ability.is_constructing() {
+					*orders.entry(order.ability).or_default() += 1
+				}
 			});
-			if u.is_ready() {
-				*self.current_units.entry(u.type_id).or_default() += 1;
+
+			if u.is_ready() && !u.is_placeholder() {
+				*current_units.entry(u.type_id).or_default() += 1;
 			} else if let Some(data) = self.game_data.units.get(&u.type_id) {
 				if let Some(ability) = data.ability {
-					*self.orders.entry(ability).or_default() += 1;
+					*orders.entry(ability).or_default() += 1;
 				}
 			}
 		});
+		self.current_units = current_units;
+		self.orders = orders;
 	}
 	fn update_units(&mut self) {
 		self.units.clear();
@@ -478,14 +470,14 @@ impl Bot {
 
 					_ => add_to!(units.destructables),
 				},
-				alliance @ Alliance::Own | alliance @ Alliance::Enemy => {
-					let units = if alliance.is_mine() {
+				Alliance::Own | Alliance::Enemy => {
+					let units = if u.is_mine() {
 						&mut units.my
 					} else {
 						&mut units.enemy
 					};
 					add_to!(units.all);
-					if alliance.is_mine() {
+					if u.is_mine() {
 						if let Some(cooldown) = u.weapon_cooldown {
 							max_cooldowns
 								.entry(u_type)
@@ -524,7 +516,7 @@ impl Bot {
 								| UnitTypeId::BarracksTechLab
 								| UnitTypeId::FactoryTechLab
 								| UnitTypeId::StarportTechLab
-									if alliance.is_mine() =>
+									if u.is_mine() =>
 								{
 									techlab_tags.push(u.tag)
 								}
@@ -533,7 +525,7 @@ impl Bot {
 								| UnitTypeId::BarracksReactor
 								| UnitTypeId::FactoryReactor
 								| UnitTypeId::StarportReactor
-									if alliance.is_mine() =>
+									if u.is_mine() =>
 								{
 									reactor_tags.push(u.tag)
 								}

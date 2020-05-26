@@ -776,7 +776,19 @@ impl Unit {
 	}
 	pub fn in_range(&self, target: &Unit, gap: f32) -> bool {
 		let range = {
-			if !target.is_flying {
+			if matches!(target.type_id, UnitTypeId::Colossus) {
+				match self.weapons() {
+					Some(weapons) => match weapons
+						.iter()
+						.map(|w| w.range)
+						.max_by(|r1, r2| r1.partial_cmp(r2).unwrap())
+					{
+						Some(max_range) => max_range,
+						None => return false,
+					},
+					None => return false,
+				}
+			} else if target.is_flying {
 				if self.can_attack_ground() {
 					self.ground_range()
 				} else {
@@ -897,56 +909,7 @@ impl Unit {
 			)
 	}
 	pub fn is_constructing(&self) -> bool {
-		!self.is_idle()
-			&& matches!(
-				self.orders[0].ability,
-				// Terran
-				AbilityId::TerranBuildCommandCenter
-				| AbilityId::TerranBuildSupplyDepot
-				| AbilityId::TerranBuildRefinery
-				| AbilityId::TerranBuildBarracks
-				| AbilityId::TerranBuildEngineeringBay
-				| AbilityId::TerranBuildMissileTurret
-				| AbilityId::TerranBuildBunker
-				| AbilityId::TerranBuildSensorTower
-				| AbilityId::TerranBuildGhostAcademy
-				| AbilityId::TerranBuildFactory
-				| AbilityId::TerranBuildStarport
-				| AbilityId::TerranBuildArmory
-				| AbilityId::TerranBuildFusionCore
-				// Protoss
-				| AbilityId::ProtossBuildNexus
-				| AbilityId::ProtossBuildPylon
-				| AbilityId::ProtossBuildAssimilator
-				| AbilityId::ProtossBuildGateway
-				| AbilityId::ProtossBuildForge
-				| AbilityId::ProtossBuildFleetBeacon
-				| AbilityId::ProtossBuildTwilightCouncil
-				| AbilityId::ProtossBuildPhotonCannon
-				| AbilityId::ProtossBuildStargate
-				| AbilityId::ProtossBuildTemplarArchive
-				| AbilityId::ProtossBuildDarkShrine
-				| AbilityId::ProtossBuildRoboticsBay
-				| AbilityId::ProtossBuildRoboticsFacility
-				| AbilityId::ProtossBuildCyberneticsCore
-				| AbilityId::BuildShieldBattery
-				// Zerg
-				| AbilityId::ZergBuildHatchery
-				| AbilityId::ZergBuildCreepTumor
-				| AbilityId::ZergBuildExtractor
-				| AbilityId::ZergBuildSpawningPool
-				| AbilityId::ZergBuildEvolutionChamber
-				| AbilityId::ZergBuildHydraliskDen
-				| AbilityId::ZergBuildSpire
-				| AbilityId::ZergBuildUltraliskCavern
-				| AbilityId::ZergBuildInfestationPit
-				| AbilityId::ZergBuildNydusNetwork
-				| AbilityId::ZergBuildBanelingNest
-				| AbilityId::BuildLurkerDen
-				| AbilityId::ZergBuildRoachWarren
-				| AbilityId::ZergBuildSpineCrawler
-				| AbilityId::ZergBuildSporeCrawler
-			)
+		!self.is_idle() && self.orders[0].ability.is_constructing()
 	}
 	// Actions
 	pub fn command(&self, ability: AbilityId, target: Target, queue: bool) {
