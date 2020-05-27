@@ -453,13 +453,11 @@ impl Unit {
 			}) || (ground && air)
 		})
 	}
-	#[rustfmt::skip::macros(matches)]
 	pub fn can_attack_ground(&self) -> bool {
 		self.weapons().map_or(false, |weapons| {
 			weapons.iter().any(|w| TARGET_GROUND.contains(&w.target))
 		})
 	}
-	#[rustfmt::skip::macros(matches)]
 	pub fn can_attack_air(&self) -> bool {
 		self.weapons().map_or(false, |weapons| {
 			weapons.iter().any(|w| TARGET_AIR.contains(&w.target))
@@ -789,25 +787,42 @@ impl Unit {
 					None => return false,
 				}
 			} else if target.is_flying {
-				if self.can_attack_ground() {
-					self.ground_range()
-				} else {
+				let range = self.air_range();
+				if range < f32::EPSILON {
 					return false;
 				}
-			} else if self.can_attack_air() {
-				self.air_range()
 			} else {
-				return false;
+				let range = self.ground_range();
+				if range < f32::EPSILON {
+					return false;
+				}
 			}
 		};
-		let total_range = (self.radius + target.radius + range + gap).powi(2);
+		let total_range = self.radius + target.radius + range + gap;
 		let distance = self.distance_squared(target);
 
 		// Takes into account that Sieged Tank has a minimum range of 2
-		distance <= total_range && (self.type_id != UnitTypeId::SiegeTankSieged || distance > 4.0)
+		distance <= total_range * total_range
+			&& (self.type_id != UnitTypeId::SiegeTankSieged || distance > 4.0)
 	}
 	pub fn in_range_of(&self, threat: &Unit, gap: f32) -> bool {
 		threat.in_range(self, gap)
+	}
+	pub fn in_real_range(&self, target: &Unit, gap: f32, upgrades: Option<&Vec<UpgradeId>>) -> bool {
+		let range = self.calculate_weapon_vs(target, upgrades).1;
+		if range < f32::EPSILON {
+			return false;
+		}
+
+		let total_range = self.radius + target.radius + range + gap;
+		let distance = self.distance_squared(target);
+
+		// Takes into account that Sieged Tank has a minimum range of 2
+		distance <= total_range * total_range
+			&& (self.type_id != UnitTypeId::SiegeTankSieged || distance > 4.0)
+	}
+	pub fn in_real_range_of(&self, threat: &Unit, gap: f32, upgrades: Option<&Vec<UpgradeId>>) -> bool {
+		threat.in_real_range(self, gap, upgrades)
 	}
 	pub fn damage_bonus(&self) -> Option<(Attribute, f32)> {
 		self.weapons().and_then(|weapons| {
