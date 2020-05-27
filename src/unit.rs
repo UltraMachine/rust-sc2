@@ -791,11 +791,13 @@ impl Unit {
 				if range < f32::EPSILON {
 					return false;
 				}
+				range
 			} else {
 				let range = self.ground_range();
 				if range < f32::EPSILON {
 					return false;
 				}
+				range
 			}
 		};
 		let total_range = self.radius + target.radius + range + gap;
