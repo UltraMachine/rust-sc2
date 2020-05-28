@@ -336,7 +336,7 @@ impl Bot {
 			.iter()
 			.map(|group| {
 				let resources = all_resources.find_tags(group.iter().map(|(_, tag)| *tag));
-				let center = resources.center().floor() + 0.5;
+				let center = resources.center().expect("No resources on this map").floor() + 0.5;
 
 				if center.distance_squared(self.start_center) < 16.0 {
 					(self.start_location, self.start_center)

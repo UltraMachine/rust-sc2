@@ -136,8 +136,12 @@ impl Units {
 	pub fn of_types<T: Iterator<Item = UnitTypeId> + Clone>(&self, types: T) -> Self {
 		self.filter(|u| types.clone().any(|u_type| u.type_id == u_type))
 	}
-	pub fn center(&self) -> Point2 {
-		self.sum(|u| u.position) / (self.len() as f32)
+	pub fn center(&self) -> Option<Point2> {
+		if self.is_empty() {
+			None
+		} else {
+			Some(self.sum(|u| u.position) / self.len() as f32)
+		}
 	}
 	// Get closest | furthest
 	pub fn closest<P: Into<Point2> + Copy>(&self, target: P) -> Option<&Unit> {
