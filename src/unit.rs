@@ -569,12 +569,11 @@ impl Unit {
 				target.buffs.iter().for_each(|buff| match buff {
 					BuffId::GuardianShield => target_has_guardian_shield = true,
 					_ => {
-						if *buff
-							== if cfg!(windows) {
-								BuffId::RavenShredderMissileArmorReductionUISubtruct
-							} else {
-								BuffId::RavenShredderMissileArmorReduction
-							} {
+						#[cfg(windows)]
+						const ANTI_ARMOR_BUFF: BuffId = BuffId::RavenShredderMissileArmorReductionUISubtruct;
+						#[cfg(unix)]
+						const ANTI_ARMOR_BUFF: BuffId = BuffId::RavenShredderMissileArmorReduction;
+						if *buff == ANTI_ARMOR_BUFF {
 							enemy_armor -= 3;
 							enemy_shield_armor -= 3;
 						}
