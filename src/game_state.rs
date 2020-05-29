@@ -3,7 +3,7 @@ use crate::{
 	geometry::Point2,
 	ids::{AbilityId, EffectId, UpgradeId},
 	pixel_map::{PixelMap, VisibilityMap},
-	unit::{DataForUnit, Unit},
+	unit::{SharedUnitData, Unit},
 	units::Units,
 	FromProto, FromProtoData,
 };
@@ -12,7 +12,11 @@ use sc2_proto::{
 	raw::{Alliance as ProtoAlliance, ObservationRaw, PowerSource as ProtoPowerSource},
 	sc2api::{Alert as ProtoAlert, Observation as ProtoObservation, ResponseObservation},
 };
+
+#[cfg(not(feature = "rayon"))]
 use std::rc::Rc;
+#[cfg(feature = "rayon")]
+use std::sync::Arc;
 
 #[derive(Default, Clone)]
 pub struct GameState {
@@ -23,7 +27,7 @@ pub struct GameState {
 	pub chat: Vec<ChatMessage>,
 }
 impl FromProtoData<&ResponseObservation> for GameState {
-	fn from_proto_data(data: Rc<DataForUnit>, response_observation: &ResponseObservation) -> Self {
+	fn from_proto_data(data: SharedUnitData, response_observation: &ResponseObservation) -> Self {
 		// let player_result = response_observation.get_player_result();
 		Self {
 			actions: response_observation
@@ -65,7 +69,7 @@ pub struct Observation {
 	pub raw: RawData,
 }
 impl FromProtoData<ProtoObservation> for Observation {
-	fn from_proto_data(data: Rc<DataForUnit>, obs: ProtoObservation) -> Self {
+	fn from_proto_data(data: SharedUnitData, obs: ProtoObservation) -> Self {
 		let common = obs.get_player_common();
 		Self {
 			game_loop: obs.get_game_loop(),
@@ -109,7 +113,7 @@ pub struct RawData {
 	pub radars: Vec<Radar>,
 }
 impl FromProtoData<ObservationRaw> for RawData {
-	fn from_proto_data(data: Rc<DataForUnit>, raw: ObservationRaw) -> Self {
+	fn from_proto_data(data: SharedUnitData, raw: ObservationRaw) -> Self {
 		let raw_player = raw.get_player();
 		let map_state = raw.get_map_state();
 		Self {
@@ -122,7 +126,21 @@ impl FromProtoData<ObservationRaw> for RawData {
 			units: raw
 				.get_units()
 				.iter()
-				.map(|u| Unit::from_proto_data(Rc::clone(&data), u.clone()))
+				.map(|u| {
+					Unit::from_proto_data(
+						{
+							#[cfg(feature = "rayon")]
+							{
+								Arc::clone(&data)
+							}
+							#[cfg(not(feature = "rayon"))]
+							{
+								Rc::clone(&data)
+							}
+						},
+						u.clone(),
+					)
+				})
 				.collect(),
 			upgrades: raw_player
 				.get_upgrade_ids()

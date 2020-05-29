@@ -47,8 +47,7 @@ pub mod units;
 pub mod utils;
 
 use player::{GameResult, Race};
-use std::rc::Rc;
-use unit::DataForUnit;
+use unit::SharedUnitData;
 
 pub use client::{run_ladder_game, run_vs_computer, run_vs_human, SC2Result};
 pub use sc2_macro::{bot, bot_new};
@@ -117,7 +116,7 @@ trait FromProtoData<T>
 where
 	Self: Sized,
 {
-	fn from_proto_data(data: Rc<DataForUnit>, proto: T) -> Self;
+	fn from_proto_data(data: SharedUnitData, proto: T) -> Self;
 }
 
 trait IntoProto<T> {

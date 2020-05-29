@@ -17,8 +17,28 @@ use sc2_proto::raw::{
 	CloakState as ProtoCloakState, DisplayType as ProtoDisplayType, Unit as ProtoUnit,
 	UnitOrder_oneof_target as ProtoTarget,
 };
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 
+#[cfg(feature = "rayon")]
+use std::sync::{Arc, RwLock};
+#[cfg(not(feature = "rayon"))]
+use std::{cell::RefCell, rc::Rc};
+
+#[cfg(feature = "rayon")]
+#[derive(Default, Clone)]
+pub struct DataForUnit {
+	pub commander: Arc<RwLock<Commander>>,
+	pub game_data: Arc<GameData>,
+	pub techlab_tags: Arc<RwLock<Vec<u64>>>,
+	pub reactor_tags: Arc<RwLock<Vec<u64>>>,
+	pub race_values: Arc<RaceValues>,
+	pub max_cooldowns: Arc<RwLock<HashMap<UnitTypeId, f32>>>,
+	pub upgrades: Arc<Vec<UpgradeId>>,
+	pub creep: Arc<PixelMap>,
+	pub game_step: u32,
+}
+
+#[cfg(not(feature = "rayon"))]
 #[derive(Default, Clone)]
 pub struct DataForUnit {
 	pub commander: Rc<RefCell<Commander>>,
@@ -37,9 +57,14 @@ pub enum CalcTarget<'a> {
 	Abstract(TargetType, Option<&'a Vec<Attribute>>),
 }
 
+#[cfg(feature = "rayon")]
+pub(crate) type SharedUnitData = Arc<DataForUnit>;
+#[cfg(not(feature = "rayon"))]
+pub(crate) type SharedUnitData = Rc<DataForUnit>;
+
 #[derive(Clone)]
 pub struct Unit {
-	data: Rc<DataForUnit>,
+	data: SharedUnitData,
 	pub allow_spam: bool,
 
 	// Fields are populated based on type/alliance
@@ -137,11 +162,19 @@ impl Unit {
 		self.addon_tag.is_some()
 	}
 	pub fn has_techlab(&self) -> bool {
+		#[cfg(not(feature = "rayon"))]
 		let techlab_tags = self.data.techlab_tags.borrow();
+		#[cfg(feature = "rayon")]
+		let techlab_tags = self.data.techlab_tags.read().unwrap();
+
 		self.addon_tag.map_or(false, |tag| techlab_tags.contains(&tag))
 	}
 	pub fn has_reactor(&self) -> bool {
+		#[cfg(not(feature = "rayon"))]
 		let reactor_tags = self.data.reactor_tags.borrow();
+		#[cfg(feature = "rayon")]
+		let reactor_tags = self.data.reactor_tags.read().unwrap();
+
 		self.addon_tag.map_or(false, |tag| reactor_tags.contains(&tag))
 	}
 	pub fn race(&self) -> Race {
@@ -467,7 +500,12 @@ impl Unit {
 		self.weapon_cooldown.map_or(false, |cool| cool > 0.0)
 	}
 	pub fn max_cooldown(&self) -> Option<f32> {
-		self.data.max_cooldowns.borrow().get(&self.type_id).copied()
+		#[cfg(feature = "rayon")]
+		let max_cooldowns = self.data.max_cooldowns.read().unwrap();
+		#[cfg(not(feature = "rayon"))]
+		let max_cooldowns = self.data.max_cooldowns.borrow();
+
+		max_cooldowns.get(&self.type_id).copied()
 	}
 	pub fn ground_range(&self) -> f32 {
 		self.weapons().map_or(0.0, |weapons| {
@@ -573,6 +611,7 @@ impl Unit {
 						const ANTI_ARMOR_BUFF: BuffId = BuffId::RavenShredderMissileArmorReductionUISubtruct;
 						#[cfg(unix)]
 						const ANTI_ARMOR_BUFF: BuffId = BuffId::RavenShredderMissileArmorReduction;
+
 						if *buff == ANTI_ARMOR_BUFF {
 							enemy_armor -= 3;
 							enemy_shield_armor -= 3;
@@ -935,10 +974,13 @@ impl Unit {
 				return;
 			}
 		}
-		self.data
-			.commander
-			.borrow_mut()
-			.command((self.tag, (ability, target, queue)));
+
+		#[cfg(feature = "rayon")]
+		let mut commander = self.data.commander.write().unwrap();
+		#[cfg(not(feature = "rayon"))]
+		let mut commander = self.data.commander.borrow_mut();
+
+		commander.command((self.tag, (ability, target, queue)));
 	}
 	pub fn use_ability(&self, ability: AbilityId, queue: bool) {
 		self.command(ability, Target::None, queue)
@@ -1043,7 +1085,7 @@ impl From<&Unit> for Point2 {
 }
 
 impl FromProtoData<ProtoUnit> for Unit {
-	fn from_proto_data(data: Rc<DataForUnit>, u: ProtoUnit) -> Self {
+	fn from_proto_data(data: SharedUnitData, u: ProtoUnit) -> Self {
 		let pos = u.get_pos();
 		let type_id = UnitTypeId::from_u32(u.get_unit_type()).unwrap();
 		Self {

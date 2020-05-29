@@ -176,9 +176,9 @@ impl Units {
 
 	pub fn filter<F>(&self, f: F) -> Self
 	where
-		F: Fn(&Unit) -> bool,
+		F: Fn(&&Unit) -> bool,
 	{
-		Self(self.iter().cloned().filter(f).map(|u| (u.tag, u)).collect())
+		Self(self.iter().filter(f).map(|u| (u.tag, u.clone())).collect())
 	}
 	pub fn ground(&self) -> Self {
 		self.filter(|u| !u.is_flying)
@@ -315,7 +315,7 @@ impl Units {
 impl FromIterator<Unit> for Units {
 	#[inline]
 	fn from_iter<I: IntoIterator<Item = Unit>>(iter: I) -> Self {
-		Units(iter.into_iter().map(|u| (u.tag, u)).collect())
+		Self(iter.into_iter().map(|u| (u.tag, u)).collect())
 	}
 }
 impl IntoIterator for Units {
@@ -344,8 +344,68 @@ impl IndexMut<u64> for Units {
 impl Extend<Unit> for Units {
 	#[inline]
 	fn extend<T: IntoIterator<Item = Unit>>(&mut self, iter: T) {
-		iter.into_iter().for_each(|u| {
-			self.push(u);
-		});
+		self.0.extend(iter.into_iter().map(|u| (u.tag, u)));
+	}
+}
+
+#[cfg(feature = "rayon")]
+use rayon::{
+	collections::hash_map::{IntoIter as IntoParIter, Iter as ParIter, IterMut as ParIterMut},
+	iter::IterBridge,
+	prelude::*,
+};
+
+#[cfg(feature = "rayon")]
+impl Units {
+	#[inline]
+	pub fn par_iter(&self) -> IterBridge<Values<u64, Unit>> {
+		self.0.values().par_bridge()
+	}
+
+	#[inline]
+	pub fn par_iter_mut(&mut self) -> IterBridge<ValuesMut<u64, Unit>> {
+		self.0.values_mut().par_bridge()
+	}
+
+	#[inline]
+	pub fn par_pairs(&self) -> ParIter<u64, Unit> {
+		self.0.par_iter()
+	}
+
+	#[inline]
+	pub fn par_pairs_mut(&mut self) -> ParIterMut<u64, Unit> {
+		self.0.par_iter_mut()
+	}
+
+	#[inline]
+	pub fn par_tags(&self) -> IterBridge<Keys<u64, Unit>> {
+		self.0.keys().par_bridge()
+	}
+}
+
+#[cfg(feature = "rayon")]
+impl IntoParallelIterator for Units {
+	type Item = (u64, Unit);
+	type Iter = IntoParIter<u64, Unit>;
+
+	#[inline]
+	fn into_par_iter(self) -> Self::Iter {
+		self.0.into_par_iter()
+	}
+}
+
+#[cfg(feature = "rayon")]
+impl ParallelExtend<Unit> for Units {
+	#[inline]
+	fn par_extend<T: IntoParallelIterator<Item = Unit>>(&mut self, par_iter: T) {
+		self.0.par_extend(par_iter.into_par_iter().map(|u| (u.tag, u)));
+	}
+}
+
+#[cfg(feature = "rayon")]
+impl FromParallelIterator<Unit> for Units {
+	#[inline]
+	fn from_par_iter<I: IntoParallelIterator<Item = Unit>>(par_iter: I) -> Self {
+		Self(par_iter.into_par_iter().map(|u| (u.tag, u)).collect())
 	}
 }

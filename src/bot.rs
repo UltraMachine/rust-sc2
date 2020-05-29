@@ -10,7 +10,7 @@ use crate::{
 	geometry::Point2,
 	ids::{AbilityId, UnitTypeId, UpgradeId},
 	player::Race,
-	unit::{DataForUnit, Unit},
+	unit::{DataForUnit, SharedUnitData, Unit},
 	units::AllUnits,
 	utils::{dbscan, range_query},
 	FromProto, IntoProto,
@@ -21,7 +21,22 @@ use sc2_proto::{
 	query::{RequestQueryBuildingPlacement, RequestQueryPathing},
 	sc2api::Request,
 };
-use std::{cell::RefCell, collections::HashMap, panic, process::Child, rc::Rc};
+use std::{collections::HashMap, panic, process::Child};
+
+#[cfg(feature = "rayon")]
+use std::sync::{Arc, RwLock};
+#[cfg(not(feature = "rayon"))]
+use std::{cell::RefCell, rc::Rc};
+
+#[cfg(feature = "rayon")]
+pub(crate) type Rs<T> = Arc<T>;
+#[cfg(not(feature = "rayon"))]
+pub(crate) type Rs<T> = Rc<T>;
+
+#[cfg(feature = "rayon")]
+type Rw<T> = Arc<RwLock<T>>;
+#[cfg(not(feature = "rayon"))]
+type Rw<T> = Rc<RefCell<T>>;
 
 pub struct PlacementOptions {
 	pub max_distance: isize,
@@ -49,13 +64,13 @@ pub struct Bot {
 	pub player_id: u32,
 	pub opponent_id: String,
 	pub actions: Vec<Action>,
-	pub commander: Rc<RefCell<Commander>>,
+	pub commander: Rw<Commander>,
 	pub debug: Debugger,
 	pub game_info: GameInfo,
-	pub game_data: Rc<GameData>,
+	pub game_data: Rs<GameData>,
 	pub state: GameState,
-	pub race_values: Rc<RaceValues>,
-	data_for_unit: Rc<DataForUnit>,
+	pub race_values: Rs<RaceValues>,
+	data_for_unit: SharedUnitData,
 	pub units: AllUnits,
 	pub abilities_units: HashMap<u64, Vec<AbilityId>>,
 	pub orders: HashMap<AbilityId, usize>,
@@ -72,10 +87,10 @@ pub struct Bot {
 	pub enemy_start: Point2,
 	pub start_center: Point2,
 	pub enemy_start_center: Point2,
-	techlab_tags: Rc<RefCell<Vec<u64>>>,
-	reactor_tags: Rc<RefCell<Vec<u64>>>,
+	techlab_tags: Rw<Vec<u64>>,
+	reactor_tags: Rw<Vec<u64>>,
 	pub expansions: Vec<(Point2, Point2)>,
-	max_cooldowns: Rc<RefCell<HashMap<UnitTypeId, f32>>>,
+	max_cooldowns: Rw<HashMap<UnitTypeId, f32>>,
 }
 
 impl Bot {
@@ -122,11 +137,23 @@ impl Bot {
 	pub fn api(&mut self) -> &mut API {
 		self.api.as_mut().expect("API is not initialized")
 	}
-	pub(crate) fn get_data_for_unit(&self) -> Rc<DataForUnit> {
-		Rc::clone(&self.data_for_unit)
+	pub(crate) fn get_data_for_unit(&self) -> SharedUnitData {
+		#[cfg(feature = "rayon")]
+		{
+			Arc::clone(&self.data_for_unit)
+		}
+		#[cfg(not(feature = "rayon"))]
+		{
+			Rc::clone(&self.data_for_unit)
+		}
 	}
 	pub(crate) fn get_actions(&self) -> Vec<Action> {
-		let commands = &self.commander.borrow().commands;
+		#[cfg(feature = "rayon")]
+		let commander = self.commander.read().unwrap();
+		#[cfg(not(feature = "rayon"))]
+		let commander = self.commander.borrow();
+
+		let commands = &commander.commands;
 		if !commands.is_empty() {
 			let mut actions = self.actions.clone();
 			commands.iter().for_each(|((ability, target, queue), units)| {
@@ -139,7 +166,13 @@ impl Bot {
 	}
 	pub(crate) fn clear_actions(&mut self) {
 		self.actions.clear();
-		self.commander.borrow_mut().commands.clear();
+
+		#[cfg(feature = "rayon")]
+		let mut commander = self.commander.write().unwrap();
+		#[cfg(not(feature = "rayon"))]
+		let mut commander = self.commander.borrow_mut();
+
+		commander.commands.clear();
 	}
 	pub(crate) fn get_debug_commands(&self) -> Vec<DebugCommand> {
 		self.debug.get_commands()
@@ -253,16 +286,16 @@ impl Bot {
 	pub fn has_creep<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
 		self.state.observation.raw.creep[pos.into()].is_empty()
 	}
-	pub(crate) fn init_data_for_unit(&mut self) {
-		self.data_for_unit = Rc::new(DataForUnit {
-			commander: Rc::clone(&self.commander),
-			game_data: Rc::clone(&self.game_data),
-			techlab_tags: Rc::clone(&self.techlab_tags),
-			reactor_tags: Rc::clone(&self.reactor_tags),
-			race_values: Rc::clone(&self.race_values),
-			max_cooldowns: Rc::clone(&self.max_cooldowns),
-			upgrades: Rc::new(self.state.observation.raw.upgrades.clone()),
-			creep: Rc::new(self.state.observation.raw.creep.clone()),
+	pub(crate) fn update_data_for_unit(&mut self) {
+		self.data_for_unit = Rs::new(DataForUnit {
+			commander: Rs::clone(&self.commander),
+			game_data: Rs::clone(&self.game_data),
+			techlab_tags: Rs::clone(&self.techlab_tags),
+			reactor_tags: Rs::clone(&self.reactor_tags),
+			race_values: Rs::clone(&self.race_values),
+			max_cooldowns: Rs::clone(&self.max_cooldowns),
+			upgrades: Rs::new(self.state.observation.raw.upgrades.clone()),
+			creep: Rs::new(self.state.observation.raw.creep.clone()),
 			game_step: self.game_step,
 		});
 	}
@@ -272,20 +305,10 @@ impl Bot {
 		if self.game_info.players.len() == 2 {
 			self.enemy_race = self.game_info.players[&(3 - self.player_id)].race_requested;
 		}
-		self.race_values = Rc::new(RACE_VALUES[&self.race].clone());
+		self.race_values = Rs::new(RACE_VALUES[&self.race].clone());
 		self.update_units();
 
-		self.data_for_unit = Rc::new(DataForUnit {
-			commander: Rc::clone(&self.commander),
-			game_data: Rc::clone(&self.game_data),
-			techlab_tags: Rc::clone(&self.techlab_tags),
-			reactor_tags: Rc::clone(&self.reactor_tags),
-			race_values: Rc::clone(&self.race_values),
-			max_cooldowns: Rc::clone(&self.max_cooldowns),
-			upgrades: Rc::new(self.state.observation.raw.upgrades.clone()),
-			creep: Rc::new(self.state.observation.raw.creep.clone()),
-			game_step: self.game_step,
-		});
+		self.update_data_for_unit();
 
 		self.start_location = self.units.my.townhalls.first().unwrap().position;
 		self.enemy_start = self.game_info.start_locations[0];
@@ -384,17 +407,7 @@ impl Bot {
 		self.supply_used = common.food_used;
 		self.supply_left = self.supply_cap - self.supply_used;
 
-		self.data_for_unit = Rc::new(DataForUnit {
-			commander: Rc::clone(&self.commander),
-			game_data: Rc::clone(&self.game_data),
-			techlab_tags: Rc::clone(&self.techlab_tags),
-			reactor_tags: Rc::clone(&self.reactor_tags),
-			race_values: Rc::clone(&self.race_values),
-			max_cooldowns: Rc::clone(&self.max_cooldowns),
-			upgrades: Rc::new(self.state.observation.raw.upgrades.clone()),
-			creep: Rc::new(self.state.observation.raw.creep.clone()),
-			game_step: self.game_step,
-		});
+		self.update_data_for_unit();
 
 		// Counting units and orders
 		let mut current_units = HashMap::new();
@@ -419,8 +432,20 @@ impl Bot {
 	}
 	fn update_units(&mut self) {
 		self.units.clear();
+
+		#[cfg(feature = "rayon")]
+		let mut techlab_tags = self.techlab_tags.write().unwrap();
+		#[cfg(not(feature = "rayon"))]
 		let mut techlab_tags = self.techlab_tags.borrow_mut();
+
+		#[cfg(feature = "rayon")]
+		let mut reactor_tags = self.reactor_tags.write().unwrap();
+		#[cfg(not(feature = "rayon"))]
 		let mut reactor_tags = self.reactor_tags.borrow_mut();
+
+		#[cfg(feature = "rayon")]
+		let mut max_cooldowns = self.max_cooldowns.write().unwrap();
+		#[cfg(not(feature = "rayon"))]
 		let mut max_cooldowns = self.max_cooldowns.borrow_mut();
 
 		techlab_tags.clear();

@@ -1,6 +1,11 @@
 use crate::{
-	api::API, bot::Bot, game_state::GameState, ids::AbilityId, paths::*, player::Computer, FromProtoData,
-	IntoProto, IntoSC2, Player, PlayerSettings,
+	api::API,
+	bot::{Bot, Rs},
+	game_state::GameState,
+	ids::AbilityId,
+	paths::*,
+	player::Computer,
+	FromProtoData, IntoProto, IntoSC2, Player, PlayerSettings,
 };
 use num_traits::FromPrimitive;
 use sc2_proto::{
@@ -15,7 +20,6 @@ use std::{
 	ops::{Deref, DerefMut},
 	panic,
 	process::{Child, Command},
-	rc::Rc,
 };
 use tungstenite::{client::AutoStream, connect, WebSocket};
 use url::Url;
@@ -333,7 +337,7 @@ fn set_static_data(bot: &mut Bot) -> SC2Result<()> {
 	req_game_data.set_buff_id(true);
 	req_game_data.set_effect_id(true);
 	let mut res = api.send(req)?;
-	bot.game_data = Rc::new(res.take_data().into_sc2());
+	bot.game_data = Rs::new(res.take_data().into_sc2());
 	Ok(())
 }
 
@@ -426,7 +430,7 @@ where
 
 	let res = bot.api().send(req)?;
 
-	bot.init_data_for_unit();
+	bot.update_data_for_unit();
 	bot.state = GameState::from_proto_data(bot.get_data_for_unit(), res.get_observation());
 	bot.prepare_start();
 
