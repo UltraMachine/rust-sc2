@@ -966,6 +966,18 @@ impl Unit {
 	pub fn is_constructing(&self) -> bool {
 		!self.is_idle() && self.orders[0].ability.is_constructing()
 	}
+	pub fn is_making_addon(&self) -> bool {
+		!self.is_idle()
+			&& matches!(
+				self.orders[0].ability,
+				AbilityId::BuildTechLabBarracks
+				| AbilityId::BuildReactorBarracks
+				| AbilityId::BuildTechLabFactory
+				| AbilityId::BuildReactorFactory
+				| AbilityId::BuildTechLabStarport
+				| AbilityId::BuildReactorStarport
+			)
+	}
 	// Actions
 	pub fn command(&self, ability: AbilityId, target: Target, queue: bool) {
 		if !(queue || self.allow_spam || self.is_idle()) {

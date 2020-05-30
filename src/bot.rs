@@ -711,7 +711,10 @@ impl Bot {
 		let expansions = self
 			.expansions
 			.iter()
-			.filter(|(loc, _)| self.units.my.townhalls.iter().all(|t| t.is_further(15.0, *loc)))
+			.filter(|(loc, _)| {
+				self.units.my.townhalls.iter().all(|t| t.is_further(7.0, *loc))
+					&& self.units.my.placeholders.iter().all(|p| p.is_further(7.0, *loc))
+			})
 			.copied()
 			.collect::<Vec<(Point2, Point2)>>();
 		let paths = self
@@ -734,13 +737,7 @@ impl Bot {
 		let expansions = self
 			.expansions
 			.iter()
-			.filter(|(loc, _)| {
-				self.units
-					.enemy
-					.townhalls
-					.iter()
-					.all(|t| t.is_further(15.0, *loc))
-			})
+			.filter(|(loc, _)| self.units.enemy.townhalls.iter().all(|t| t.is_further(7.0, *loc)))
 			.copied()
 			.collect::<Vec<(Point2, Point2)>>();
 		let paths = self
