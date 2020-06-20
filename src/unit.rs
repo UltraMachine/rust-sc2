@@ -20,38 +20,18 @@ use sc2_proto::raw::{
 };
 use std::collections::HashMap;
 
-#[cfg(feature = "rayon")]
-use std::sync::{Arc, RwLock};
-#[cfg(not(feature = "rayon"))]
-use std::{cell::RefCell, rc::Rc};
-
-#[cfg(feature = "rayon")]
 #[derive(Default, Clone)]
 pub struct DataForUnit {
-	pub commander: Arc<RwLock<Commander>>,
-	pub game_data: Arc<GameData>,
-	pub techlab_tags: Arc<RwLock<Vec<u64>>>,
-	pub reactor_tags: Arc<RwLock<Vec<u64>>>,
-	pub race_values: Arc<RaceValues>,
-	pub max_cooldowns: Arc<RwLock<HashMap<UnitTypeId, f32>>>,
-	pub upgrades: Arc<Vec<UpgradeId>>,
-	pub creep: Arc<PixelMap>,
-	pub game_step: u32,
-}
-
-#[cfg(not(feature = "rayon"))]
-#[derive(Default, Clone)]
-pub struct DataForUnit {
-	pub commander: Rc<RefCell<Commander>>,
-	pub game_data: Rc<GameData>,
-	pub techlab_tags: Rc<RefCell<Vec<u64>>>,
-	pub reactor_tags: Rc<RefCell<Vec<u64>>>,
-	pub race_values: Rc<RaceValues>,
-	pub max_cooldowns: Rc<RefCell<HashMap<UnitTypeId, f32>>>,
-	pub upgrades: Rc<Vec<UpgradeId>>,
-	pub creep: Rc<PixelMap>,
+	pub commander: Rw<Commander>,
+	pub game_data: Rs<GameData>,
+	pub techlab_tags: Rw<Vec<u64>>,
+	pub reactor_tags: Rw<Vec<u64>>,
+	pub race_values: Rs<RaceValues>,
+	pub max_cooldowns: Rw<HashMap<UnitTypeId, f32>>,
 	pub last_units_health: Rs<HashMap<u64, f32>>,
 	pub abilities_units: Rs<HashMap<u64, Vec<AbilityId>>>,
+	pub upgrades: Rs<Vec<UpgradeId>>,
+	pub creep: Rs<PixelMap>,
 	pub game_step: u32,
 }
 
@@ -60,10 +40,7 @@ pub enum CalcTarget<'a> {
 	Abstract(TargetType, Option<&'a Vec<Attribute>>),
 }
 
-#[cfg(feature = "rayon")]
-pub(crate) type SharedUnitData = Arc<DataForUnit>;
-#[cfg(not(feature = "rayon"))]
-pub(crate) type SharedUnitData = Rc<DataForUnit>;
+pub(crate) type SharedUnitData = Rs<DataForUnit>;
 
 #[derive(Clone)]
 pub struct Unit {

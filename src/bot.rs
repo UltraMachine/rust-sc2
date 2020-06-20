@@ -140,14 +140,7 @@ impl Bot {
 		self.api.as_mut().expect("API is not initialized")
 	}
 	pub(crate) fn get_data_for_unit(&self) -> SharedUnitData {
-		#[cfg(feature = "rayon")]
-		{
-			Arc::clone(&self.data_for_unit)
-		}
-		#[cfg(not(feature = "rayon"))]
-		{
-			Rc::clone(&self.data_for_unit)
-		}
+		Rs::clone(&self.data_for_unit)
 	}
 	pub(crate) fn get_actions(&self) -> Vec<Action> {
 		#[cfg(feature = "rayon")]
