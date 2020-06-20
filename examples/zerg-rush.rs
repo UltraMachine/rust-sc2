@@ -3,7 +3,7 @@ extern crate clap;
 
 use rand::prelude::{thread_rng, SliceRandom};
 use rust_sc2::prelude::*;
-use std::cmp::{min, Ordering};
+use std::cmp::Ordering;
 
 #[bot]
 #[derive(Default)]
@@ -50,10 +50,7 @@ impl ZergRushAI {
 		let speed_upgrade = UpgradeId::Zerglingmovementspeed;
 		let has_enough_gas = self.can_afford_upgrade(speed_upgrade)
 			|| self.has_upgrade(speed_upgrade)
-			|| self
-				.orders
-				.get(&self.game_data.upgrades[&speed_upgrade].ability)
-				.unwrap_or(&0) == &1;
+			|| self.is_ordered_upgrade(speed_upgrade);
 
 		bases.iter().for_each(
 			|base| match base.assigned_harvesters.cmp(&base.ideal_harvesters) {
@@ -157,7 +154,7 @@ impl ZergRushAI {
 		}
 
 		let minerals_near_base = if idle_workers.len() > deficit_minings.len() + deficit_geysers.len() {
-			let minerals = mineral_fields.filter(|m| bases.iter().any(|base| base.is_closer(11.0, m)));
+			let minerals = mineral_fields.filter(|m| bases.iter().any(|base| base.is_closer(11.0, *m)));
 			if minerals.is_empty() {
 				None
 			} else {
@@ -200,10 +197,7 @@ impl ZergRushAI {
 		let over = UnitTypeId::Overlord;
 		if self.supply_left < 3
 			&& self.supply_cap < 200
-			&& self
-				.orders
-				.get(&self.game_data.units[&over].ability.unwrap())
-				.unwrap_or(&0) == &0
+			&& self.counter().ordered().count(over) == 0
 			&& self.can_afford(over, false)
 		{
 			if let Some(larva) = self.units.my.larvas.pop() {
@@ -213,13 +207,8 @@ impl ZergRushAI {
 		}
 
 		let drone = UnitTypeId::Drone;
-		if (self.supply_workers as usize)
-			< min(
-				96,
-				self.current_units
-					.get(&UnitTypeId::Hatchery)
-					.map_or(0, |n| n * 16),
-			) && self.can_afford(drone, true)
+		if (self.supply_workers as usize) < 96.min(self.counter().all().count(UnitTypeId::Hatchery) * 16)
+			&& self.can_afford(drone, true)
 		{
 			if let Some(larva) = self.units.my.larvas.pop() {
 				larva.train(drone, false);
@@ -228,14 +217,7 @@ impl ZergRushAI {
 		}
 
 		let queen = UnitTypeId::Queen;
-		if self.current_units.get(&queen).unwrap_or(&0)
-			+ self
-				.orders
-				.get(&self.game_data.units[&queen].ability.unwrap())
-				.unwrap_or(&0)
-			< self.units.my.townhalls.len()
-			&& self.can_afford(queen, true)
-		{
+		if self.counter().all().count(queen) < self.units.my.townhalls.len() && self.can_afford(queen, true) {
 			let townhalls = self.units.my.townhalls.clone();
 			if !townhalls.is_empty() {
 				townhalls.first().unwrap().train(queen, false);
@@ -274,13 +256,7 @@ impl ZergRushAI {
 			.collect::<Vec<u64>>();
 
 		let pool = UnitTypeId::SpawningPool;
-		if self.current_units.get(&pool).unwrap_or(&0)
-			+ self
-				.orders
-				.get(&self.game_data.units[&pool].ability.unwrap())
-				.unwrap_or(&0)
-			== 0 && self.can_afford(pool, false)
-		{
+		if self.counter().all().count(pool) == 0 && self.can_afford(pool, false) {
 			let place = self.start_location.towards(self.game_info.map_center, 6.0);
 			if let Some(location) = self.find_placement(pool, place, Default::default()) {
 				if let Some(builder) = self.get_builder(location, &mineral_tags) {
@@ -291,13 +267,7 @@ impl ZergRushAI {
 		}
 
 		let extractor = UnitTypeId::Extractor;
-		if self.current_units.get(&extractor).unwrap_or(&0)
-			+ self
-				.orders
-				.get(&self.game_data.units[&extractor].ability.unwrap())
-				.unwrap_or(&0)
-			== 0 && self.can_afford(extractor, false)
-		{
+		if self.counter().all().count(extractor) == 0 && self.can_afford(extractor, false) {
 			let start_location = self.start_location;
 			if let Some(geyser) = self.find_gas_placement(start_location) {
 				if let Some(builder) = self.get_builder(geyser.position, &mineral_tags) {
@@ -321,10 +291,7 @@ impl ZergRushAI {
 	fn upgrades(&mut self) {
 		let speed_upgrade = UpgradeId::Zerglingmovementspeed;
 		if !self.has_upgrade(speed_upgrade)
-			&& self
-				.orders
-				.get(&self.game_data.upgrades[&speed_upgrade].ability)
-				.unwrap_or(&0) == &0
+			&& !self.is_ordered_upgrade(speed_upgrade)
 			&& self.can_afford_upgrade(speed_upgrade)
 		{
 			let pool = self.units.my.structures.of_type(UnitTypeId::SpawningPool);
@@ -347,9 +314,7 @@ impl ZergRushAI {
 				let mut queens = self.units.my.units.filter(|u| {
 					u.type_id == UnitTypeId::Queen
 						&& !u.is_using(AbilityId::EffectInjectLarva)
-						&& self.abilities_units.get(&u.tag).map_or(false, |abilities| {
-							abilities.contains(&AbilityId::EffectInjectLarva)
-						})
+						&& u.has_ability(AbilityId::EffectInjectLarva)
 				});
 				for h in hatcheries.iter() {
 					if queens.is_empty() {
@@ -367,16 +332,10 @@ impl ZergRushAI {
 			return;
 		}
 
-		// Check if speed upgrade is >90% ready
+		// Check if speed upgrade is >80% ready
 		let speed_upgrade = UpgradeId::Zerglingmovementspeed;
-
-		let speed_upgrade_is_almost_ready = self.has_upgrade(speed_upgrade)
-			|| self.units.my.structures.iter().any(|s| {
-				s.type_id == UnitTypeId::SpawningPool && !s.is_idle() && {
-					let order = &s.orders[0];
-					order.ability == self.game_data.upgrades[&speed_upgrade].ability && order.progress >= 0.9
-				}
-			});
+		let speed_upgrade_is_almost_ready =
+			self.has_upgrade(speed_upgrade) || self.upgrade_progress(speed_upgrade) >= 0.8;
 
 		// Attacking with zerglings or defending our locations
 		let targets = {
@@ -386,7 +345,7 @@ impl ZergRushAI {
 				self.units
 					.enemy
 					.all
-					.filter(|e| hatcheries.iter().any(|h| h.is_closer(25.0, e)))
+					.filter(|e| hatcheries.iter().any(|h| h.is_closer(25.0, *e)))
 			};
 			if enemies.is_empty() {
 				None

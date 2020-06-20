@@ -10,6 +10,7 @@ use std::{cmp::Ordering, collections::HashSet};
 struct ReaperRushAI {
 	reapers_retreat: HashSet<u64>,
 	last_loop_distributed: u32,
+	reaper_mine_cast_range: f32,
 }
 
 impl ReaperRushAI {
@@ -113,7 +114,7 @@ impl ReaperRushAI {
 			});
 
 		let minerals_near_base = if idle_workers.len() > deficit_minings.len() + deficit_geysers.len() {
-			let minerals = mineral_fields.filter(|m| bases.iter().any(|base| base.is_closer(11.0, m)));
+			let minerals = mineral_fields.filter(|m| bases.iter().any(|base| base.is_closer(11.0, *m)));
 			if minerals.is_empty() {
 				None
 			} else {
@@ -170,8 +171,8 @@ impl ReaperRushAI {
 			.collect::<Vec<u64>>();
 		let main_base = self.start_location.towards(self.game_info.map_center, 8.0);
 
-		if self.current_units.get(&UnitTypeId::Refinery).unwrap_or(&0) < &2
-			&& self.orders.get(&AbilityId::TerranBuildRefinery).unwrap_or(&0) == &0
+		if self.counter().count(UnitTypeId::Refinery) < 2
+			&& self.counter().ordered().count(UnitTypeId::Refinery) == 0
 			&& self.can_afford(UnitTypeId::Refinery, false)
 		{
 			let start_location = self.start_location;
@@ -185,7 +186,7 @@ impl ReaperRushAI {
 
 		if self.supply_left < 3
 			&& self.supply_cap < 200
-			&& self.orders.get(&AbilityId::TerranBuildSupplyDepot).unwrap_or(&0) == &0
+			&& self.counter().ordered().count(UnitTypeId::SupplyDepot) == 0
 			&& self.can_afford(UnitTypeId::SupplyDepot, false)
 		{
 			if let Some(location) =
@@ -199,9 +200,8 @@ impl ReaperRushAI {
 			}
 		}
 
-		if self.current_units.get(&UnitTypeId::Barracks).unwrap_or(&0)
-			+ self.orders.get(&AbilityId::TerranBuildBarracks).unwrap_or(&0)
-			< 4 && self.can_afford(UnitTypeId::Barracks, false)
+		if self.counter().all().count(UnitTypeId::Barracks) < 4
+			&& self.can_afford(UnitTypeId::Barracks, false)
 		{
 			if let Some(location) = self.find_placement(
 				UnitTypeId::Barracks,
@@ -245,21 +245,14 @@ impl ReaperRushAI {
 	}
 
 	fn throw_mine(&mut self, reaper: &Unit, target: &Unit) -> bool {
-		self.abilities_units.get(&reaper.tag).map_or(false, |abilities| {
-			if abilities.contains(&AbilityId::KD8ChargeKD8Charge)
-				&& reaper.is_closer(
-					reaper.radius
-						+ target.radius + self.game_data.abilities[&AbilityId::KD8ChargeKD8Charge]
-						.cast_range
-						.unwrap(),
-					target,
-				) {
+		if reaper.has_ability(AbilityId::KD8ChargeKD8Charge) {
+			let cast_range = reaper.radius + target.radius + self.reaper_mine_cast_range;
+			if reaper.is_closer(cast_range, target) {
 				reaper.command(AbilityId::KD8ChargeKD8Charge, Target::Pos(target.position), false);
-				true
-			} else {
-				false
+				return true;
 			}
-		})
+		}
+		false
 	}
 	fn execute_micro(&mut self) {
 		// Lower ready depots
@@ -374,6 +367,10 @@ impl Player for ReaperRushAI {
 		self.units.my.workers.clone().iter().for_each(|u| {
 			u.gather(minerals_near_base.closest(u).unwrap().tag, false);
 		});
+
+		self.reaper_mine_cast_range = self.game_data.abilities[&AbilityId::KD8ChargeKD8Charge]
+			.cast_range
+			.unwrap();
 		Ok(())
 	}
 
