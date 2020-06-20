@@ -331,6 +331,28 @@ impl Bot {
 	pub fn has_upgrade(&self, upgrade: UpgradeId) -> bool {
 		self.state.observation.raw.upgrades.contains(&upgrade)
 	}
+	pub fn is_ordered_upgrade(&self, upgrade: UpgradeId) -> bool {
+		let ability = self.game_data.upgrades[&upgrade].ability;
+		self.orders
+			.get(&ability)
+			.copied()
+			.map_or(false, |count| count > 0)
+	}
+	pub fn upgrade_progress(&self, upgrade: UpgradeId) -> f32 {
+		let ability = self.game_data.upgrades[&upgrade].ability;
+		self.units
+			.my
+			.structures
+			.iter()
+			.filter(|s| s.is_ready())
+			.find_map(|s| {
+				s.orders
+					.iter()
+					.find(|order| order.ability == ability)
+					.map(|order| order.progress)
+			})
+			.unwrap_or(0.0)
+	}
 	pub fn chat(&mut self, message: &str) {
 		self.actions.push(Action::Chat(message.to_string(), false));
 	}
