@@ -268,6 +268,30 @@ impl Unit {
 	pub fn supply_cost(&self) -> f32 {
 		self.type_data().map_or(0.0, |data| data.food_required)
 	}
+	pub fn health_percentage(&self) -> Option<f32> {
+		let current = self.health?;
+		let max = self.health_max?;
+		if max < f32::EPSILON {
+			return None;
+		}
+		Some(current / max)
+	}
+	pub fn shield_percentage(&self) -> Option<f32> {
+		let current = self.shield?;
+		let max = self.shield_max?;
+		if max < f32::EPSILON {
+			return None;
+		}
+		Some(current / max)
+	}
+	pub fn energy_percentage(&self) -> Option<f32> {
+		let current = self.energy?;
+		let max = self.energy_max?;
+		if max < f32::EPSILON {
+			return None;
+		}
+		Some(current / max)
+	}
 	pub fn hits(&self) -> Option<f32> {
 		match (self.health, self.shield) {
 			(Some(health), Some(shield)) => Some(health + shield),
@@ -283,6 +307,14 @@ impl Unit {
 			(None, Some(shield)) => Some(shield),
 			(None, None) => None,
 		}
+	}
+	pub fn hits_percentage(&self) -> Option<f32> {
+		let current = self.hits()?;
+		let max = self.hits_max()?;
+		if max < f32::EPSILON {
+			return None;
+		}
+		Some(current / max)
 	}
 	pub fn speed(&self) -> f32 {
 		self.type_data().map_or(0.0, |data| data.movement_speed)
