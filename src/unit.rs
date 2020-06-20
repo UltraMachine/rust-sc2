@@ -573,6 +573,21 @@ impl Unit {
 				.map_or(0.0, |w| w.range)
 		})
 	}
+	pub fn range_vs(&self, target: &Unit) -> f32 {
+		let weapon_target = {
+			if target.is_flying {
+				TARGET_AIR
+			} else {
+				TARGET_GROUND
+			}
+		};
+		self.weapons().map_or(0.0, |weapons| {
+			weapons
+				.iter()
+				.find(|w| weapon_target.contains(&w.target))
+				.map_or(0.0, |w| w.range)
+		})
+	}
 	pub fn ground_dps(&self) -> f32 {
 		self.weapons().map_or(0.0, |weapons| {
 			weapons
@@ -586,6 +601,21 @@ impl Unit {
 			weapons
 				.iter()
 				.find(|w| TARGET_AIR.contains(&w.target))
+				.map_or(0.0, |w| w.damage * (w.attacks as f32) / w.speed)
+		})
+	}
+	pub fn dps_vs(&self, target: &Unit) -> f32 {
+		let weapon_target = {
+			if target.is_flying {
+				TARGET_AIR
+			} else {
+				TARGET_GROUND
+			}
+		};
+		self.weapons().map_or(0.0, |weapons| {
+			weapons
+				.iter()
+				.find(|w| weapon_target.contains(&w.target))
 				.map_or(0.0, |w| w.damage * (w.attacks as f32) / w.speed)
 		})
 	}
