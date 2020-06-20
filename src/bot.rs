@@ -91,6 +91,7 @@ pub struct Bot {
 	reactor_tags: Rw<Vec<u64>>,
 	pub expansions: Vec<(Point2, Point2)>,
 	max_cooldowns: Rw<HashMap<UnitTypeId, f32>>,
+	last_units_health: Rs<HashMap<u64, f32>>,
 }
 
 impl Bot {
@@ -131,6 +132,7 @@ impl Bot {
 			reactor_tags: Default::default(),
 			expansions: Default::default(),
 			max_cooldowns: Default::default(),
+			last_units_health: Default::default(),
 		}
 	}
 	#[inline]
@@ -294,6 +296,7 @@ impl Bot {
 			reactor_tags: Rs::clone(&self.reactor_tags),
 			race_values: Rs::clone(&self.race_values),
 			max_cooldowns: Rs::clone(&self.max_cooldowns),
+			last_units_health: Rs::clone(&self.last_units_health),
 			abilities_units: Rs::clone(&self.abilities_units),
 			upgrades: Rs::new(self.state.observation.raw.upgrades.clone()),
 			creep: Rs::new(self.state.observation.raw.creep.clone()),
@@ -396,6 +399,13 @@ impl Bot {
 			.collect();
 	}
 	pub(crate) fn prepare_step(&mut self) {
+		self.last_units_health = Rs::new(
+			self.units
+				.all
+				.iter()
+				.filter_map(|u| Some((u.tag, u.hits()?)))
+				.collect(),
+		);
 		self.update_units();
 		let observation = &self.state.observation;
 		self.time = (observation.game_loop as f32) / 22.4;

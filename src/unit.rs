@@ -50,6 +50,7 @@ pub struct DataForUnit {
 	pub max_cooldowns: Rc<RefCell<HashMap<UnitTypeId, f32>>>,
 	pub upgrades: Rc<Vec<UpgradeId>>,
 	pub creep: Rc<PixelMap>,
+	pub last_units_health: Rs<HashMap<u64, f32>>,
 	pub abilities_units: Rs<HashMap<u64, Vec<AbilityId>>>,
 	pub game_step: u32,
 }
@@ -178,6 +179,9 @@ impl Unit {
 		let reactor_tags = self.data.reactor_tags.read().unwrap();
 
 		self.addon_tag.map_or(false, |tag| reactor_tags.contains(&tag))
+	}
+	pub fn is_attacked(&self) -> bool {
+		self.hits() < self.data.last_units_health.get(&self.tag).copied()
 	}
 	pub fn abilities(&self) -> &[AbilityId] {
 		match self.data.abilities_units.get(&self.tag) {
