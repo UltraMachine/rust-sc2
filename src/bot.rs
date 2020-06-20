@@ -405,6 +405,7 @@ impl Bot {
 			abilities_units: Rs::clone(&self.abilities_units),
 			upgrades: Rs::new(self.state.observation.raw.upgrades.clone()),
 			creep: Rs::new(self.state.observation.raw.creep.clone()),
+			visibility: Rs::new(self.state.observation.raw.visibility.clone()),
 			game_step: self.game_step,
 		});
 	}

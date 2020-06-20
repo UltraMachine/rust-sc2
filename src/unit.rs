@@ -9,7 +9,7 @@ use crate::{
 	game_state::Alliance,
 	geometry::{Point2, Point3},
 	ids::{AbilityId, BuffId, UnitTypeId, UpgradeId},
-	pixel_map::PixelMap,
+	pixel_map::{PixelMap, VisibilityMap},
 	player::Race,
 	FromProto, FromProtoData,
 };
@@ -32,6 +32,7 @@ pub struct DataForUnit {
 	pub abilities_units: Rs<HashMap<u64, Vec<AbilityId>>>,
 	pub upgrades: Rs<Vec<UpgradeId>>,
 	pub creep: Rs<PixelMap>,
+	pub visibility: Rs<VisibilityMap>,
 	pub game_step: u32,
 }
 
@@ -206,11 +207,15 @@ impl Unit {
 		self.position
 			.offset(offset * self.facing.cos(), offset * self.facing.sin())
 	}
+	#[inline]
+	fn is_pos_visible(&self) -> bool {
+		self.data.visibility[self.position].is_visible()
+	}
 	pub fn is_visible(&self) -> bool {
-		self.display_type.is_visible()
+		self.display_type.is_visible() && self.is_pos_visible()
 	}
 	pub fn is_snapshot(&self) -> bool {
-		self.display_type.is_snapshot()
+		self.display_type.is_snapshot() && !self.is_pos_visible()
 	}
 	pub fn is_hidden(&self) -> bool {
 		self.display_type.is_hidden()
