@@ -570,6 +570,7 @@ impl Bot {
 				_ => {}
 			}
 		});
+		units.all = self.state.observation.raw.units.clone();
 	}
 	pub fn can_place(&mut self, building: UnitTypeId, pos: Point2) -> bool {
 		self.query_placement(

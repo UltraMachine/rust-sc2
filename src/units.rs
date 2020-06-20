@@ -9,6 +9,7 @@ use std::{
 
 #[derive(Default, Clone)]
 pub struct AllUnits {
+	pub all: Units,
 	pub my: PlayerUnits,
 	pub enemy: PlayerUnits,
 	pub mineral_fields: Units,
@@ -20,6 +21,7 @@ pub struct AllUnits {
 }
 impl AllUnits {
 	pub(crate) fn clear(&mut self) {
+		self.all.clear();
 		self.my.clear();
 		self.enemy.clear();
 		self.mineral_fields.clear();
