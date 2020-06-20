@@ -342,6 +342,10 @@ impl Bot {
 		if self.has_upgrade(upgrade) {
 			return 1.0;
 		}
+		if !self.is_ordered_upgrade(upgrade) {
+			return 0.0;
+		}
+
 		let ability = self.game_data.upgrades[&upgrade].ability;
 		self.units
 			.my
