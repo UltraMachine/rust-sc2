@@ -109,6 +109,12 @@ impl Point2 {
 			y: (self.y + 1.0) as u32 as f32,
 		}
 	}
+	pub fn abs(self) -> Self {
+		Self {
+			x: self.x.abs(),
+			y: self.y.abs(),
+		}
+	}
 	pub fn neighbors4(self) -> [Self; 4] {
 		[
 			self.offset(1.0, 0.0),
