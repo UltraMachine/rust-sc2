@@ -2,7 +2,7 @@ use crate::{
 	action::{Action, ActionResult, Commander, Target},
 	api::API,
 	client::SC2Result,
-	constants::{RaceValues, INHIBITOR_IDS, RACE_VALUES},
+	constants::{RaceValues, INHIBITOR_IDS, RACE_VALUES, TECH_ALIAS, UNIT_ALIAS},
 	debug::{DebugCommand, Debugger},
 	game_data::{Cost, GameData},
 	game_info::GameInfo,
@@ -52,6 +52,86 @@ impl Default for PlacementOptions {
 			random: false,
 			addon: false,
 		}
+	}
+}
+
+pub struct CountOptions<'a> {
+	bot: &'a Bot,
+	pub completion: Completion,
+	pub alias: UnitAlias,
+}
+impl<'a> CountOptions<'a> {
+	pub fn new(bot: &'a Bot) -> Self {
+		Self {
+			bot,
+			completion: Default::default(),
+			alias: Default::default(),
+		}
+	}
+	pub fn ordered(&mut self) -> &mut Self {
+		self.completion = Completion::Ordered;
+		self
+	}
+	pub fn all(&mut self) -> &mut Self {
+		self.completion = Completion::All;
+		self
+	}
+	pub fn alias(&mut self) -> &mut Self {
+		self.alias = UnitAlias::Unit;
+		self
+	}
+	pub fn tech(&mut self) -> &mut Self {
+		self.alias = UnitAlias::Tech;
+		self
+	}
+	pub fn count(&self, unit_id: UnitTypeId) -> usize {
+		let bot = self.bot;
+		let count: Box<dyn Fn(UnitTypeId) -> usize> = match self.completion {
+			Completion::Complete => Box::new(|id| bot.current_units.get(&id).copied().unwrap_or(0)),
+			Completion::Ordered => Box::new(|id| {
+				bot.game_data.units[&id]
+					.ability
+					.and_then(|ability| bot.orders.get(&ability).copied())
+					.unwrap_or(0)
+			}),
+			Completion::All => Box::new(|id| {
+				bot.current_units.get(&id).copied().unwrap_or(0)
+					+ bot.game_data.units[&id]
+						.ability
+						.and_then(|ability| bot.orders.get(&ability).copied())
+						.unwrap_or(0)
+			}),
+		};
+		match self.alias {
+			UnitAlias::None => count(unit_id),
+			UnitAlias::Unit => count(unit_id) + UNIT_ALIAS.get(&unit_id).copied().map(count).unwrap_or(0),
+			UnitAlias::Tech => {
+				count(unit_id)
+					+ TECH_ALIAS
+						.get(&unit_id)
+						.map_or(0, |alias| alias.iter().copied().map(count).sum::<usize>())
+			}
+		}
+	}
+}
+pub enum UnitAlias {
+	None,
+	Unit,
+	Tech,
+}
+impl Default for UnitAlias {
+	fn default() -> Self {
+		Self::None
+	}
+}
+pub enum Completion {
+	Complete,
+	Ordered,
+	All,
+}
+impl Default for Completion {
+	fn default() -> Self {
+		Self::Complete
 	}
 }
 
@@ -138,6 +218,9 @@ impl Bot {
 	#[inline]
 	pub fn api(&mut self) -> &mut API {
 		self.api.as_mut().expect("API is not initialized")
+	}
+	pub fn counter(&self) -> CountOptions {
+		CountOptions::new(self)
 	}
 	pub(crate) fn get_data_for_unit(&self) -> SharedUnitData {
 		Rs::clone(&self.data_for_unit)
