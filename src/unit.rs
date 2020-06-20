@@ -904,14 +904,12 @@ impl Unit {
 					},
 					None => return false,
 				}
-			} else if target.is_flying {
-				let range = self.air_range();
-				if range < f32::EPSILON {
-					return false;
-				}
-				range
 			} else {
-				let range = self.ground_range();
+				let range = if target.is_flying {
+					self.air_range()
+				} else {
+					self.ground_range()
+				};
 				if range < f32::EPSILON {
 					return false;
 				}
