@@ -34,9 +34,9 @@ pub(crate) type Rs<T> = Arc<T>;
 pub(crate) type Rs<T> = Rc<T>;
 
 #[cfg(feature = "rayon")]
-type Rw<T> = Arc<RwLock<T>>;
+pub(crate) type Rw<T> = Arc<RwLock<T>>;
 #[cfg(not(feature = "rayon"))]
-type Rw<T> = Rc<RefCell<T>>;
+pub(crate) type Rw<T> = Rc<RefCell<T>>;
 
 pub struct PlacementOptions {
 	pub max_distance: isize,
@@ -72,7 +72,7 @@ pub struct Bot {
 	pub race_values: Rs<RaceValues>,
 	data_for_unit: SharedUnitData,
 	pub units: AllUnits,
-	pub abilities_units: HashMap<u64, Vec<AbilityId>>,
+	pub abilities_units: Rs<HashMap<u64, Vec<AbilityId>>>,
 	pub orders: HashMap<AbilityId, usize>,
 	pub current_units: HashMap<UnitTypeId, usize>,
 	pub time: f32,
@@ -294,6 +294,7 @@ impl Bot {
 			reactor_tags: Rs::clone(&self.reactor_tags),
 			race_values: Rs::clone(&self.race_values),
 			max_cooldowns: Rs::clone(&self.max_cooldowns),
+			abilities_units: Rs::clone(&self.abilities_units),
 			upgrades: Rs::new(self.state.observation.raw.upgrades.clone()),
 			creep: Rs::new(self.state.observation.raw.creep.clone()),
 			game_step: self.game_step,

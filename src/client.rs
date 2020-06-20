@@ -482,20 +482,21 @@ where
 	});
 
 	let res = bot.api().send(req)?;
-	bot.abilities_units = res
-		.get_query()
-		.get_abilities()
-		.iter()
-		.map(|a| {
-			(
-				a.get_unit_tag(),
-				a.get_abilities()
-					.iter()
-					.filter_map(|ab| AbilityId::from_i32(ab.get_ability_id()))
-					.collect(),
-			)
-		})
-		.collect();
+	bot.abilities_units = Rs::new(
+		res.get_query()
+			.get_abilities()
+			.iter()
+			.map(|a| {
+				(
+					a.get_unit_tag(),
+					a.get_abilities()
+						.iter()
+						.filter_map(|ab| AbilityId::from_i32(ab.get_ability_id()))
+						.collect(),
+				)
+			})
+			.collect(),
+	);
 
 	bot.state = state;
 	bot.prepare_step();

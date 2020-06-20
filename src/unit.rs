@@ -1,5 +1,6 @@
 use crate::{
 	action::{Commander, Target},
+	bot::{Rs, Rw},
 	constants::{
 		RaceValues, DAMAGE_BONUS_PER_UPGRADE, FRAMES_PER_SECOND, MISSED_WEAPONS, OFF_CREEP_SPEED_UPGRADES,
 		SPEED_BUFFS, SPEED_ON_CREEP, SPEED_UPGRADES, TARGET_AIR, TARGET_GROUND, WARPGATE_ABILITIES,
@@ -49,6 +50,7 @@ pub struct DataForUnit {
 	pub max_cooldowns: Rc<RefCell<HashMap<UnitTypeId, f32>>>,
 	pub upgrades: Rc<Vec<UpgradeId>>,
 	pub creep: Rc<PixelMap>,
+	pub abilities_units: Rs<HashMap<u64, Vec<AbilityId>>>,
 	pub game_step: u32,
 }
 
@@ -176,6 +178,18 @@ impl Unit {
 		let reactor_tags = self.data.reactor_tags.read().unwrap();
 
 		self.addon_tag.map_or(false, |tag| reactor_tags.contains(&tag))
+	}
+	pub fn abilities(&self) -> &[AbilityId] {
+		match self.data.abilities_units.get(&self.tag) {
+			Some(abilities) => abilities,
+			None => &[],
+		}
+	}
+	pub fn has_ability(&self, ability: AbilityId) -> bool {
+		self.data
+			.abilities_units
+			.get(&self.tag)
+			.map_or(false, |abilities| abilities.contains(&ability))
 	}
 	pub fn race(&self) -> Race {
 		self.type_data().map_or(Race::Random, |data| data.race)
