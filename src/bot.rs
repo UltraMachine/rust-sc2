@@ -339,6 +339,9 @@ impl Bot {
 			.map_or(false, |count| count > 0)
 	}
 	pub fn upgrade_progress(&self, upgrade: UpgradeId) -> f32 {
+		if self.has_upgrade(upgrade) {
+			return 1.0;
+		}
 		let ability = self.game_data.upgrades[&upgrade].ability;
 		self.units
 			.my
