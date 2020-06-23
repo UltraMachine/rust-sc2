@@ -93,20 +93,20 @@ impl Point2 {
 	// Other
 	pub fn round(self) -> Self {
 		Self {
-			x: (self.x + 0.5) as u32 as f32,
-			y: (self.y + 0.5) as u32 as f32,
+			x: (self.x + 0.5) as i32 as f32,
+			y: (self.y + 0.5) as i32 as f32,
 		}
 	}
 	pub fn floor(self) -> Self {
 		Self {
-			x: self.x as u32 as f32,
-			y: self.y as u32 as f32,
+			x: self.x as i32 as f32,
+			y: self.y as i32 as f32,
 		}
 	}
 	pub fn ceil(self) -> Self {
 		Self {
-			x: (self.x + 1.0) as u32 as f32,
-			y: (self.y + 1.0) as u32 as f32,
+			x: (self.x + 1.0) as i32 as f32,
+			y: (self.y + 1.0) as i32 as f32,
 		}
 	}
 	pub fn abs(self) -> Self {
@@ -156,15 +156,14 @@ impl Point2 {
 }
 impl PartialEq for Point2 {
 	fn eq(&self, other: &Self) -> bool {
-		// ((self.x + 0.5) as u32) == ((other.x + 0.5) as u32) && ((self.y + 0.5) as u32) == ((other.y + 0.5) as u32)
 		(self.x - other.x).abs() < std::f32::EPSILON && (self.y - other.y).abs() < std::f32::EPSILON
 	}
 }
 impl Eq for Point2 {}
 impl Hash for Point2 {
 	fn hash<H: Hasher>(&self, state: &mut H) {
-		((self.x + 0.5) as u32).hash(state);
-		((self.y + 0.5) as u32).hash(state);
+		((self.x + 0.5) as i32).hash(state);
+		((self.y + 0.5) as i32).hash(state);
 	}
 }
 impl From<Point2> for (usize, usize) {
@@ -360,9 +359,9 @@ impl Point3 {
 	}
 	pub fn round(self) -> Self {
 		Self {
-			x: (self.x + 0.5) as u32 as f32,
-			y: (self.y + 0.5) as u32 as f32,
-			z: (self.z + 0.5) as u32 as f32,
+			x: (self.x + 0.5) as i32 as f32,
+			y: (self.y + 0.5) as i32 as f32,
+			z: (self.z + 0.5) as i32 as f32,
 		}
 	}
 	pub fn as_tuple(self) -> (f32, f32, f32) {

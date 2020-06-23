@@ -902,8 +902,8 @@ impl Unit {
 		let distance = self.distance_squared(target);
 
 		// Takes into account that Sieged Tank has a minimum range of 2
-		distance <= total_range * total_range
-			&& (self.type_id != UnitTypeId::SiegeTankSieged || distance > 4.0)
+		(self.type_id != UnitTypeId::SiegeTankSieged || distance > 4.0)
+			&& distance <= total_range * total_range
 	}
 	pub fn in_range_of(&self, threat: &Unit, gap: f32) -> bool {
 		threat.in_range(self, gap)
@@ -918,8 +918,8 @@ impl Unit {
 		let distance = self.distance_squared(target);
 
 		// Takes into account that Sieged Tank has a minimum range of 2
-		distance <= total_range * total_range
-			&& (self.type_id != UnitTypeId::SiegeTankSieged || distance > 4.0)
+		(self.type_id != UnitTypeId::SiegeTankSieged || distance > 4.0)
+			&& distance <= total_range * total_range
 	}
 	pub fn in_real_range_of(&self, threat: &Unit, gap: f32, upgrades: Option<&Vec<UpgradeId>>) -> bool {
 		threat.in_real_range(self, gap, upgrades)
