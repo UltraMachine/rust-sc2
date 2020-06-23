@@ -126,6 +126,9 @@ impl Units {
 	}
 
 	// Units methods
+	pub fn contains_tag(&self, tag: u64) -> bool {
+		self.0.contains_key(&tag)
+	}
 	pub fn find_tag(&self, tag: u64) -> Option<&Unit> {
 		self.0.get(&tag)
 	}
