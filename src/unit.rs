@@ -528,6 +528,18 @@ impl Unit {
 			weapons.iter().any(|w| TARGET_AIR.contains(&w.target))
 		})
 	}
+	pub fn can_attack_unit(&self, target: &Unit) -> bool {
+		let weapon_target = {
+			if target.is_flying {
+				TARGET_AIR
+			} else {
+				TARGET_GROUND
+			}
+		};
+		self.weapons().map_or(false, |weapons| {
+			weapons.iter().any(|w| weapon_target.contains(&w.target))
+		})
+	}
 	pub fn on_cooldown(&self) -> bool {
 		self.weapon_cooldown.map_or(false, |cool| cool > 0.0)
 	}
