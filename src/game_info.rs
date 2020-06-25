@@ -1,4 +1,5 @@
 use crate::{
+	bot::Rs,
 	geometry::{Point2, Rect, Size},
 	pixel_map::{ByteMap, PixelMap},
 	player::{AIBuild, Difficulty, PlayerType, Race},
@@ -16,7 +17,7 @@ pub struct GameInfo {
 	pub players: HashMap<u32, PlayerInfo>,
 	pub map_size: Size,
 	pub pathing_grid: PixelMap,
-	pub terrain_height: ByteMap,
+	pub terrain_height: Rs<ByteMap>,
 	pub placement_grid: PixelMap,
 	pub playable_area: Rect,
 	pub start_locations: Vec<Point2>,
@@ -65,7 +66,7 @@ impl FromProto<ResponseGameInfo> for GameInfo {
 				.collect(),
 			map_size: Size::new(map_size.get_x() as usize, map_size.get_y() as usize),
 			pathing_grid: PixelMap::from_proto(start_raw.get_pathing_grid().clone()),
-			terrain_height: ByteMap::from_proto(start_raw.get_terrain_height().clone()),
+			terrain_height: Rs::new(ByteMap::from_proto(start_raw.get_terrain_height().clone())),
 			placement_grid: PixelMap::from_proto(start_raw.get_placement_grid().clone()),
 			playable_area: Rect::new(
 				area_p0_x as usize,

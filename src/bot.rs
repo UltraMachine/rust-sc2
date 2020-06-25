@@ -10,6 +10,7 @@ use crate::{
 	geometry::Point2,
 	ids::{AbilityId, UnitTypeId, UpgradeId},
 	player::Race,
+	ramp::{Ramp, Ramps},
 	unit::{DataForUnit, SharedUnitData, Unit},
 	units::AllUnits,
 	utils::{dbscan, range_query},
@@ -17,6 +18,7 @@ use crate::{
 };
 use num_traits::ToPrimitive;
 use rand::prelude::{thread_rng, SliceRandom};
+use rustc_hash::FxHashSet;
 use sc2_proto::{
 	query::{RequestQueryBuildingPlacement, RequestQueryPathing},
 	sc2api::Request,
@@ -172,6 +174,8 @@ pub struct Bot {
 	pub expansions: Vec<(Point2, Point2)>,
 	max_cooldowns: Rw<HashMap<UnitTypeId, f32>>,
 	last_units_health: Rs<HashMap<u64, f32>>,
+	pub vision_blockers: Vec<Point2>,
+	pub ramps: Ramps,
 }
 
 impl Bot {
@@ -213,6 +217,8 @@ impl Bot {
 			expansions: Default::default(),
 			max_cooldowns: Default::default(),
 			last_units_health: Default::default(),
+			vision_blockers: Default::default(),
+			ramps: Default::default(),
 		}
 	}
 	#[inline]
@@ -502,6 +508,98 @@ impl Bot {
 				}
 			})
 			.collect();
+
+		// Calclulating ramp locations
+		let mut ramp_points = FxHashSet::default();
+
+		let area = self.game_info.playable_area;
+		iproduct!(area.x0..area.x1, area.y0..area.y1).for_each(|pos| {
+			if !self.is_pathable(pos) || self.is_placeable(pos) {
+				return;
+			}
+
+			let h = self.get_height(pos);
+			let (x, y) = pos;
+
+			let neighbors = [
+				(x + 1, y),
+				(x - 1, y),
+				(x, y + 1),
+				(x, y - 1),
+				(x + 1, y + 1),
+				(x - 1, y - 1),
+				(x + 1, y - 1),
+				(x - 1, y + 1),
+			];
+
+			if neighbors.iter().all(|p| self.get_height(*p) == h) {
+				self.vision_blockers.push(Point2::new(x as f32, y as f32));
+			} else {
+				ramp_points.insert(pos);
+			}
+		});
+
+		let ramps = dbscan(
+			&ramp_points,
+			|&(x, y)| {
+				[
+					(x + 1, y),
+					(x - 1, y),
+					(x, y + 1),
+					(x, y - 1),
+					(x + 1, y + 1),
+					(x - 1, y - 1),
+					(x + 1, y - 1),
+					(x - 1, y + 1),
+				]
+				.iter()
+				.filter(|n| ramp_points.contains(n))
+				.copied()
+				.collect()
+			},
+			4,
+		)
+		.0
+		.into_iter()
+		.filter(|ps| ps.len() >= 8)
+		.map(|ps| Ramp::new(ps, &self.game_info.terrain_height, self.start_location))
+		.collect::<Vec<Ramp>>();
+
+		let get_closest_ramp = |loc: Point2| {
+			let (loc_x, loc_y) = ((loc.x + 0.5) as usize, (loc.y + 0.5) as usize);
+			let cmp = |r: &&Ramp| {
+				let (x, y) = r.top_center().unwrap();
+				let dx = loc_x.checked_sub(x).unwrap_or_else(|| x - loc_x);
+				let dy = loc_y.checked_sub(y).unwrap_or_else(|| y - loc_y);
+				dx * dx + dy * dy
+			};
+			ramps
+				.iter()
+				.filter(|r| {
+					let upper_len = r.upper().len();
+					upper_len == 2 || upper_len == 5
+				})
+				.min_by_key(cmp)
+				.or_else(|| {
+					ramps
+						.iter()
+						.filter(|r| {
+							let upper_len = r.upper().len();
+							upper_len == 4 || upper_len == 9
+						})
+						.min_by_key(cmp)
+				})
+				.cloned()
+		};
+
+		if let Some(ramp) = get_closest_ramp(self.start_location) {
+			self.ramps.my = ramp;
+		}
+		if let Some(ramp) = get_closest_ramp(self.enemy_start) {
+			self.ramps.enemy = ramp;
+		}
+
+		self.ramps.all = ramps;
 	}
 	pub(crate) fn prepare_step(&mut self) {
 		self.last_units_health = Rs::new(

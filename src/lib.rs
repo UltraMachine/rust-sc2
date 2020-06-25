@@ -32,6 +32,7 @@ mod client;
 mod debug;
 mod game_info;
 mod paths;
+mod ramp;
 
 pub mod action;
 pub mod bot;
