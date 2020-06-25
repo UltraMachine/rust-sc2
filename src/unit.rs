@@ -359,8 +359,8 @@ impl Unit {
 		speed
 	}
 	// Distance unit can travel per one "on_step" iteration
-	pub fn distance_per_step(&self) -> f32 {
-		self.real_speed() / FRAMES_PER_SECOND * self.data.game_step as f32
+	pub fn distance_per_step(&self, upgrades: Option<&Vec<UpgradeId>>) -> f32 {
+		self.calculate_speed(upgrades) / FRAMES_PER_SECOND * self.data.game_step as f32
 	}
 	// Distance unit can travel until weapons be ready to fire
 	pub fn distance_to_weapon_ready(&self) -> f32 {
