@@ -65,6 +65,20 @@ impl Point2 {
 			y: self.y + y,
 		}
 	}
+	pub fn circle_intersection(self, other: Self, radius: f32) -> [Self; 2] {
+		let vec_to_center = (other - self) / 2.0;
+
+		let half_distance = vec_to_center.len();
+		let remaining_distance = (radius * radius - half_distance * half_distance).sqrt();
+		let stretch_factor = remaining_distance / half_distance;
+
+		let center = self + vec_to_center;
+		let vec_stretched = vec_to_center * stretch_factor;
+		[
+			center + vec_stretched.rotate90(true),
+			center + vec_stretched.rotate90(false),
+		]
+	}
 
 	// Vector operations
 	pub fn len(self) -> f32 {
