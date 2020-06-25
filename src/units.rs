@@ -1,11 +1,17 @@
 use crate::{geometry::Point2, ids::UnitTypeId, unit::Unit};
+use indexmap::{
+	map::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut},
+	IndexMap,
+};
 use itertools::Itertools;
-use rustc_hash::FxHashMap;
+use rustc_hash::FxHasher;
 use std::{
-	collections::hash_map::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut},
+	hash::BuildHasherDefault,
 	iter::{FromIterator, Sum},
 	ops::{Index, IndexMut},
 };
+
+type FxIndexMap<K, V> = IndexMap<K, V, BuildHasherDefault<FxHasher>>;
 
 #[derive(Default, Clone)]
 pub struct AllUnits {
@@ -57,12 +63,12 @@ impl PlayerUnits {
 }
 
 #[derive(Default, Clone)]
-pub struct Units(FxHashMap<u64, Unit>);
+pub struct Units(FxIndexMap<u64, Unit>);
 impl Units {
 	// HashMap methods
 	#[inline]
 	pub fn new() -> Self {
-		Units(FxHashMap::default())
+		Units(FxIndexMap::default())
 	}
 
 	#[inline]
@@ -77,7 +83,7 @@ impl Units {
 
 	#[inline]
 	pub fn pop(&mut self) -> Option<Unit> {
-		self.0.keys().next().copied().and_then(|u| self.0.remove(&u))
+		self.0.pop().map(|i| i.1)
 	}
 
 	#[inline]
