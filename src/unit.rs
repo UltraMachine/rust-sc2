@@ -1043,11 +1043,11 @@ impl Unit {
 			&& matches!(
 				self.orders[0].ability,
 				AbilityId::BuildTechLabBarracks
-				| AbilityId::BuildReactorBarracks
-				| AbilityId::BuildTechLabFactory
-				| AbilityId::BuildReactorFactory
-				| AbilityId::BuildTechLabStarport
-				| AbilityId::BuildReactorStarport
+					| AbilityId::BuildReactorBarracks
+					| AbilityId::BuildTechLabFactory
+					| AbilityId::BuildReactorFactory
+					| AbilityId::BuildTechLabStarport
+					| AbilityId::BuildReactorStarport
 			)
 	}
 	// Actions

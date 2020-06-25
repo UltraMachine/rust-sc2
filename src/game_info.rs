@@ -9,7 +9,7 @@ use std::{collections::HashMap, path::Path};
 
 #[derive(Default, Clone)]
 pub struct GameInfo {
-	pub map_name: String,      // Depends on sc2 localization
+	pub map_name: String,      // Depends on sc2 localization language
 	pub map_name_path: String, // Depends on file name
 	pub mod_names: Vec<String>,
 	pub local_map_path: String,

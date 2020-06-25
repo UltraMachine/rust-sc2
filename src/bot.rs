@@ -432,7 +432,6 @@ impl Bot {
 			(resources.sum(|r| r.position) + self.enemy_start) / (resources.len() + 1) as f32;
 
 		// Calculating expansion locations
-		// dbscan, range_query
 
 		const RESOURCE_SPREAD: f32 = 8.5;
 		const RESOURCE_SPREAD_SQUARED: f32 = RESOURCE_SPREAD * RESOURCE_SPREAD;
