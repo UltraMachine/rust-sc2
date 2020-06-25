@@ -467,7 +467,7 @@ impl Bot {
 		self.expansions = resource_groups
 			.iter()
 			.map(|group| {
-				let resources = all_resources.find_tags(group.iter().map(|(_, tag)| *tag));
+				let resources = all_resources.find_tags(group.iter().map(|r| r.1));
 				let center = resources.center().expect("No resources on this map").floor() + 0.5;
 
 				if center.distance_squared(self.start_center) < 16.0 {

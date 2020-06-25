@@ -409,29 +409,21 @@ impl Unit {
 	pub fn has_buff(&self, buff: BuffId) -> bool {
 		self.buffs.contains(&buff)
 	}
-	pub fn has_any_buff<B: Iterator<Item = BuffId>>(&self, mut buffs: B) -> bool {
-		buffs.any(|b| self.buffs.contains(&b))
+	pub fn has_any_buff<'a, B: IntoIterator<Item = &'a BuffId>>(&self, buffs: B) -> bool {
+		buffs.into_iter().any(|b| self.buffs.contains(&b))
 	}
 	pub fn is_carrying_minerals(&self) -> bool {
-		self.has_any_buff(
-			[
-				BuffId::CarryMineralFieldMinerals,
-				BuffId::CarryHighYieldMineralFieldMinerals,
-			]
-			.iter()
-			.copied(),
-		)
+		self.has_any_buff(&[
+			BuffId::CarryMineralFieldMinerals,
+			BuffId::CarryHighYieldMineralFieldMinerals,
+		])
 	}
 	pub fn is_carrying_vespene(&self) -> bool {
-		self.has_any_buff(
-			[
-				BuffId::CarryHarvestableVespeneGeyserGas,
-				BuffId::CarryHarvestableVespeneGeyserGasProtoss,
-				BuffId::CarryHarvestableVespeneGeyserGasZerg,
-			]
-			.iter()
-			.copied(),
-		)
+		self.has_any_buff(&[
+			BuffId::CarryHarvestableVespeneGeyserGas,
+			BuffId::CarryHarvestableVespeneGeyserGasProtoss,
+			BuffId::CarryHarvestableVespeneGeyserGasZerg,
+		])
 	}
 	pub fn is_carrying_resource(&self) -> bool {
 		self.is_carrying_minerals() || self.is_carrying_vespene()
@@ -994,8 +986,8 @@ impl Unit {
 	pub fn is_using(&self, ability: AbilityId) -> bool {
 		!self.is_idle() && self.orders[0].ability == ability
 	}
-	pub fn is_using_any<A: Iterator<Item = AbilityId>>(&self, mut abilities: A) -> bool {
-		!self.is_idle() && abilities.any(|a| self.orders[0].ability == a)
+	pub fn is_using_any<'a, A: IntoIterator<Item = &'a AbilityId>>(&self, abilities: A) -> bool {
+		!self.is_idle() && abilities.into_iter().any(|a| self.orders[0].ability == *a)
 	}
 	#[rustfmt::skip::macros(matches)]
 	pub fn is_attacking(&self) -> bool {

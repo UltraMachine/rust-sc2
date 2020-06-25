@@ -138,14 +138,16 @@ impl Units {
 	pub fn find_tag(&self, tag: u64) -> Option<&Unit> {
 		self.0.get(&tag)
 	}
-	pub fn find_tags<T: Iterator<Item = u64>>(&self, tags: T) -> Self {
-		tags.filter_map(|tag| self.0.get(&tag).cloned()).collect()
+	pub fn find_tags<'a, T: IntoIterator<Item = &'a u64>>(&self, tags: T) -> Self {
+		tags.into_iter()
+			.filter_map(|tag| self.0.get(tag).cloned())
+			.collect()
 	}
 	pub fn of_type(&self, u_type: UnitTypeId) -> Self {
 		self.filter(|u| u.type_id == u_type)
 	}
-	pub fn of_types<T: Iterator<Item = UnitTypeId> + Clone>(&self, types: T) -> Self {
-		self.filter(|u| types.clone().any(|u_type| u.type_id == u_type))
+	pub fn of_types<T: Container<UnitTypeId>>(&self, types: T) -> Self {
+		self.filter(|u| types.contains(&u.type_id))
 	}
 	pub fn center(&self) -> Option<Point2> {
 		if self.is_empty() {
@@ -418,5 +420,45 @@ impl FromParallelIterator<Unit> for Units {
 	#[inline]
 	fn from_par_iter<I: IntoParallelIterator<Item = Unit>>(par_iter: I) -> Self {
 		Self(par_iter.into_par_iter().map(|u| (u.tag, u)).collect())
+	}
+}
+
+pub trait Container<T> {
+	fn contains(&self, item: &T) -> bool;
+}
+
+use std::{
+	collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+	hash::{BuildHasher, Hash},
+};
+
+impl<T: PartialEq> Container<T> for [T] {
+	fn contains(&self, other: &T) -> bool {
+		self.iter().any(|item| item == other)
+	}
+}
+impl<T: PartialEq> Container<T> for Vec<T> {
+	fn contains(&self, other: &T) -> bool {
+		self.iter().any(|item| item == other)
+	}
+}
+impl<T: Eq + Hash, S: BuildHasher> Container<T> for HashSet<T, S> {
+	fn contains(&self, item: &T) -> bool {
+		self.contains(item)
+	}
+}
+impl<T: Eq + Hash, V, S: BuildHasher> Container<T> for HashMap<T, V, S> {
+	fn contains(&self, item: &T) -> bool {
+		self.contains_key(item)
+	}
+}
+impl<T: Ord> Container<T> for BTreeSet<T> {
+	fn contains(&self, item: &T) -> bool {
+		self.contains(item)
+	}
+}
+impl<T: Ord, V> Container<T> for BTreeMap<T, V> {
+	fn contains(&self, item: &T) -> bool {
+		self.contains_key(item)
 	}
 }
