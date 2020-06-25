@@ -612,14 +612,23 @@ impl Unit {
 			self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Any, None), None);
 		(if speed == 0.0 { 0.0 } else { damage / speed }, range)
 	}
-	pub fn calculate_ground_weapon(&self) -> (f32, f32) {
+
+	pub fn calculate_ground_weapon(
+		&self,
+		attributes: Option<&Vec<Attribute>>,
+		upgrades: Option<&Vec<UpgradeId>>,
+	) -> (f32, f32) {
 		let (damage, speed, range) =
-			self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Ground, None), None);
+			self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Ground, attributes), upgrades);
 		(if speed == 0.0 { 0.0 } else { damage / speed }, range)
 	}
-	pub fn calculate_air_weapon(&self) -> (f32, f32) {
+	pub fn calculate_air_weapon(
+		&self,
+		attributes: Option<&Vec<Attribute>>,
+		upgrades: Option<&Vec<UpgradeId>>,
+	) -> (f32, f32) {
 		let (damage, speed, range) =
-			self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Air, None), None);
+			self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Air, attributes), upgrades);
 		(if speed == 0.0 { 0.0 } else { damage / speed }, range)
 	}
 
