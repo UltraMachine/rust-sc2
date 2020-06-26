@@ -557,7 +557,7 @@ impl Bot {
 				.copied()
 				.collect()
 			},
-			4,
+			3,
 		)
 		.0
 		.into_iter()
