@@ -65,9 +65,9 @@ pub fn bot_new(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
 				quote! {
 					#path {
-						#(#fields,)*
 						_bot: Default::default(),
-						#rest
+						#(#fields,)*
+						..#rest
 					}
 				}
 			}
