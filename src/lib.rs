@@ -33,6 +33,7 @@ mod debug;
 mod game_info;
 mod paths;
 mod ramp;
+mod score;
 
 pub mod action;
 pub mod bot;

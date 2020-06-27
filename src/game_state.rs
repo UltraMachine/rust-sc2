@@ -4,6 +4,7 @@ use crate::{
 	geometry::Point2,
 	ids::{AbilityId, EffectId, UpgradeId},
 	pixel_map::{PixelMap, VisibilityMap},
+	score::Score,
 	unit::{SharedUnitData, Unit},
 	units::Units,
 	FromProto, FromProtoData,
