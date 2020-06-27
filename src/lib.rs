@@ -52,6 +52,7 @@ use unit::SharedUnitData;
 
 pub use client::{run_ladder_game, run_vs_computer, run_vs_human, SC2Result};
 pub use sc2_macro::{bot, bot_new};
+pub use sc2_proto::sc2api::Request;
 
 pub type PlayerBox = Box<dyn Player>;
 
@@ -123,3 +124,12 @@ where
 trait IntoProto<T> {
 	fn into_proto(self) -> T;
 }
+
+/*trait FromSC2<T> {
+	fn from_sc2(s: T) -> Self;
+}
+impl<T, U: IntoProto<T>> FromSC2<U> for T {
+	fn from_sc2(s: U) -> T {
+		s.into_proto()
+	}
+}*/

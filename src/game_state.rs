@@ -1,5 +1,6 @@
 use crate::{
 	action::{Action, ActionError},
+	bot::Rs,
 	geometry::Point2,
 	ids::{AbilityId, EffectId, UpgradeId},
 	pixel_map::{PixelMap, VisibilityMap},
@@ -12,11 +13,6 @@ use sc2_proto::{
 	raw::{Alliance as ProtoAlliance, ObservationRaw, PowerSource as ProtoPowerSource},
 	sc2api::{Alert as ProtoAlert, Observation as ProtoObservation, ResponseObservation},
 };
-
-#[cfg(not(feature = "rayon"))]
-use std::rc::Rc;
-#[cfg(feature = "rayon")]
-use std::sync::Arc;
 
 #[derive(Default, Clone)]
 pub struct GameState {
@@ -127,21 +123,7 @@ impl FromProtoData<&ObservationRaw> for RawData {
 			units: raw
 				.get_units()
 				.iter()
-				.map(|u| {
-					Unit::from_proto_data(
-						{
-							#[cfg(feature = "rayon")]
-							{
-								Arc::clone(&data)
-							}
-							#[cfg(not(feature = "rayon"))]
-							{
-								Rc::clone(&data)
-							}
-						},
-						u.clone(),
-					)
-				})
+				.map(|u| Unit::from_proto_data(Rs::clone(&data), u))
 				.collect(),
 			upgrades: raw_player
 				.get_upgrade_ids()
