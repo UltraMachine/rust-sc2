@@ -79,7 +79,7 @@ impl fmt::Display for ProtoError {
 impl Error for ProtoError {}
 
 struct Ports {
-	shared: i32,
+	// shared: i32,
 	server: (i32, i32),
 	client: Vec<(i32, i32)>,
 }
@@ -191,7 +191,7 @@ where
 		&bot.get_player_settings(),
 		bot.api(),
 		Some(&Ports {
-			shared: player_port + 1,
+			// shared: player_port + 1,
 			server: (player_port + 2, player_port + 3),
 			client: vec![(player_port + 4, player_port + 5)],
 		}),
@@ -271,7 +271,7 @@ where
 		client: vec![(ports[5], ports[6]), (ports[7], ports[8])],
 	};*/
 	let ports = Ports {
-		shared: PORT + 2,
+		// shared: PORT + 2,
 		server: (PORT + 3, PORT + 4),
 		client: vec![(PORT + 5, PORT + 6), (PORT + 7, PORT + 8)],
 	};
@@ -389,8 +389,7 @@ fn join_game2(settings: &PlayerSettings, api: &mut API, ports: Option<&Ports>) -
 	}
 
 	if let Some(ports) = ports {
-		// Shared port is deprecated
-		req_join_game.set_shared_port(ports.shared);
+		// req_join_game.set_shared_port(ports.shared);
 
 		let server_ports = req_join_game.mut_server_ports();
 		server_ports.set_game_port(ports.server.0);
