@@ -38,31 +38,31 @@ pub enum Action {
 	ToggleAutocast(AbilityId, Vec<u64>),
 	Chat(String, bool),
 }
-impl IntoProto<ProtoAction> for Action {
+impl IntoProto<ProtoAction> for &Action {
 	fn into_proto(self) -> ProtoAction {
 		let mut action = ProtoAction::new();
 		match self {
 			Action::Chat(message, team_only) => {
 				let chat_action = action.mut_action_chat();
 				chat_action.set_channel({
-					if team_only {
+					if *team_only {
 						ActionChat_Channel::Team
 					} else {
 						ActionChat_Channel::Broadcast
 					}
 				});
-				chat_action.set_message(message);
+				chat_action.set_message(message.to_string());
 			}
 			Action::UnitCommand(ability, target, units, queue) => {
 				let unit_command = action.mut_action_raw().mut_unit_command();
 				unit_command.set_ability_id(ability.to_i32().unwrap());
 				match target {
 					Target::Pos(pos) => unit_command.set_target_world_space_pos(pos.into_proto()),
-					Target::Tag(tag) => unit_command.set_target_unit_tag(tag),
+					Target::Tag(tag) => unit_command.set_target_unit_tag(*tag),
 					Target::None => {}
 				}
-				unit_command.set_unit_tags(units);
-				unit_command.set_queue_command(queue);
+				unit_command.set_unit_tags(units.to_vec());
+				unit_command.set_queue_command(*queue);
 			}
 			Action::CameraMove(pos) => {
 				let camera_move = action.mut_action_raw().mut_camera_move();
@@ -71,14 +71,14 @@ impl IntoProto<ProtoAction> for Action {
 			Action::ToggleAutocast(ability, units) => {
 				let toggle_autocast = action.mut_action_raw().mut_toggle_autocast();
 				toggle_autocast.set_ability_id(ability.to_i32().unwrap());
-				toggle_autocast.set_unit_tags(units);
+				toggle_autocast.set_unit_tags(units.to_vec());
 			}
 		}
 		action
 	}
 }
-impl FromProto<ProtoAction> for Option<Action> {
-	fn from_proto(action: ProtoAction) -> Self {
+impl FromProto<&ProtoAction> for Option<Action> {
+	fn from_proto(action: &ProtoAction) -> Self {
 		// let game_loop: u32 = action.get_game_loop();
 		if action.has_action_raw() {
 			match &action.get_action_raw().action {
@@ -87,7 +87,7 @@ impl FromProto<ProtoAction> for Option<Action> {
 					{
 						match &unit_command.target {
 							Some(ProtoTarget::target_world_space_pos(pos)) => {
-								Target::Pos(Point2::from_proto(pos.clone()))
+								Target::Pos(Point2::from_proto(pos))
 							}
 							Some(ProtoTarget::target_unit_tag(tag)) => Target::Tag(*tag),
 							None => Target::None,
@@ -97,7 +97,7 @@ impl FromProto<ProtoAction> for Option<Action> {
 					unit_command.get_queue_command(),
 				)),
 				Some(ProtoRawAction::camera_move(camera_move)) => Some(Action::CameraMove(
-					Point3::from_proto(camera_move.get_center_world_space().clone()),
+					Point3::from_proto(camera_move.get_center_world_space()),
 				)),
 				Some(ProtoRawAction::toggle_autocast(toggle_autocast)) => Some(Action::ToggleAutocast(
 					AbilityId::from_i32(toggle_autocast.get_ability_id()).unwrap(),
@@ -125,8 +125,8 @@ pub struct ActionError {
 	pub ability: AbilityId,
 	pub result: ActionResult,
 }
-impl FromProto<ProtoActionError> for ActionError {
-	fn from_proto(e: ProtoActionError) -> Self {
+impl FromProto<&ProtoActionError> for ActionError {
+	fn from_proto(e: &ProtoActionError) -> Self {
 		Self {
 			unit: e.get_unit_tag(),
 			ability: AbilityId::from_u64(e.get_ability_id()).unwrap(),

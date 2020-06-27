@@ -233,34 +233,29 @@ impl Bot {
 	pub(crate) fn get_data_for_unit(&self) -> SharedUnitData {
 		Rs::clone(&self.data_for_unit)
 	}
-	pub(crate) fn get_actions(&self) -> Vec<Action> {
-		#[cfg(feature = "rayon")]
-		let commander = self.commander.read().unwrap();
-		#[cfg(not(feature = "rayon"))]
-		let commander = self.commander.borrow();
-
-		let commands = &commander.commands;
-		if !commands.is_empty() {
-			let mut actions = self.actions.clone();
-			commands.iter().for_each(|((ability, target, queue), units)| {
-				actions.push(Action::UnitCommand(*ability, *target, units.clone(), *queue));
-			});
-			actions
-		} else {
-			self.actions.clone()
-		}
-	}
-	pub(crate) fn clear_actions(&mut self) {
-		self.actions.clear();
-
+	pub(crate) fn get_actions(&mut self) -> &[Action] {
 		#[cfg(feature = "rayon")]
 		let mut commander = self.commander.write().unwrap();
 		#[cfg(not(feature = "rayon"))]
 		let mut commander = self.commander.borrow_mut();
 
-		commander.commands.clear();
+		let actions = &mut self.actions;
+		let commands = &mut commander.commands;
+
+		if !commands.is_empty() {
+			actions.extend(
+				commands.drain().map(|((ability, target, queue), units)| {
+					Action::UnitCommand(ability, target, units, queue)
+				}),
+			);
+		}
+
+		actions
 	}
-	pub(crate) fn get_debug_commands(&self) -> Vec<DebugCommand> {
+	pub(crate) fn clear_actions(&mut self) {
+		self.actions.clear();
+	}
+	pub(crate) fn get_debug_commands(&mut self) -> &[DebugCommand] {
 		self.debug.get_commands()
 	}
 	pub(crate) fn clear_debug_commands(&mut self) {

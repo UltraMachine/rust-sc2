@@ -33,14 +33,14 @@ impl FromProtoData<&ResponseObservation> for GameState {
 			actions: response_observation
 				.get_actions()
 				.iter()
-				.filter_map(|a| Option::<Action>::from_proto(a.clone()))
+				.filter_map(|a| Option::<Action>::from_proto(a))
 				.collect(),
 			action_errors: response_observation
 				.get_action_errors()
 				.iter()
-				.map(|e| ActionError::from_proto(e.clone()))
+				.map(|e| ActionError::from_proto(e))
 				.collect(),
-			observation: Observation::from_proto_data(data, response_observation.get_observation().clone()),
+			observation: Observation::from_proto_data(data, response_observation.get_observation()),
 			chat: response_observation
 				.get_chat()
 				.iter()
@@ -65,11 +65,11 @@ pub struct Observation {
 	pub common: Common,
 	pub alerts: Vec<Alert>,
 	pub abilities: Vec<AvailableAbility>,
-	// pub score: Score,
+	pub score: Score,
 	pub raw: RawData,
 }
-impl FromProtoData<ProtoObservation> for Observation {
-	fn from_proto_data(data: SharedUnitData, obs: ProtoObservation) -> Self {
+impl FromProtoData<&ProtoObservation> for Observation {
+	fn from_proto_data(data: SharedUnitData, obs: &ProtoObservation) -> Self {
 		let common = obs.get_player_common();
 		Self {
 			game_loop: obs.get_game_loop(),
@@ -95,7 +95,8 @@ impl FromProtoData<ProtoObservation> for Observation {
 					requires_point: a.get_requires_point(),
 				})
 				.collect(),
-			raw: RawData::from_proto_data(data, obs.get_raw_data().clone()),
+			score: Score::from_proto(obs.get_score()),
+			raw: RawData::from_proto_data(data, obs.get_raw_data()),
 		}
 	}
 }
@@ -112,17 +113,17 @@ pub struct RawData {
 	pub effects: Vec<Effect>,
 	pub radars: Vec<Radar>,
 }
-impl FromProtoData<ObservationRaw> for RawData {
-	fn from_proto_data(data: SharedUnitData, raw: ObservationRaw) -> Self {
+impl FromProtoData<&ObservationRaw> for RawData {
+	fn from_proto_data(data: SharedUnitData, raw: &ObservationRaw) -> Self {
 		let raw_player = raw.get_player();
 		let map_state = raw.get_map_state();
 		Self {
 			psionic_matrix: raw_player
 				.get_power_sources()
 				.iter()
-				.map(|ps| PsionicMatrix::from_proto(ps.clone()))
+				.map(|ps| PsionicMatrix::from_proto(ps))
 				.collect(),
-			camera: Point2::from_proto(raw_player.get_camera().clone()),
+			camera: Point2::from_proto(raw_player.get_camera()),
 			units: raw
 				.get_units()
 				.iter()
@@ -147,19 +148,15 @@ impl FromProtoData<ObservationRaw> for RawData {
 				.iter()
 				.map(|u| UpgradeId::from_u32(*u).unwrap())
 				.collect(),
-			visibility: VisibilityMap::from_proto(map_state.get_visibility().clone()),
-			creep: PixelMap::from_proto(map_state.get_creep().clone()),
+			visibility: VisibilityMap::from_proto(map_state.get_visibility()),
+			creep: PixelMap::from_proto(map_state.get_creep()),
 			dead_units: raw.get_event().get_dead_units().to_vec(),
 			effects: raw
 				.get_effects()
 				.iter()
 				.map(|e| Effect {
 					id: EffectId::from_u32(e.get_effect_id()).unwrap(),
-					positions: e
-						.get_pos()
-						.iter()
-						.map(|p| Point2::from_proto(p.clone()))
-						.collect(),
+					positions: e.get_pos().iter().map(Point2::from_proto).collect(),
 					alliance: Alliance::from_proto(e.get_alliance()),
 					owner: e.get_owner() as u32,
 					radius: e.get_radius(),
@@ -169,7 +166,7 @@ impl FromProtoData<ObservationRaw> for RawData {
 				.get_radar()
 				.iter()
 				.map(|r| Radar {
-					pos: Point2::from_proto(r.get_pos().clone()),
+					pos: Point2::from_proto(r.get_pos()),
 					radius: r.get_radius(),
 				})
 				.collect(),
@@ -183,10 +180,10 @@ pub struct PsionicMatrix {
 	pub radius: f32,
 	pub tag: u64,
 }
-impl FromProto<ProtoPowerSource> for PsionicMatrix {
-	fn from_proto(ps: ProtoPowerSource) -> Self {
+impl FromProto<&ProtoPowerSource> for PsionicMatrix {
+	fn from_proto(ps: &ProtoPowerSource) -> Self {
 		Self {
-			pos: Point2::from_proto(ps.get_pos().clone()),
+			pos: Point2::from_proto(ps.get_pos()),
 			radius: ps.get_radius(),
 			tag: ps.get_tag(),
 		}

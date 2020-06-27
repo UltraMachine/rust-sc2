@@ -329,16 +329,16 @@ impl Sum for Point2 {
 		iter.fold(Default::default(), Add::add)
 	}
 }
-impl FromProto<Point2D> for Point2 {
-	fn from_proto(p: Point2D) -> Self {
+impl FromProto<&Point2D> for Point2 {
+	fn from_proto(p: &Point2D) -> Self {
 		Self {
 			x: p.get_x(),
 			y: p.get_y(),
 		}
 	}
 }
-impl FromProto<Point> for Point2 {
-	fn from_proto(p: Point) -> Self {
+impl FromProto<&Point> for Point2 {
+	fn from_proto(p: &Point) -> Self {
 		Self {
 			x: p.get_x(),
 			y: p.get_y(),
@@ -484,8 +484,8 @@ impl Sum for Point3 {
 		iter.fold(Default::default(), Add::add)
 	}
 }
-impl FromProto<Point> for Point3 {
-	fn from_proto(p: Point) -> Self {
+impl FromProto<&Point> for Point3 {
+	fn from_proto(p: &Point) -> Self {
 		Self {
 			x: p.get_x(),
 			y: p.get_y(),

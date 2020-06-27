@@ -34,8 +34,8 @@ fn to_binary(n: u8) -> Vec<Pixel> {
 	}
 }
 
-impl FromProto<ImageData> for PixelMap {
-	fn from_proto(grid: ImageData) -> Self {
+impl FromProto<&ImageData> for PixelMap {
+	fn from_proto(grid: &ImageData) -> Self {
 		let size = grid.get_size();
 		Array2::from_shape_vec(
 			(size.get_y() as usize, size.get_x() as usize),
@@ -45,8 +45,8 @@ impl FromProto<ImageData> for PixelMap {
 		.reversed_axes()
 	}
 }
-impl FromProto<ImageData> for ByteMap {
-	fn from_proto(grid: ImageData) -> Self {
+impl FromProto<&ImageData> for ByteMap {
+	fn from_proto(grid: &ImageData) -> Self {
 		let size = grid.get_size();
 		Array2::from_shape_vec(
 			(size.get_y() as usize, size.get_x() as usize),
@@ -56,8 +56,8 @@ impl FromProto<ImageData> for ByteMap {
 		.reversed_axes()
 	}
 }
-impl FromProto<ImageData> for VisibilityMap {
-	fn from_proto(grid: ImageData) -> Self {
+impl FromProto<&ImageData> for VisibilityMap {
+	fn from_proto(grid: &ImageData) -> Self {
 		let size = grid.get_size();
 		Array2::from_shape_vec(
 			(size.get_y() as usize, size.get_x() as usize),

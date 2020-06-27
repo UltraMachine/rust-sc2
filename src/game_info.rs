@@ -59,15 +59,15 @@ impl FromProto<ResponseGameInfo> for GameInfo {
 							race_actual: i.race_actual.map(Race::from_proto),
 							difficulty: i.difficulty.map(Difficulty::from_proto),
 							ai_build: i.ai_build.map(AIBuild::from_proto),
-							player_name: i.player_name.clone().into_option(),
+							player_name: i.player_name.as_ref().cloned(),
 						},
 					)
 				})
 				.collect(),
 			map_size: Size::new(map_size.get_x() as usize, map_size.get_y() as usize),
-			pathing_grid: PixelMap::from_proto(start_raw.get_pathing_grid().clone()),
-			terrain_height: Rs::new(ByteMap::from_proto(start_raw.get_terrain_height().clone())),
-			placement_grid: PixelMap::from_proto(start_raw.get_placement_grid().clone()),
+			pathing_grid: PixelMap::from_proto(start_raw.get_pathing_grid()),
+			terrain_height: Rs::new(ByteMap::from_proto(start_raw.get_terrain_height())),
+			placement_grid: PixelMap::from_proto(start_raw.get_placement_grid()),
 			playable_area: Rect::new(
 				area_p0_x as usize,
 				area_p0_y as usize,
@@ -77,7 +77,7 @@ impl FromProto<ResponseGameInfo> for GameInfo {
 			start_locations: start_raw
 				.get_start_locations()
 				.iter()
-				.map(|p| Point2::from_proto(p.clone()))
+				.map(Point2::from_proto)
 				.collect(),
 			map_center: Point2::new(
 				(area_p0_x + (area_p1_x - area_p0_x) / 2) as f32,

@@ -440,7 +440,7 @@ where
 	if !bot_actions.is_empty() {
 		let mut req = Request::new();
 		let actions = req.mut_action().mut_actions();
-		bot_actions.into_iter().for_each(|a| actions.push(a.into_proto()));
+		bot_actions.iter().for_each(|a| actions.push(a.into_proto()));
 		bot.clear_actions();
 		bot.api().send_request(req)?;
 	}
@@ -508,7 +508,7 @@ where
 		// println!("{:?}: {:?}", iteration, bot_actions);
 		let mut req = Request::new();
 		let actions = req.mut_action().mut_actions();
-		bot_actions.into_iter().for_each(|a| actions.push(a.into_proto()));
+		bot_actions.iter().for_each(|a| actions.push(a.into_proto()));
 		bot.clear_actions();
 		bot.api().send_request(req)?;
 		/*
@@ -525,7 +525,7 @@ where
 		let mut req = Request::new();
 		let debug_commands = req.mut_debug().mut_debug();
 		bot_debug_commands
-			.into_iter()
+			.iter()
 			.for_each(|cmd| debug_commands.push(cmd.into_proto()));
 		bot.clear_debug_commands();
 		bot.api().send_request(req)?;
@@ -602,7 +602,7 @@ fn launch_client(sc2_path: &str, port: i32, sc2_version: Option<&str>) -> SC2Res
 fn connect_to_websocket(host: &str, port: i32) -> SC2Result<WS> {
 	let url = Url::parse(format!("ws://{}:{}/sc2api", host, port).as_str())?;
 	let (ws, _rs) = loop {
-		if let Ok(result) = connect(url.clone()) {
+		if let Ok(result) = connect(&url) {
 			break result;
 		}
 	};

@@ -28,27 +28,27 @@ impl FromProto<ResponseData> for GameData {
 			abilities: data
 				.get_abilities()
 				.iter()
-				.filter_map(|a| AbilityData::try_from_proto(a.clone()).map(|data| (data.id, data)))
+				.filter_map(|a| AbilityData::try_from_proto(a).map(|data| (data.id, data)))
 				.collect(),
 			units: data
 				.get_units()
 				.iter()
-				.filter_map(|u| UnitTypeData::try_from_proto(u.clone()).map(|data| (data.id, data)))
+				.filter_map(|u| UnitTypeData::try_from_proto(u).map(|data| (data.id, data)))
 				.collect(),
 			upgrades: data
 				.get_upgrades()
 				.iter()
-				.filter_map(|u| UpgradeData::try_from_proto(u.clone()).map(|data| (data.id, data)))
+				.filter_map(|u| UpgradeData::try_from_proto(u).map(|data| (data.id, data)))
 				.collect(),
 			buffs: data
 				.get_buffs()
 				.iter()
-				.filter_map(|b| BuffData::try_from_proto(b.clone()).map(|data| (data.id, data)))
+				.filter_map(|b| BuffData::try_from_proto(b).map(|data| (data.id, data)))
 				.collect(),
 			effects: data
 				.get_effects()
 				.iter()
-				.filter_map(|e| EffectData::try_from_proto(e.clone()).map(|data| (data.id, data)))
+				.filter_map(|e| EffectData::try_from_proto(e).map(|data| (data.id, data)))
 				.collect(),
 		}
 	}
@@ -141,8 +141,8 @@ pub struct Weapon {
 	pub range: f32,
 	pub speed: f32,
 }
-impl FromProto<ProtoWeapon> for Weapon {
-	fn from_proto(weapon: ProtoWeapon) -> Self {
+impl FromProto<&ProtoWeapon> for Weapon {
+	fn from_proto(weapon: &ProtoWeapon) -> Self {
 		Self {
 			target: TargetType::from_proto(weapon.get_field_type()),
 			damage: weapon.get_damage(),
@@ -176,15 +176,15 @@ pub struct AbilityData {
 	pub is_instant_placement: bool,
 	pub cast_range: Option<f32>,
 }
-impl TryFromProto<ProtoAbilityData> for AbilityData {
-	fn try_from_proto(a: ProtoAbilityData) -> Option<Self> {
+impl TryFromProto<&ProtoAbilityData> for AbilityData {
+	fn try_from_proto(a: &ProtoAbilityData) -> Option<Self> {
 		Some(Self {
 			id: AbilityId::from_u32(a.get_ability_id())?,
 			link_name: a.get_link_name().to_string(),
 			link_index: a.get_link_index(),
-			button_name: a.button_name.clone().into_option(),
-			friendly_name: a.friendly_name.clone().into_option(),
-			hotkey: a.hotkey.clone().into_option(),
+			button_name: a.button_name.as_ref().cloned(),
+			friendly_name: a.friendly_name.as_ref().cloned(),
+			hotkey: a.hotkey.as_ref().cloned(),
 			remaps_to_ability_id: a.remaps_to_ability_id.and_then(AbilityId::from_u32),
 			available: a.get_available(),
 			target: AbilityTarget::from_proto(a.get_target()),
@@ -233,8 +233,8 @@ impl UnitTypeData {
 		}
 	}
 }
-impl TryFromProto<ProtoUnitTypeData> for UnitTypeData {
-	fn try_from_proto(u: ProtoUnitTypeData) -> Option<Self> {
+impl TryFromProto<&ProtoUnitTypeData> for UnitTypeData {
+	fn try_from_proto(u: &ProtoUnitTypeData) -> Option<Self> {
 		Some(Self {
 			id: UnitTypeId::from_u32(u.get_unit_id())?,
 			name: u.get_name().to_string(),
@@ -265,11 +265,7 @@ impl TryFromProto<ProtoUnitTypeData> for UnitTypeData {
 				.collect(),
 			movement_speed: u.get_movement_speed(),
 			armor: u.get_armor() as i32,
-			weapons: u
-				.get_weapons()
-				.iter()
-				.map(|w| Weapon::from_proto(w.clone()))
-				.collect(),
+			weapons: u.get_weapons().iter().map(|w| Weapon::from_proto(w)).collect(),
 		})
 	}
 }
@@ -293,8 +289,8 @@ impl UpgradeData {
 		}
 	}
 }
-impl TryFromProto<ProtoUpgradeData> for UpgradeData {
-	fn try_from_proto(u: ProtoUpgradeData) -> Option<Self> {
+impl TryFromProto<&ProtoUpgradeData> for UpgradeData {
+	fn try_from_proto(u: &ProtoUpgradeData) -> Option<Self> {
 		Some(Self {
 			id: UpgradeId::from_u32(u.get_upgrade_id())?,
 			ability: AbilityId::from_u32(u.get_ability_id())?,
@@ -311,8 +307,8 @@ pub struct BuffData {
 	pub id: BuffId,
 	pub name: String,
 }
-impl TryFromProto<ProtoBuffData> for BuffData {
-	fn try_from_proto(b: ProtoBuffData) -> Option<Self> {
+impl TryFromProto<&ProtoBuffData> for BuffData {
+	fn try_from_proto(b: &ProtoBuffData) -> Option<Self> {
 		Some(Self {
 			id: BuffId::from_u32(b.get_buff_id())?,
 			name: b.get_name().to_string(),
@@ -329,8 +325,8 @@ pub struct EffectData {
 	pub target: TargetType,
 	pub friendly_fire: bool,
 }
-impl TryFromProto<ProtoEffectData> for EffectData {
-	fn try_from_proto(e: ProtoEffectData) -> Option<Self> {
+impl TryFromProto<&ProtoEffectData> for EffectData {
+	fn try_from_proto(e: &ProtoEffectData) -> Option<Self> {
 		EffectId::from_u32(e.get_effect_id()).map(|id| Self {
 			id,
 			name: e.get_name().to_string(),

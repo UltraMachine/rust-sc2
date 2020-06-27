@@ -20,22 +20,20 @@ pub struct Debugger {
 	kill_tags: FxHashSet<u64>,
 }
 impl Debugger {
-	pub fn get_commands(&self) -> Vec<DebugCommand> {
-		let mut commands = self.debug_commands.clone();
+	pub fn get_commands(&mut self) -> &[DebugCommand] {
+		let commands = &mut self.debug_commands;
 
 		if !self.debug_drawings.is_empty() {
-			commands.push(DebugCommand::Draw(self.debug_drawings.clone()));
+			commands.push(DebugCommand::Draw(self.debug_drawings.drain(..).collect()));
 		}
 		if !self.kill_tags.is_empty() {
-			commands.push(DebugCommand::KillUnit(self.kill_tags.iter().copied().collect()));
+			commands.push(DebugCommand::KillUnit(self.kill_tags.drain().collect()));
 		}
 
 		commands
 	}
 	pub fn clear_commands(&mut self) {
 		self.debug_commands.clear();
-		self.debug_drawings.clear();
-		self.kill_tags.clear();
 	}
 	pub fn draw_text(&mut self, text: &str, pos: DebugPos, color: Option<Color>, size: Option<u32>) {
 		self.debug_drawings
@@ -167,7 +165,7 @@ pub enum DebugCommand {
 	EndGame,
 	SetUnitValue(u64, DebugUnitValue, f32),
 }
-impl IntoProto<ProtoDebugCommand> for DebugCommand {
+impl IntoProto<ProtoDebugCommand> for &DebugCommand {
 	fn into_proto(self) -> ProtoDebugCommand {
 		let mut proto = ProtoDebugCommand::new();
 		match self {
@@ -177,27 +175,27 @@ impl IntoProto<ProtoDebugCommand> for DebugCommand {
 				let unit = proto.mut_create_unit();
 				unit.set_unit_type(type_id.to_u32().unwrap());
 				if let Some(owner) = owner {
-					unit.set_owner(owner as i32);
+					unit.set_owner(*owner as i32);
 				}
 				unit.set_pos(pos.into_proto());
-				unit.set_quantity(count);
+				unit.set_quantity(*count);
 			}
-			DebugCommand::KillUnit(tags) => proto.mut_kill_unit().set_tag(tags),
+			DebugCommand::KillUnit(tags) => proto.mut_kill_unit().set_tag(tags.to_vec()),
 			DebugCommand::EndGame => {
 				proto.mut_end_game();
 			}
 			DebugCommand::SetUnitValue(tag, unit_value, value) => {
 				let cmd = proto.mut_unit_value();
-				cmd.set_unit_tag(tag);
+				cmd.set_unit_tag(*tag);
 				cmd.set_unit_value(unit_value.into_proto());
-				cmd.set_value(value);
+				cmd.set_value(*value);
 			}
 		}
 		proto
 	}
 }
 
-impl IntoProto<ProtoDebugDraw> for Vec<DebugDraw> {
+impl IntoProto<ProtoDebugDraw> for &[DebugDraw] {
 	fn into_proto(self) -> ProtoDebugDraw {
 		let mut cmds = ProtoDebugDraw::new();
 		self.iter().for_each(|drawing| match drawing {
@@ -295,7 +293,7 @@ impl IntoProto<DebugSetUnitValue_UnitValue> for DebugUnitValue {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum DebugGameState {
 	ShowMap,
 	ControlEnemy,

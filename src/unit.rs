@@ -1169,8 +1169,8 @@ impl From<&Unit> for Point2 {
 	}
 }
 
-impl FromProtoData<ProtoUnit> for Unit {
-	fn from_proto_data(data: SharedUnitData, u: ProtoUnit) -> Self {
+impl FromProtoData<&ProtoUnit> for Unit {
+	fn from_proto_data(data: SharedUnitData, u: &ProtoUnit) -> Self {
 		let pos = u.get_pos();
 		let type_id = UnitTypeId::from_u32(u.get_unit_type()).unwrap();
 		Self {
@@ -1181,8 +1181,8 @@ impl FromProtoData<ProtoUnit> for Unit {
 			tag: u.get_tag(),
 			type_id,
 			owner: u.get_owner() as u32,
-			position: Point2::from_proto(pos.clone()),
-			position3d: Point3::from_proto(pos.clone()),
+			position: Point2::from_proto(pos),
+			position3d: Point3::from_proto(pos),
 			facing: u.get_facing(),
 			radius: u.get_radius(),
 			build_progress: u.get_build_progress(),
@@ -1226,7 +1226,7 @@ impl FromProtoData<ProtoUnit> for Unit {
 					ability: AbilityId::from_u32(order.get_ability_id()).unwrap(),
 					target: match &order.target {
 						Some(ProtoTarget::target_world_space_pos(pos)) => {
-							Target::Pos(Point2::from_proto(pos.clone()))
+							Target::Pos(Point2::from_proto(pos))
 						}
 						Some(ProtoTarget::target_unit_tag(tag)) => Target::Tag(*tag),
 						None => Target::None,
@@ -1261,7 +1261,7 @@ impl FromProtoData<ProtoUnit> for Unit {
 				.get_rally_targets()
 				.iter()
 				.map(|t| RallyTarget {
-					point: Point2::from_proto(t.get_point().clone()),
+					point: Point2::from_proto(t.get_point()),
 					tag: t.tag,
 				})
 				.collect(),
