@@ -144,6 +144,7 @@ pub struct Bot {
 	pub race: Race,
 	pub enemy_race: Race,
 	pub player_id: u32,
+	pub enemy_player_id: u32,
 	pub opponent_id: String,
 	pub actions: Vec<Action>,
 	pub commander: Rw<Commander>,
@@ -187,6 +188,7 @@ impl Bot {
 			process: None,
 			api: None,
 			player_id: Default::default(),
+			enemy_player_id: Default::default(),
 			opponent_id: Default::default(),
 			actions: Default::default(),
 			commander: Default::default(),
@@ -419,7 +421,9 @@ impl Bot {
 	pub(crate) fn prepare_start(&mut self) {
 		self.race = self.game_info.players[&self.player_id].race_actual.unwrap();
 		if self.game_info.players.len() == 2 {
-			self.enemy_race = self.game_info.players[&(3 - self.player_id)].race_requested;
+			let enemy_player_id = 3 - self.player_id;
+			self.enemy_race = self.game_info.players[&enemy_player_id].race_requested;
+			self.enemy_player_id = enemy_player_id;
 		}
 		self.race_values = Rs::new(RACE_VALUES[&self.race].clone());
 		self.update_units();
