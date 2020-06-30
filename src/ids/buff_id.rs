@@ -298,6 +298,7 @@ pub enum BuffId {
 	ResonatingGlaivesPhaseShift = 293,
 	AmorphousArmorcloud = 294,
 	RavenShredderMissileArmorReductionUISubtruct = 295,
+	BatteryOvercharge = 296,
 }
 
 #[cfg(target_os = "linux")]

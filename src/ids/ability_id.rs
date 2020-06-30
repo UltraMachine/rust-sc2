@@ -1263,7 +1263,8 @@ pub enum AbilityId {
 	UnloadUnit = 3796,
 	MorphToCollapsibleRockTowerDebrisRampLeftGreenCancel = 3798,
 	MorphToCollapsibleRockTowerDebrisRampRightGreenCancel = 3800,
-	AmorphousArmorcloudAmorphousArmorcloud = 3801,
+	BatteryOverchargeBatteryOvercharge = 3801,
+	AmorphousArmorcloudAmorphousArmorcloud = 3803,
 }
 
 #[cfg(target_os = "linux")]
