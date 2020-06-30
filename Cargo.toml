@@ -27,3 +27,10 @@ serde = { version = "^1.0.114", features = ["derive"], optional = true }
 
 [dev-dependencies]
 clap = "^2.33.1"
+
+[features]
+protoc = ["sc2-proto/protoc-rust"]
+
+[target.'cfg(feature = "rayon")'.dependencies]
+indexmap = { version = "^1.4.0", features = ["rayon"] }
+ndarray = { version = "^0.13.1", features = ["rayon"] }
