@@ -3,7 +3,7 @@ extern crate num_derive;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
-extern crate sc2_macro;
+pub extern crate sc2_macro;
 #[macro_use]
 extern crate itertools;
 #[macro_use]
@@ -52,7 +52,6 @@ use player::{GameResult, Race};
 use unit::SharedUnitData;
 
 pub use client::{run_ladder_game, run_vs_computer, run_vs_human, SC2Result};
-pub use sc2_macro::{bot, bot_new};
 pub use sc2_proto::sc2api::Request;
 
 pub type PlayerBox = Box<dyn Player>;
