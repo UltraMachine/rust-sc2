@@ -816,30 +816,36 @@ lazy_static! {
 			speed: 1.0,
 		}],
 	];
-	pub static ref INHIBITOR_ZONE_RADIUS: HashMap<UnitTypeId, f32> = hashmap![
-		UnitTypeId::InhibitorZoneSmall => 4.0,
-		UnitTypeId::InhibitorZoneMedium => 5.0,
-		UnitTypeId::InhibitorZoneLarge => 6.0,
+	pub static ref INHIBITOR_ZONE_RADIUS: HashMap<UnitTypeId, f32> = {
+		let mut map = hashmap![
+			UnitTypeId::InhibitorZoneSmall => 4.0,
+			UnitTypeId::InhibitorZoneMedium => 5.0,
+			UnitTypeId::InhibitorZoneLarge => 6.0,
+		];
 		#[cfg(windows)]
-		UnitTypeId::InhibitorZoneFlyingSmall => 4.0,
+		{
+			map.insert(UnitTypeId::InhibitorZoneFlyingSmall, 4.0);
+			map.insert(UnitTypeId::InhibitorZoneFlyingMedium, 5.0);
+			map.insert(UnitTypeId::InhibitorZoneFlyingLarge, 6.0);
+		}
+		map
+	};
+	pub(crate) static ref SPEED_BUFFS: HashMap<BuffId, f32> = {
+		let mut map = hashmap![
+			BuffId::Stimpack => 1.5,
+			BuffId::StimpackMarauder => 1.5,
+			BuffId::ChargeUp => if cfg!(windows) { 2.8 } else { 2.2 },
+			BuffId::DutchMarauderSlow => 0.5,
+			BuffId::TimeWarpProduction => 0.5,
+			BuffId::FungalGrowth => 0.25,
+			BuffId::InhibitorZoneTemporalField => 0.65,
+		];
 		#[cfg(windows)]
-		UnitTypeId::InhibitorZoneFlyingMedium => 5.0,
-		#[cfg(windows)]
-		UnitTypeId::InhibitorZoneFlyingLarge => 6.0,
-	];
-	pub(crate) static ref SPEED_BUFFS: HashMap<BuffId, f32> = hashmap![
-		BuffId::Stimpack => 1.5,
-		BuffId::StimpackMarauder => 1.5,
-		BuffId::ChargeUp => if cfg!(windows) { 2.8 } else { 2.2 },
-		BuffId::DutchMarauderSlow => 0.5,
-		BuffId::TimeWarpProduction => 0.5,
-		BuffId::FungalGrowth => 0.25,
-		BuffId::InhibitorZoneTemporalField => 0.65,
-		#[cfg(windows)]
-		BuffId::InhibitorZoneFlyingTemporalField => 0.65,
-		#[cfg(windows)]
-		BuffId::AccelerationZoneTemporalField => 1.35,
-		#[cfg(windows)]
-		BuffId::AccelerationZoneFlyingTemporalField => 1.35,
-	];
+		{
+			map.insert(BuffId::InhibitorZoneFlyingTemporalField, 0.65);
+			map.insert(BuffId::AccelerationZoneTemporalField, 1.35);
+			map.insert(BuffId::AccelerationZoneFlyingTemporalField, 1.35);
+		}
+		map
+	};
 }
