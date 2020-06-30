@@ -141,6 +141,7 @@ pub struct Bot {
 	pub(crate) process: Option<Child>,
 	pub(crate) api: Option<API>,
 	pub game_step: u32,
+	pub disable_fog: bool,
 	pub race: Race,
 	pub enemy_race: Race,
 	pub player_id: u32,
@@ -183,6 +184,7 @@ impl Bot {
 	pub fn new() -> Self {
 		Self {
 			game_step: 1,
+			disable_fog: false,
 			race: Race::Random,
 			enemy_race: Race::Random,
 			process: None,
