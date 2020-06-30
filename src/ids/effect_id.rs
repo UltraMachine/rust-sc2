@@ -1,3 +1,4 @@
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, FromPrimitive, ToPrimitive, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum EffectId {
 	Null = 0,

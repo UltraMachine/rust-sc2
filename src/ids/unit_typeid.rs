@@ -1,4 +1,5 @@
 #[cfg(target_os = "windows")]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, FromPrimitive, ToPrimitive, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum UnitTypeId {
 	NotAUnit = 0,
@@ -1995,6 +1996,7 @@ pub enum UnitTypeId {
 }
 
 #[cfg(target_os = "linux")]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, FromPrimitive, ToPrimitive, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum UnitTypeId {
 	NotAUnit = 0,

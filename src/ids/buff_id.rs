@@ -1,4 +1,5 @@
 #[cfg(target_os = "windows")]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, FromPrimitive, ToPrimitive, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum BuffId {
 	Null = 0,
@@ -300,6 +301,7 @@ pub enum BuffId {
 }
 
 #[cfg(target_os = "linux")]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, FromPrimitive, ToPrimitive, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum BuffId {
 	Null = 0,

@@ -9,6 +9,7 @@ use sc2_proto::{
 };
 
 #[variant_checkers]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FromStr)]
 pub enum Race {
 	Terran,
@@ -43,6 +44,7 @@ impl Default for Race {
 	}
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Copy, Clone, FromPrimitive, FromStr)]
 #[enum_from_str(use_primitives)]
 pub enum Difficulty {
@@ -90,6 +92,7 @@ impl IntoProto<ProtoDifficulty> for Difficulty {
 	}
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Copy, Clone, FromStr)]
 pub enum AIBuild {
 	RandomBuild,
@@ -170,6 +173,7 @@ impl Computer {
 }
 
 #[variant_checkers]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum GameResult {
 	Victory,

@@ -2,7 +2,10 @@ from json import load
 from pathlib import Path
 from sys import argv
 
-DERIVES = "#[derive(Debug, FromPrimitive, ToPrimitive, Copy, Clone, PartialEq, Eq, Hash)]"
+DERIVES = """\
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, FromPrimitive, ToPrimitive, Copy, Clone, PartialEq, Eq, Hash)]\
+"""
 ENUM_NAMES = ("UnitTypeId", "AbilityId", "UpgradeId", "BuffId", "EffectId")
 FILE_NAMES = ("unit_typeid", "ability_id", "upgrade_id", "buff_id", "effect_id")
 
