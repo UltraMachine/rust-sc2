@@ -4,7 +4,8 @@ extern crate quote;
 use proc_macro::TokenStream;
 use regex::Regex;
 use syn::{
-	parse_macro_input, Data, DeriveInput, Expr, Fields, ItemEnum, ItemFn, ItemStruct, Meta, NestedMeta, Stmt,
+	parse_macro_input, Attribute, Data, DeriveInput, Expr, Fields, ItemEnum, ItemFn, ItemStruct, Meta,
+	NestedMeta, Stmt,
 };
 
 #[proc_macro_attribute]
@@ -91,8 +92,7 @@ pub fn enum_from_str_derive(input: TokenStream) -> TokenStream {
 		let variants = data.variants.iter().map(|v| &v.ident);
 		// let variants2 = variants.clone().map(|v| format!("{}::{}", name, v));
 
-		#[allow(clippy::block_in_if_condition_stmt)]
-		let other_cases = if item.attrs.iter().any(|a| {
+		let additional_attributes = |a: &Attribute| {
 			if a.path.is_ident("enum_from_str") {
 				if let Meta::List(list) = a.parse_meta().unwrap() {
 					return list.nested.iter().any(|n| {
@@ -107,7 +107,8 @@ pub fn enum_from_str_derive(input: TokenStream) -> TokenStream {
 				}
 			}
 			false
-		}) {
+		};
+		let other_cases = if item.attrs.iter().any(additional_attributes) {
 			quote! {
 				n => {
 					if let Ok(num) = n.parse() {
