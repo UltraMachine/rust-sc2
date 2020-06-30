@@ -3,7 +3,7 @@ use crate::{
 	bot::{Rs, Rw},
 	constants::{
 		RaceValues, DAMAGE_BONUS_PER_UPGRADE, FRAMES_PER_SECOND, MISSED_WEAPONS, OFF_CREEP_SPEED_UPGRADES,
-		SPEED_BUFFS, SPEED_ON_CREEP, SPEED_UPGRADES, TARGET_AIR, TARGET_GROUND, WARPGATE_ABILITIES,
+		SPEED_BUFFS, SPEED_ON_CREEP, SPEED_UPGRADES, WARPGATE_ABILITIES,
 	},
 	game_data::{Attribute, GameData, TargetType, UnitTypeData, Weapon},
 	game_state::Alliance,
@@ -326,13 +326,14 @@ impl Unit {
 		}
 
 		// ---- Upgrades ----
-		if let Some(upgrades) = upgrades.or_else(|| {
+		let upgrades = upgrades.or_else(|| {
 			if self.is_mine() {
 				Some(&self.data.upgrades)
 			} else {
 				None
 			}
-		}) {
+		});
+		if let Some(upgrades) = upgrades {
 			if let Some((upgrade_id, increase)) = SPEED_UPGRADES.get(&unit_type) {
 				if upgrades.contains(upgrade_id) {
 					speed *= increase;
@@ -489,11 +490,9 @@ impl Unit {
 			}
 		})
 	}
-	#[rustfmt::skip::macros(matches)]
 	pub fn can_attack(&self) -> bool {
 		self.weapons().map_or(false, |weapons| !weapons.is_empty())
 	}
-	#[rustfmt::skip::macros(matches)]
 	pub fn can_attack_both(&self) -> bool {
 		self.weapons().map_or(false, |weapons| {
 			let mut ground = false;

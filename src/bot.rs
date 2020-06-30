@@ -412,7 +412,6 @@ impl Bot {
 			game_step: self.game_step,
 		});
 	}
-	#[allow(clippy::block_in_if_condition_stmt)]
 	pub(crate) fn prepare_start(&mut self) {
 		self.race = self.game_info.players[&self.player_id].race_actual.unwrap();
 		if self.game_info.players.len() == 2 {
@@ -486,11 +485,12 @@ impl Bot {
 							let pos = center.offset(*x as f32, *y as f32);
 							if self.game_info.placement_grid[pos].is_empty() {
 								let mut distance_sum = 0_f32;
-								if resources.iter().all(|r| {
+								let far_enough = |r: &Unit| {
 									let dist = pos.distance_squared(r);
 									distance_sum += dist;
 									dist > if r.is_geyser() { 49.0 } else { 36.0 }
-								}) {
+								};
+								if resources.iter().all(far_enough) {
 									return Some((pos, distance_sum));
 								}
 							}
@@ -877,8 +877,7 @@ impl Bot {
 
 					if !valid_positions.is_empty() {
 						return if options.random {
-							let mut rng = thread_rng();
-							valid_positions.choose(&mut rng).copied()
+							valid_positions.choose(&mut thread_rng()).copied()
 						} else {
 							let f = |pos: Point2| near.distance_squared(pos);
 							valid_positions
