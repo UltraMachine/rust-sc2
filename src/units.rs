@@ -362,22 +362,20 @@ impl Extend<Unit> for Units {
 }
 
 #[cfg(feature = "rayon")]
-use rayon::{
-	collections::hash_map::{IntoIter as IntoParIter, Iter as ParIter, IterMut as ParIterMut},
-	iter::IterBridge,
-	prelude::*,
-};
+use indexmap::map::rayon::{IntoParIter, ParIter, ParIterMut, ParKeys, ParValues, ParValuesMut};
+#[cfg(feature = "rayon")]
+use rayon::prelude::*;
 
 #[cfg(feature = "rayon")]
 impl Units {
 	#[inline]
-	pub fn par_iter(&self) -> IterBridge<Values<u64, Unit>> {
-		self.0.values().par_bridge()
+	pub fn par_iter(&self) -> ParValues<u64, Unit> {
+		self.0.par_values()
 	}
 
 	#[inline]
-	pub fn par_iter_mut(&mut self) -> IterBridge<ValuesMut<u64, Unit>> {
-		self.0.values_mut().par_bridge()
+	pub fn par_iter_mut(&mut self) -> ParValuesMut<u64, Unit> {
+		self.0.par_values_mut()
 	}
 
 	#[inline]
@@ -391,8 +389,8 @@ impl Units {
 	}
 
 	#[inline]
-	pub fn par_tags(&self) -> IterBridge<Keys<u64, Unit>> {
-		self.0.keys().par_bridge()
+	pub fn par_tags(&self) -> ParKeys<u64, Unit> {
+		self.0.par_keys()
 	}
 }
 
