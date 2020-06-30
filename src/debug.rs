@@ -6,7 +6,7 @@ use crate::{
 use num_traits::ToPrimitive;
 use rustc_hash::FxHashSet;
 use sc2_proto::debug::{
-	DebugBox, DebugCommand as ProtoDebugCommand, DebugDraw as ProtoDebugDraw,
+	DebugBox, DebugCommand as ProtoDebugCommand, DebugDraw as ProtoDebugDraw, DebugEndGame_EndResult,
 	DebugGameState as ProtoDebugGameState, DebugLine, DebugSetUnitValue_UnitValue, DebugSphere, DebugText,
 };
 
@@ -88,8 +88,11 @@ impl Debugger {
 				.map(|(tag, unit_value, value)| DebugCommand::SetUnitValue(tag, unit_value, value)),
 		);
 	}
+	pub fn win_game(&mut self) {
+		self.debug_commands.push(DebugCommand::EndGame(true));
+	}
 	pub fn end_game(&mut self) {
-		self.debug_commands.push(DebugCommand::EndGame);
+		self.debug_commands.push(DebugCommand::EndGame(false));
 	}
 	pub fn show_map(&mut self) {
 		self.debug_commands
@@ -162,7 +165,7 @@ pub enum DebugCommand {
 	KillUnit(Vec<u64>),
 	// TestProcess,
 	// SetScore,
-	EndGame,
+	EndGame(bool),
 	SetUnitValue(u64, DebugUnitValue, f32),
 }
 impl IntoProto<ProtoDebugCommand> for &DebugCommand {
@@ -181,8 +184,11 @@ impl IntoProto<ProtoDebugCommand> for &DebugCommand {
 				unit.set_quantity(*count);
 			}
 			DebugCommand::KillUnit(tags) => proto.mut_kill_unit().set_tag(tags.to_vec()),
-			DebugCommand::EndGame => {
-				proto.mut_end_game();
+			DebugCommand::EndGame(win) => {
+				let end_game = proto.mut_end_game();
+				if *win {
+					end_game.set_end_result(DebugEndGame_EndResult::DeclareVictory);
+				}
 			}
 			DebugCommand::SetUnitValue(tag, unit_value, value) => {
 				let cmd = proto.mut_unit_value();
