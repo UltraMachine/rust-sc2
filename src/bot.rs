@@ -18,7 +18,7 @@ use crate::{
 };
 use num_traits::ToPrimitive;
 use rand::prelude::{thread_rng, SliceRandom};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use sc2_proto::{
 	query::{RequestQueryBuildingPlacement, RequestQueryPathing},
 	sc2api::Request,
@@ -155,7 +155,7 @@ pub struct Bot {
 	pub race_values: Rs<RaceValues>,
 	data_for_unit: SharedUnitData,
 	pub units: AllUnits,
-	pub abilities_units: Rs<HashMap<u64, Vec<AbilityId>>>,
+	pub abilities_units: Rs<FxHashMap<u64, Vec<AbilityId>>>,
 	pub orders: HashMap<AbilityId, usize>,
 	pub current_units: HashMap<UnitTypeId, usize>,
 	pub time: f32,
@@ -170,11 +170,11 @@ pub struct Bot {
 	pub enemy_start: Point2,
 	pub start_center: Point2,
 	pub enemy_start_center: Point2,
-	techlab_tags: Rw<Vec<u64>>,
-	reactor_tags: Rw<Vec<u64>>,
+	techlab_tags: Rw<FxHashSet<u64>>,
+	reactor_tags: Rw<FxHashSet<u64>>,
 	pub expansions: Vec<(Point2, Point2)>,
 	max_cooldowns: Rw<HashMap<UnitTypeId, f32>>,
-	last_units_health: Rs<HashMap<u64, f32>>,
+	last_units_health: Rs<FxHashMap<u64, f32>>,
 	pub vision_blockers: Vec<Point2>,
 	pub ramps: Ramps,
 }
@@ -756,7 +756,7 @@ impl Bot {
 								| UnitTypeId::StarportTechLab
 									if u.is_mine() =>
 								{
-									techlab_tags.push(u.tag)
+									techlab_tags.insert(u.tag);
 								}
 
 								UnitTypeId::Reactor
@@ -765,7 +765,7 @@ impl Bot {
 								| UnitTypeId::StarportReactor
 									if u.is_mine() =>
 								{
-									reactor_tags.push(u.tag)
+									reactor_tags.insert(u.tag);
 								}
 
 								_ => {}

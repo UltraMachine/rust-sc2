@@ -10,6 +10,7 @@ use crate::{
 	FromProto, FromProtoData,
 };
 use num_traits::FromPrimitive;
+use rustc_hash::FxHashSet;
 use sc2_proto::{
 	raw::{Alliance as ProtoAlliance, ObservationRaw, PowerSource as ProtoPowerSource},
 	sc2api::{Alert as ProtoAlert, Observation as ProtoObservation, ResponseObservation},
@@ -103,7 +104,7 @@ pub struct RawData {
 	pub psionic_matrix: Vec<PsionicMatrix>,
 	pub camera: Point2,
 	pub units: Units,
-	pub upgrades: Vec<UpgradeId>,
+	pub upgrades: FxHashSet<UpgradeId>,
 	pub visibility: VisibilityMap,
 	pub creep: PixelMap,
 	pub dead_units: Vec<u64>,
