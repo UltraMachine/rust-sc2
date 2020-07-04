@@ -1091,16 +1091,8 @@ impl Bot {
 			.map(|result| ActionResult::from_proto(result.get_result()))
 			.collect())
 	}
-}
 
-impl Default for Bot {
-	fn default() -> Self {
-		Self::new()
-	}
-}
-
-impl Drop for Bot {
-	fn drop(&mut self) {
+	pub(crate) fn close_client(&mut self) {
 		if let Some(api) = &mut self.api {
 			let mut req = Request::new();
 			req.mut_leave_game();
@@ -1120,5 +1112,17 @@ impl Drop for Bot {
 				error!("Can't kill SC2 process: {}", e);
 			}
 		}
+	}
+}
+
+impl Default for Bot {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
+impl Drop for Bot {
+	fn drop(&mut self) {
+		self.close_client();
 	}
 }

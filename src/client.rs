@@ -4,8 +4,7 @@ use crate::{
 	game_state::GameState,
 	ids::{AbilityId, UnitTypeId},
 	paths::*,
-	player::Computer,
-	FromProtoData, IntoProto, IntoSC2, Player, PlayerSettings,
+	player::{Computer, Difficulty, Race},
 	Event, FromProtoData, IntoProto, IntoSC2, Player, PlayerSettings,
 };
 use num_traits::FromPrimitive;
@@ -31,6 +30,246 @@ pub type SC2Result<T> = Result<T, Box<dyn Error>>;
 const HOST: &str = "127.0.0.1";
 const PORT: i32 = 5000;
 
+pub struct RunnerSingle<'a, B>
+where
+	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
+{
+	bot: &'a mut B,
+	sc2_path: String,
+	sc2_version: Option<&'a str>,
+	pub computer: Computer,
+	pub map: &'a str,
+	pub realtime: bool,
+	pub save_replay_as: Option<&'a str>,
+}
+
+impl<'a, B> RunnerSingle<'a, B>
+where
+	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
+{
+	pub fn new(bot: &'a mut B, sc2_version: Option<&'a str>) -> SC2Result<Self> {
+		debug!("Starting game vs computer");
+
+		let sc2_path = get_path_to_sc2();
+
+		debug!("Launching SC2 process");
+		bot.process = Some(launch_client(&sc2_path, PORT, sc2_version)?);
+		debug!("Connecting to websocket");
+		bot.api = Some(API(connect_to_websocket(HOST, PORT)?));
+
+		Ok(Self {
+			bot,
+			sc2_path,
+			sc2_version,
+			computer: Computer::new(Race::Random, Difficulty::VeryEasy, None),
+			map: "",
+			save_replay_as: None,
+			realtime: false,
+		})
+	}
+
+	pub fn run_game(&mut self) -> SC2Result<()> {
+		let settings = self.bot.get_player_settings();
+		let api = &mut self.bot.api.as_mut().unwrap();
+
+		debug!("Sending CreateGame request");
+		let mut req = Request::new();
+		let req_create_game = req.mut_create_game();
+
+		let map_name = &self.map;
+		if map_name.is_empty() {
+			let err = "Map name is not specified, but required to run game.";
+			error!("{}", err);
+			panic!("{}", err);
+		}
+		let map_path = get_map_path(&self.sc2_path, &map_name);
+		req_create_game.mut_local_map().set_map_path(map_path);
+		create_player_setup(&settings, req_create_game);
+		create_computer_setup(&self.computer, req_create_game);
+
+		req_create_game.set_realtime(self.realtime);
+
+		let res = api.send(req)?;
+		let res_create_game = res.get_create_game();
+		if res_create_game.has_error() {
+			let err = format!(
+				"{:?}: {}",
+				res_create_game.get_error(),
+				res_create_game.get_error_details()
+			);
+			error!("{}", err);
+			panic!(err);
+		}
+
+		debug!("Sending JoinGame request");
+		self.bot.player_id = join_game(&settings, api, None)?;
+
+		set_static_data(self.bot)?;
+
+		debug!("Entered main loop");
+		play_first_step(self.bot, self.realtime)?;
+		let mut iteration = 0;
+		while play_step(self.bot, iteration, self.realtime)? {
+			iteration += 1;
+		}
+		debug!("Game finished");
+
+		if let Some(path) = &self.save_replay_as {
+			save_replay(self.bot.api(), &path)?;
+		}
+		Ok(())
+	}
+
+	pub fn close(&mut self) {
+		self.bot.close_client();
+	}
+
+	pub fn into_multi(self) -> SC2Result<RunnerMulti<'a, B>> {
+		let mut human = Human::new();
+		let port = PORT + 1;
+
+		debug!("Launching human SC2 process");
+		human.process = Some(launch_client(&self.sc2_path, port, self.sc2_version)?);
+		debug!("Connecting to human websocket");
+		human.api = Some(API(connect_to_websocket(HOST, port)?));
+
+		Ok(RunnerMulti {
+			bot: self.bot,
+			human,
+			sc2_path: self.sc2_path,
+			sc2_version: self.sc2_version,
+			human_settings: PlayerSettings::new(Race::Random, None),
+			map: self.map,
+			save_replay_as: self.save_replay_as,
+			realtime: self.realtime,
+		})
+	}
+}
+
+pub struct RunnerMulti<'a, B>
+where
+	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
+{
+	bot: &'a mut B,
+	human: Human,
+	sc2_path: String,
+	sc2_version: Option<&'a str>,
+	pub human_settings: PlayerSettings,
+	pub map: &'a str,
+	pub realtime: bool,
+	pub save_replay_as: Option<&'a str>,
+}
+
+impl<'a, B> RunnerMulti<'a, B>
+where
+	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
+{
+	pub fn new(bot: &'a mut B, sc2_version: Option<&'a str>) -> SC2Result<Self> {
+		debug!("Starting human vs bot");
+		let sc2_path = get_path_to_sc2();
+		let (port_bot, port_human) = (PORT, PORT + 1);
+
+		let mut human = Human::new();
+
+		debug!("Launching host SC2 process");
+		human.process = Some(launch_client(&sc2_path, port_human, sc2_version)?);
+		debug!("Launching client SC2 process");
+		bot.process = Some(launch_client(&sc2_path, port_bot, sc2_version)?);
+
+		debug!("Connecting to host websocket");
+		human.api = Some(API(connect_to_websocket(HOST, port_human)?));
+		debug!("Connecting to client websocket");
+		bot.api = Some(API(connect_to_websocket(HOST, port_bot)?));
+
+		Ok(Self {
+			bot,
+			human,
+			sc2_path,
+			sc2_version,
+			human_settings: PlayerSettings::new(Race::Random, None),
+			map: "",
+			save_replay_as: None,
+			realtime: false,
+		})
+	}
+
+	pub fn run_game(&mut self) -> SC2Result<()> {
+		let bot_settings = self.bot.get_player_settings();
+		let human_api = &mut self.human.api.as_mut().unwrap();
+
+		debug!("Sending CreateGame request to host process");
+		let mut req = Request::new();
+		let req_create_game = req.mut_create_game();
+
+		let map_name = &self.map;
+		if map_name.is_empty() {
+			let err = "Map name is not specified, but required to run game.";
+			error!("{}", err);
+			panic!("{}", err);
+		}
+		let map_path = get_map_path(&self.sc2_path, &map_name);
+		req_create_game.mut_local_map().set_map_path(map_path);
+		create_player_setup(&self.human_settings, req_create_game);
+		create_player_setup(&bot_settings, req_create_game);
+		req_create_game.set_realtime(self.realtime);
+
+		let res = human_api.send(req)?;
+		let res_create_game = res.get_create_game();
+		if res_create_game.has_error() {
+			let err = format!(
+				"{:?}: {}",
+				res_create_game.get_error(),
+				res_create_game.get_error_details()
+			);
+			error!("{}", err);
+			panic!(err);
+		}
+
+		debug!("Sending JoinGame request to both processes");
+		let ports = Ports {
+			// shared: PORT + 2,
+			server: (PORT + 3, PORT + 4),
+			client: vec![(PORT + 5, PORT + 6), (PORT + 7, PORT + 8)],
+		};
+		join_game2(&self.human_settings, human_api, Some(&ports))?;
+		join_game2(&bot_settings, self.bot.api(), Some(&ports))?;
+		let _ = wait_join(human_api)?;
+		self.bot.player_id = wait_join(self.bot.api())?;
+
+		set_static_data(self.bot)?;
+
+		debug!("Entered main loop");
+		play_first_step(self.bot, self.realtime)?;
+		let mut iteration = 0;
+		while play_step(self.bot, iteration, self.realtime)? {
+			iteration += 1;
+		}
+		debug!("Game finished");
+
+		if let Some(path) = &self.save_replay_as {
+			save_replay(self.bot.api(), &path)?;
+		}
+		Ok(())
+	}
+
+	pub fn close(&mut self) {
+		self.bot.close_client();
+		self.human.close_client();
+	}
+
+	pub fn into_single(self) -> RunnerSingle<'a, B> {
+		RunnerSingle {
+			bot: self.bot,
+			sc2_path: self.sc2_path,
+			sc2_version: self.sc2_version,
+			computer: Computer::new(Race::Random, Difficulty::VeryEasy, None),
+			map: self.map,
+			save_replay_as: self.save_replay_as,
+			realtime: self.realtime,
+		}
+	}
+}
+
 #[derive(Default)]
 struct Human {
 	process: Option<Child>,
@@ -40,9 +279,7 @@ impl Human {
 	pub fn new() -> Self {
 		Default::default()
 	}
-}
-impl Drop for Human {
-	fn drop(&mut self) {
+	pub(crate) fn close_client(&mut self) {
 		if let Some(api) = &mut self.api {
 			let mut req = Request::new();
 			req.mut_leave_game();
@@ -62,6 +299,11 @@ impl Drop for Human {
 				error!("Can't kill SC2 process: {}", e);
 			}
 		}
+	}
+}
+impl Drop for Human {
+	fn drop(&mut self) {
+		self.close_client();
 	}
 }
 
@@ -102,68 +344,13 @@ pub fn run_vs_computer<B>(
 where
 	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
 {
-	debug!("Starting game vs computer");
-
-	let sc2_path = get_path_to_sc2();
-	let map_path = get_map_path(&sc2_path, map_name);
-
-	// let port = get_unused_port();
-	debug!("Launching SC2 process");
-	bot.process = Some(launch_client(&sc2_path, PORT, options.sc2_version)?);
-	debug!("Connecting to websocket");
-	bot.api = Some(API(connect_to_websocket(HOST, PORT)?));
-
-	let settings = bot.get_player_settings();
-	let api = &mut bot.api.as_mut().unwrap();
-
-	debug!("Sending CreateGame request");
-	// Create game
-	let mut req = Request::new();
-	let req_create_game = req.mut_create_game();
-
-	req_create_game.mut_local_map().set_map_path(map_path);
-	/*
-	Set Map
-		req.mut_create_game().mut_local_map().set_map_path("");
-	OR
-		req.mut_create_game().set_battlenet_map_name("");
-	*/
-	create_player_setup(&settings, req_create_game);
-	create_computer_setup(computer, req_create_game);
-	// req_create_game.set_disable_fog(bool); // Cheat
-	// req_create_game.set_random_seed(u32);
-	let realtime = options.realtime;
-	req_create_game.set_realtime(realtime);
-
-	let res = api.send(req)?;
-	let res_create_game = res.get_create_game();
-	if res_create_game.has_error() {
-		let err = format!(
-			"{:?}: {}",
-			res_create_game.get_error(),
-			res_create_game.get_error_details()
-		);
-		error!("{}", err);
-		panic!(err);
-	}
-
-	debug!("Sending JoinGame request");
-	bot.player_id = join_game(&settings, api, None)?;
-
-	set_static_data(bot)?;
-
-	debug!("Entered main loop");
-	// Main loop
-	play_first_step(bot, realtime)?;
-	let mut iteration = 0;
-	while play_step(bot, iteration, realtime)? {
-		iteration += 1;
-	}
-	debug!("Game finished");
-
-	if let Some(path) = options.save_replay_as {
-		save_replay(bot.api(), path)?;
-	}
+	let mut runner = RunnerSingle::new(bot, options.sc2_version)?;
+	runner.computer = computer;
+	runner.map = map_name;
+	runner.realtime = options.realtime;
+	runner.save_replay_as = options.save_replay_as;
+	runner.run_game()?;
+	runner.close();
 	Ok(())
 }
 
@@ -221,79 +408,13 @@ pub fn run_vs_human<B>(
 where
 	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
 {
-	debug!("Starting human vs bot");
-	let sc2_path = get_path_to_sc2();
-	let map_path = get_map_path(&sc2_path, map_name);
-
-	// let ports = get_unused_ports(9);
-	// let (port_human, port_bot) = (ports[0], ports[1]);
-	let (port_human, port_bot) = (PORT, PORT + 1);
-
-	let mut human = Human::new();
-
-	let sc2_version = options.sc2_version;
-	debug!("Launching host SC2 process");
-	human.process = Some(launch_client(&sc2_path, port_human, sc2_version)?);
-	debug!("Launching client SC2 process");
-	bot.process = Some(launch_client(&sc2_path, port_bot, sc2_version)?);
-	debug!("Connecting to host websocket");
-	human.api = Some(API(connect_to_websocket(HOST, port_human)?));
-	debug!("Connecting to client websocket");
-	bot.api = Some(API(connect_to_websocket(HOST, port_bot)?));
-	let human_api = &mut human.api.as_mut().unwrap();
-
-	debug!("Sending CreateGame request to host process");
-	let mut req = Request::new();
-	let req_create_game = req.mut_create_game();
-	req_create_game.mut_local_map().set_map_path(map_path);
-	create_player_setup(&human_settings, req_create_game);
-	create_player_setup(&bot.get_player_settings(), req_create_game);
-	// req_create_game.set_disable_fog(bool); // Cheat
-	// req_create_game.set_random_seed(u32);
-	let realtime = options.realtime;
-	req_create_game.set_realtime(realtime);
-
-	let res = human_api.send(req)?;
-	let res_create_game = res.get_create_game();
-	if res_create_game.has_error() {
-		let err = format!(
-			"{:?}: {}",
-			res_create_game.get_error(),
-			res_create_game.get_error_details()
-		);
-		error!("{}", err);
-		panic!(err);
-	}
-
-	debug!("Sending JoinGame request to both processes");
-	/*let ports = Ports {
-		shared: ports[2],
-		server: (ports[3], ports[4]),
-		client: vec![(ports[5], ports[6]), (ports[7], ports[8])],
-	};*/
-	let ports = Ports {
-		// shared: PORT + 2,
-		server: (PORT + 3, PORT + 4),
-		client: vec![(PORT + 5, PORT + 6), (PORT + 7, PORT + 8)],
-	};
-	join_game2(&human_settings, human_api, Some(&ports))?;
-	join_game2(&bot.get_player_settings(), bot.api(), Some(&ports))?;
-	let _ = wait_join(human_api)?;
-	bot.player_id = wait_join(bot.api())?;
-
-	set_static_data(bot)?;
-
-	debug!("Entered main loop");
-	play_first_step(bot, realtime)?;
-	let mut iteration = 0;
-	while play_step(bot, iteration, realtime)? {
-		iteration += 1;
-	}
-	debug!("Game finished");
-
-	if let Some(path) = options.save_replay_as {
-		save_replay(bot.api(), path)?;
-	}
+	let mut runner = RunnerMulti::new(bot, options.sc2_version)?;
+	runner.human_settings = human_settings;
+	runner.map = map_name;
+	runner.realtime = options.realtime;
+	runner.save_replay_as = options.save_replay_as;
+	runner.run_game()?;
+	runner.close();
 	Ok(())
 }
 
@@ -353,7 +474,7 @@ fn create_player_setup(settings: &PlayerSettings, req_create_game: &mut RequestC
 	req_create_game.mut_player_setup().push(setup);
 }
 
-fn create_computer_setup(computer: Computer, req_create_game: &mut RequestCreateGame) {
+fn create_computer_setup(computer: &Computer, req_create_game: &mut RequestCreateGame) {
 	let mut setup = PlayerSetup::new();
 
 	setup.set_race(computer.race.into_proto());
@@ -627,7 +748,7 @@ fn launch_client(sc2_path: &str, port: i32, sc2_version: Option<&str>) -> SC2Res
 }
 
 fn connect_to_websocket(host: &str, port: i32) -> SC2Result<WS> {
-	let url = Url::parse(format!("ws://{}:{}/sc2api", host, port).as_str())?;
+	let url = Url::parse(&format!("ws://{}:{}/sc2api", host, port))?;
 	let (ws, _rs) = loop {
 		if let Ok(result) = connect(&url) {
 			break result;

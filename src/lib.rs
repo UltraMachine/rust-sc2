@@ -15,7 +15,10 @@ pub mod prelude {
 	pub use crate::{
 		action::Target,
 		bot::PlacementOptions,
-		client::{run_ladder_game, run_vs_computer, run_vs_human, LaunchOptions, SC2Result},
+		client::{
+			run_ladder_game, run_vs_computer, run_vs_human, LaunchOptions, RunnerMulti, RunnerSingle,
+			SC2Result,
+		},
 		constants::{ALL_PRODUCERS, PRODUCERS, RESEARCHERS, TECH_REQUIREMENTS},
 		distance::*,
 		geometry::Point2,
