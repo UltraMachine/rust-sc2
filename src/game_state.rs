@@ -1,6 +1,6 @@
 use crate::{
 	action::{Action, ActionError},
-	bot::Rs,
+	bot::{Rs, Rw},
 	geometry::Point2,
 	ids::{AbilityId, EffectId, UpgradeId},
 	pixel_map::{PixelMap, VisibilityMap},
@@ -15,6 +15,16 @@ use sc2_proto::{
 	raw::{Alliance as ProtoAlliance, ObservationRaw, PowerSource as ProtoPowerSource},
 	sc2api::{Alert as ProtoAlert, Observation as ProtoObservation, ResponseObservation},
 };
+
+#[cfg(not(feature = "rayon"))]
+use std::cell::RefCell;
+#[cfg(feature = "rayon")]
+use std::sync::RwLock;
+
+#[cfg(feature = "rayon")]
+pub(crate) type Rl<T> = RwLock<T>;
+#[cfg(not(feature = "rayon"))]
+pub(crate) type Rl<T> = RefCell<T>;
 
 #[derive(Default, Clone)]
 pub struct GameState {
@@ -104,9 +114,9 @@ pub struct RawData {
 	pub psionic_matrix: Vec<PsionicMatrix>,
 	pub camera: Point2,
 	pub units: Units,
-	pub upgrades: FxHashSet<UpgradeId>,
-	pub visibility: VisibilityMap,
-	pub creep: PixelMap,
+	pub upgrades: Rw<FxHashSet<UpgradeId>>,
+	pub visibility: Rs<VisibilityMap>,
+	pub creep: Rs<PixelMap>,
 	pub dead_units: Vec<u64>,
 	pub effects: Vec<Effect>,
 	pub radars: Vec<Radar>,
@@ -127,13 +137,15 @@ impl FromProtoData<&ObservationRaw> for RawData {
 				.iter()
 				.map(|u| Unit::from_proto_data(Rs::clone(&data), u))
 				.collect(),
-			upgrades: raw_player
-				.get_upgrade_ids()
-				.iter()
-				.map(|u| UpgradeId::from_u32(*u).unwrap())
-				.collect(),
-			visibility: VisibilityMap::from_proto(map_state.get_visibility()),
-			creep: PixelMap::from_proto(map_state.get_creep()),
+			upgrades: Rs::new(Rl::new(
+				raw_player
+					.get_upgrade_ids()
+					.iter()
+					.map(|u| UpgradeId::from_u32(*u).unwrap())
+					.collect::<FxHashSet<_>>(),
+			)),
+			visibility: Rs::new(VisibilityMap::from_proto(map_state.get_visibility())),
+			creep: Rs::new(PixelMap::from_proto(map_state.get_creep())),
 			dead_units: raw.get_event().get_dead_units().to_vec(),
 			effects: raw
 				.get_effects()

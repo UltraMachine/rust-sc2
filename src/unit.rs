@@ -1,6 +1,6 @@
 use crate::{
 	action::{Commander, Target},
-	bot::{Rs, Rw},
+	bot::{Locked, Reader, Rs, Rw},
 	constants::{
 		RaceValues, DAMAGE_BONUS_PER_UPGRADE, FRAMES_PER_SECOND, MISSED_WEAPONS, OFF_CREEP_SPEED_UPGRADES,
 		SPEED_BUFFS, SPEED_ON_CREEP, SPEED_UPGRADES, WARPGATE_ABILITIES,
@@ -20,19 +20,19 @@ use sc2_proto::raw::{
 	CloakState as ProtoCloakState, DisplayType as ProtoDisplayType, Unit as ProtoUnit,
 	UnitOrder_oneof_target as ProtoTarget,
 };
-use std::collections::HashMap;
 
 #[derive(Default, Clone)]
-pub struct DataForUnit {
+pub(crate) struct DataForUnit {
 	pub commander: Rw<Commander>,
 	pub game_data: Rs<GameData>,
 	pub techlab_tags: Rw<FxHashSet<u64>>,
 	pub reactor_tags: Rw<FxHashSet<u64>>,
 	pub race_values: Rs<RaceValues>,
-	pub max_cooldowns: Rw<HashMap<UnitTypeId, f32>>,
+	pub max_cooldowns: Rw<FxHashMap<UnitTypeId, f32>>,
 	pub last_units_health: Rs<FxHashMap<u64, f32>>,
 	pub abilities_units: Rs<FxHashMap<u64, Vec<AbilityId>>>,
-	pub upgrades: Rs<FxHashSet<UpgradeId>>,
+	pub upgrades: Rw<FxHashSet<UpgradeId>>,
+	pub enemy_upgrades: Rw<FxHashSet<UpgradeId>>,
 	pub creep: Rs<PixelMap>,
 	pub visibility: Rs<VisibilityMap>,
 	pub game_step: u32,
@@ -40,7 +40,7 @@ pub struct DataForUnit {
 
 pub enum CalcTarget<'a> {
 	Unit(&'a Unit),
-	Abstract(TargetType, Option<&'a [Attribute]>),
+	Abstract(TargetType, &'a [Attribute]),
 }
 
 pub(crate) type SharedUnitData = Rs<DataForUnit>;
@@ -107,6 +107,13 @@ impl Unit {
 	fn type_data(&self) -> Option<&UnitTypeData> {
 		self.data.game_data.units.get(&self.type_id)
 	}
+	fn upgrades(&self) -> Reader<FxHashSet<UpgradeId>> {
+		if self.is_mine() {
+			self.data.upgrades.lock_read()
+		} else {
+			self.data.enemy_upgrades.lock_read()
+		}
+	}
 	pub fn is_worker(&self) -> bool {
 		self.type_id.is_worker()
 	}
@@ -145,23 +152,26 @@ impl Unit {
 		self.addon_tag.is_some()
 	}
 	pub fn has_techlab(&self) -> bool {
-		#[cfg(not(feature = "rayon"))]
-		let techlab_tags = self.data.techlab_tags.borrow();
-		#[cfg(feature = "rayon")]
-		let techlab_tags = self.data.techlab_tags.read().unwrap();
-
+		let techlab_tags = self.data.techlab_tags.lock_read();
 		self.addon_tag.map_or(false, |tag| techlab_tags.contains(&tag))
 	}
 	pub fn has_reactor(&self) -> bool {
-		#[cfg(not(feature = "rayon"))]
-		let reactor_tags = self.data.reactor_tags.borrow();
-		#[cfg(feature = "rayon")]
-		let reactor_tags = self.data.reactor_tags.read().unwrap();
-
+		let reactor_tags = self.data.reactor_tags.lock_read();
 		self.addon_tag.map_or(false, |tag| reactor_tags.contains(&tag))
 	}
 	pub fn is_attacked(&self) -> bool {
 		self.hits() < self.data.last_units_health.get(&self.tag).copied()
+	}
+	pub fn damage_taken(&self) -> f32 {
+		let hits = match self.hits() {
+			Some(hits) => hits,
+			None => return 0.0,
+		};
+		let last_hits = match self.data.last_units_health.get(&self.tag) {
+			Some(hits) => hits,
+			None => return 0.0,
+		};
+		last_hits - hits
 	}
 	pub fn abilities(&self) -> &[AbilityId] {
 		match self.data.abilities_units.get(&self.tag) {
@@ -304,9 +314,6 @@ impl Unit {
 		self.type_data().map_or(0.0, |data| data.movement_speed)
 	}
 	pub fn real_speed(&self) -> f32 {
-		self.calculate_speed(None)
-	}
-	pub fn calculate_speed(&self, upgrades: Option<&FxHashSet<UpgradeId>>) -> f32 {
 		let mut speed = self.speed();
 		let unit_type = self.type_id;
 
@@ -327,18 +334,10 @@ impl Unit {
 		}
 
 		// ---- Upgrades ----
-		let upgrades = upgrades.or_else(|| {
-			if self.is_mine() {
-				Some(&self.data.upgrades)
-			} else {
-				None
-			}
-		});
-		if let Some(upgrades) = upgrades {
-			if let Some((upgrade_id, increase)) = SPEED_UPGRADES.get(&unit_type) {
-				if upgrades.contains(upgrade_id) {
-					speed *= increase;
-				}
+		let upgrades = self.upgrades();
+		if let Some((upgrade_id, increase)) = SPEED_UPGRADES.get(&unit_type) {
+			if upgrades.contains(upgrade_id) {
+				speed *= increase;
 			}
 		}
 
@@ -350,27 +349,26 @@ impl Unit {
 			}
 		}
 		// Off creep upgrades
-		else if let Some(upgrades) = upgrades {
-			if !upgrades.is_empty() {
-				if let Some((upgrade_id, increase)) = OFF_CREEP_SPEED_UPGRADES.get(&unit_type) {
-					if upgrades.contains(upgrade_id) {
-						speed *= increase;
-					}
+		if !upgrades.is_empty() {
+			if let Some((upgrade_id, increase)) = OFF_CREEP_SPEED_UPGRADES.get(&unit_type) {
+				if upgrades.contains(upgrade_id) {
+					speed *= increase;
 				}
 			}
 		}
+
 		speed
 	}
 	// Distance unit can travel per one "on_step" iteration
-	pub fn distance_per_step(&self, upgrades: Option<&FxHashSet<UpgradeId>>) -> f32 {
-		self.calculate_speed(upgrades) / FRAMES_PER_SECOND * self.data.game_step as f32
+	pub fn distance_per_step(&self) -> f32 {
+		self.real_speed() / FRAMES_PER_SECOND * self.data.game_step as f32
 	}
 	// Distance unit can travel until weapons be ready to fire
 	pub fn distance_to_weapon_ready(&self) -> f32 {
 		self.real_speed() / FRAMES_PER_SECOND * self.weapon_cooldown.unwrap_or(0.0)
 	}
-	pub fn attributes(&self) -> Option<&[Attribute]> {
-		self.type_data().map(|data| data.attributes.as_slice())
+	pub fn attributes(&self) -> &[Attribute] {
+		self.type_data().map_or(&[], |data| data.attributes.as_slice())
 	}
 	pub fn has_attribute(&self, attribute: Attribute) -> bool {
 		self.type_data()
@@ -431,380 +429,322 @@ impl Unit {
 	pub fn is_carrying_resource(&self) -> bool {
 		self.is_carrying_minerals() || self.is_carrying_vespene()
 	}
+
 	#[inline]
-	pub fn distance<P: Into<Point2>>(&self, other: P) -> f32 {
-		self.position.distance(other)
-	}
-	#[inline]
-	pub fn distance_squared<P: Into<Point2>>(&self, other: P) -> f32 {
-		self.position.distance_squared(other)
-	}
-	#[inline]
-	pub fn is_closer<P: Into<Point2>>(&self, distance: f32, other: P) -> bool {
-		self.distance_squared(other) < distance * distance
-	}
-	#[inline]
-	pub fn is_further<P: Into<Point2>>(&self, distance: f32, other: P) -> bool {
-		self.distance_squared(other) > distance * distance
-	}
-	#[inline]
-	fn weapons(&self) -> Option<Vec<Weapon>> {
+	fn weapons(&self) -> &[Weapon] {
 		self.type_data()
-			.map(|data| data.weapons.clone())
+			.map(|data| data.weapons.as_slice())
 			.filter(|weapons| !weapons.is_empty())
 			.or_else(|| match self.type_id {
 				UnitTypeId::BanelingBurrowed | UnitTypeId::BanelingCocoon => {
-					MISSED_WEAPONS.get(&UnitTypeId::Baneling).cloned()
+					MISSED_WEAPONS.get(&UnitTypeId::Baneling).map(|ws| ws.as_slice())
 				}
 				UnitTypeId::RavagerCocoon => self
 					.data
 					.game_data
 					.units
 					.get(&UnitTypeId::Ravager)
-					.map(|data| data.weapons.clone()),
-				unit_type => MISSED_WEAPONS.get(&unit_type).cloned(),
+					.map(|data| data.weapons.as_slice()),
+				unit_type => MISSED_WEAPONS.get(&unit_type).map(|ws| ws.as_slice()),
 			})
+			.unwrap_or_default()
 	}
 	pub fn weapon_target(&self) -> Option<TargetType> {
-		self.weapons().and_then(|weapons| {
-			let mut ground = false;
-			let mut air = false;
-			if weapons.iter().any(|w| match w.target {
-				TargetType::Ground => {
-					ground = true;
-					ground && air
-				}
-				TargetType::Air => {
-					air = true;
-					ground && air
-				}
-				_ => true,
-			}) || (ground && air)
-			{
-				Some(TargetType::Any)
-			} else if ground {
-				Some(TargetType::Ground)
-			} else if air {
-				Some(TargetType::Air)
-			} else {
-				None
+		let weapons = self.weapons();
+		if weapons.is_empty() {
+			return None;
+		}
+
+		let mut ground = false;
+		let mut air = false;
+		if weapons.iter().any(|w| match w.target {
+			TargetType::Ground => {
+				ground = true;
+				ground && air
 			}
-		})
+			TargetType::Air => {
+				air = true;
+				ground && air
+			}
+			_ => true,
+		}) || (ground && air)
+		{
+			Some(TargetType::Any)
+		} else if ground {
+			Some(TargetType::Ground)
+		} else if air {
+			Some(TargetType::Air)
+		} else {
+			None
+		}
 	}
 	pub fn can_attack(&self) -> bool {
-		self.weapons().map_or(false, |weapons| !weapons.is_empty())
+		!self.weapons().is_empty()
 	}
 	pub fn can_attack_both(&self) -> bool {
-		self.weapons().map_or(false, |weapons| {
-			let mut ground = false;
-			let mut air = false;
-			weapons.iter().any(|w| match w.target {
-				TargetType::Ground => {
-					ground = true;
-					ground && air
-				}
-				TargetType::Air => {
-					air = true;
-					ground && air
-				}
-				_ => true,
-			}) || (ground && air)
-		})
+		let weapons = self.weapons();
+		if weapons.is_empty() {
+			return false;
+		}
+
+		let mut ground = false;
+		let mut air = false;
+		weapons.iter().any(|w| match w.target {
+			TargetType::Ground => {
+				ground = true;
+				ground && air
+			}
+			TargetType::Air => {
+				air = true;
+				ground && air
+			}
+			_ => true,
+		}) || (ground && air)
 	}
 	pub fn can_attack_ground(&self) -> bool {
-		self.weapons()
-			.map_or(false, |weapons| weapons.iter().any(|w| !w.target.is_air()))
+		self.weapons().iter().any(|w| !w.target.is_air())
 	}
 	pub fn can_attack_air(&self) -> bool {
-		self.weapons()
-			.map_or(false, |weapons| weapons.iter().any(|w| !w.target.is_ground()))
+		self.weapons().iter().any(|w| !w.target.is_ground())
 	}
 	pub fn can_attack_unit(&self, target: &Unit) -> bool {
-		self.weapons().map_or(false, |weapons| {
-			if target.type_id == UnitTypeId::Colossus {
-				!weapons.is_empty()
-			} else {
-				let weapon_target = {
-					if target.is_flying {
-						TargetType::Air
-					} else {
-						TargetType::Ground
-					}
-				};
-				weapons
-					.iter()
-					.any(|w| w.target.is_any() || w.target == weapon_target)
-			}
-		})
+		let weapons = self.weapons();
+		if weapons.is_empty() {
+			return false;
+		}
+
+		if target.type_id == UnitTypeId::Colossus {
+			!weapons.is_empty()
+		} else {
+			let not_target = {
+				if target.is_flying {
+					TargetType::Ground
+				} else {
+					TargetType::Air
+				}
+			};
+			weapons.iter().any(|w| w.target != not_target)
+		}
 	}
 	pub fn on_cooldown(&self) -> bool {
 		self.weapon_cooldown.map_or(false, |cool| cool > f32::EPSILON)
 	}
 	pub fn max_cooldown(&self) -> Option<f32> {
-		#[cfg(feature = "rayon")]
-		let max_cooldowns = self.data.max_cooldowns.read().unwrap();
-		#[cfg(not(feature = "rayon"))]
-		let max_cooldowns = self.data.max_cooldowns.borrow();
-
-		max_cooldowns.get(&self.type_id).copied()
+		self.data.max_cooldowns.lock_read().get(&self.type_id).copied()
 	}
 	pub fn ground_range(&self) -> f32 {
-		self.weapons().map_or(0.0, |weapons| {
-			weapons
-				.iter()
-				.find(|w| !w.target.is_air())
-				.map_or(0.0, |w| w.range)
-		})
+		self.weapons()
+			.iter()
+			.find(|w| !w.target.is_air())
+			.map_or(0.0, |w| w.range)
 	}
 	pub fn air_range(&self) -> f32 {
-		self.weapons().map_or(0.0, |weapons| {
-			weapons
-				.iter()
-				.find(|w| !w.target.is_ground())
-				.map_or(0.0, |w| w.range)
-		})
+		self.weapons()
+			.iter()
+			.find(|w| !w.target.is_ground())
+			.map_or(0.0, |w| w.range)
 	}
 	pub fn range_vs(&self, target: &Unit) -> f32 {
-		self.weapons().map_or(0.0, |weapons| {
-			if target.type_id == UnitTypeId::Colossus {
-				weapons
-					.iter()
-					.map(|w| w.range)
-					.max_by(|r1, r2| r1.partial_cmp(r2).unwrap())
-					.unwrap_or(0.0)
-			} else {
-				let weapon_target = {
-					if target.is_flying {
-						TargetType::Air
-					} else {
-						TargetType::Ground
-					}
-				};
-				weapons
-					.iter()
-					.find(|w| w.target.is_any() || w.target == weapon_target)
-					.map_or(0.0, |w| w.range)
-			}
-		})
-	}
-	pub fn calculate_ground_range(&self, upgrades: Option<&FxHashSet<UpgradeId>>) -> f32 {
-		self.weapons().map_or(0.0, |weapons| {
-			weapons.iter().find(|w| !w.target.is_air()).map_or(0.0, |w| {
-				let upgrades = upgrades.or_else(|| {
-					if self.is_mine() {
-						Some(&self.data.upgrades)
-					} else {
-						None
-					}
-				});
-				if let Some(upgrades) = upgrades {
-					match self.type_id {
-						UnitTypeId::Hydralisk => {
-							if upgrades.contains(&UpgradeId::EvolveGroovedSpines) {
-								return w.range + 1.0;
-							}
-						}
-						UnitTypeId::Phoenix => {
-							if upgrades.contains(&UpgradeId::PhoenixRangeUpgrade) {
-								return w.range + 2.0;
-							}
-						}
-						UnitTypeId::PlanetaryFortress
-						| UnitTypeId::MissileTurret
-						| UnitTypeId::AutoTurret => {
-							if upgrades.contains(&UpgradeId::HiSecAutoTracking) {
-								return w.range + 1.0;
-							}
-						}
-						_ => {}
-					}
-				}
-				w.range
-			})
-		})
-	}
-	pub fn calculate_air_range(&self, upgrades: Option<&FxHashSet<UpgradeId>>) -> f32 {
-		self.weapons().map_or(0.0, |weapons| {
-			weapons.iter().find(|w| !w.target.is_ground()).map_or(0.0, |w| {
-				let upgrades = upgrades.or_else(|| {
-					if self.is_mine() {
-						Some(&self.data.upgrades)
-					} else {
-						None
-					}
-				});
-				if let Some(upgrades) = upgrades {
-					match self.type_id {
-						UnitTypeId::Hydralisk => {
-							if upgrades.contains(&UpgradeId::EvolveGroovedSpines) {
-								return w.range + 1.0;
-							}
-						}
-						UnitTypeId::Phoenix => {
-							if upgrades.contains(&UpgradeId::PhoenixRangeUpgrade) {
-								return w.range + 2.0;
-							}
-						}
-						UnitTypeId::PlanetaryFortress
-						| UnitTypeId::MissileTurret
-						| UnitTypeId::AutoTurret => {
-							if upgrades.contains(&UpgradeId::HiSecAutoTracking) {
-								return w.range + 1.0;
-							}
-						}
-						_ => {}
-					}
-				}
-				w.range
-			})
-		})
-	}
-	pub fn calculate_range_vs(&self, target: &Unit, upgrades: Option<&FxHashSet<UpgradeId>>) -> f32 {
-		self.weapons().map_or(0.0, |weapons| {
-			let extract_range = |w: &Weapon| {
-				let upgrades = upgrades.or_else(|| {
-					if self.is_mine() {
-						Some(&self.data.upgrades)
-					} else {
-						None
-					}
-				});
-				if let Some(upgrades) = upgrades {
-					match self.type_id {
-						UnitTypeId::Hydralisk => {
-							if upgrades.contains(&UpgradeId::EvolveGroovedSpines) {
-								return w.range + 1.0;
-							}
-						}
-						UnitTypeId::Phoenix => {
-							if upgrades.contains(&UpgradeId::PhoenixRangeUpgrade) {
-								return w.range + 2.0;
-							}
-						}
-						UnitTypeId::PlanetaryFortress
-						| UnitTypeId::MissileTurret
-						| UnitTypeId::AutoTurret => {
-							if upgrades.contains(&UpgradeId::HiSecAutoTracking) {
-								return w.range + 1.0;
-							}
-						}
-						_ => {}
-					}
-				}
-				w.range
-			};
+		let weapons = self.weapons();
+		if weapons.is_empty() {
+			return 0.0;
+		}
 
-			if target.type_id == UnitTypeId::Colossus {
-				weapons
-					.iter()
-					.map(extract_range)
-					.max_by(|r1, r2| r1.partial_cmp(r2).unwrap())
-					.unwrap_or(0.0)
-			} else {
-				let weapon_target = {
-					if target.is_flying {
-						TargetType::Air
-					} else {
-						TargetType::Ground
+		if target.type_id == UnitTypeId::Colossus {
+			weapons
+				.iter()
+				.map(|w| w.range)
+				.max_by(|r1, r2| r1.partial_cmp(r2).unwrap())
+				.unwrap_or(0.0)
+		} else {
+			let not_target = {
+				if target.is_flying {
+					TargetType::Ground
+				} else {
+					TargetType::Air
+				}
+			};
+			weapons
+				.iter()
+				.find(|w| w.target != not_target)
+				.map_or(0.0, |w| w.range)
+		}
+	}
+	pub fn real_ground_range(&self) -> f32 {
+		self.weapons()
+			.iter()
+			.find(|w| !w.target.is_air())
+			.map_or(0.0, |w| {
+				let upgrades = self.upgrades();
+				match self.type_id {
+					UnitTypeId::Hydralisk => {
+						if upgrades.contains(&UpgradeId::EvolveGroovedSpines) {
+							return w.range + 1.0;
+						}
 					}
-				};
-				weapons
-					.iter()
-					.find(|w| w.target.is_any() || w.target == weapon_target)
-					.map_or(0.0, extract_range)
+					UnitTypeId::Phoenix => {
+						if upgrades.contains(&UpgradeId::PhoenixRangeUpgrade) {
+							return w.range + 2.0;
+						}
+					}
+					UnitTypeId::PlanetaryFortress | UnitTypeId::MissileTurret | UnitTypeId::AutoTurret => {
+						if upgrades.contains(&UpgradeId::HiSecAutoTracking) {
+							return w.range + 1.0;
+						}
+					}
+					_ => {}
+				}
+				w.range
+			})
+	}
+	pub fn real_air_range(&self) -> f32 {
+		self.weapons()
+			.iter()
+			.find(|w| !w.target.is_ground())
+			.map_or(0.0, |w| {
+				let upgrades = self.upgrades();
+				match self.type_id {
+					UnitTypeId::Hydralisk => {
+						if upgrades.contains(&UpgradeId::EvolveGroovedSpines) {
+							return w.range + 1.0;
+						}
+					}
+					UnitTypeId::Phoenix => {
+						if upgrades.contains(&UpgradeId::PhoenixRangeUpgrade) {
+							return w.range + 2.0;
+						}
+					}
+					UnitTypeId::PlanetaryFortress | UnitTypeId::MissileTurret | UnitTypeId::AutoTurret => {
+						if upgrades.contains(&UpgradeId::HiSecAutoTracking) {
+							return w.range + 1.0;
+						}
+					}
+					_ => {}
+				}
+				w.range
+			})
+	}
+	pub fn real_range_vs(&self, target: &Unit) -> f32 {
+		let weapons = self.weapons();
+		if weapons.is_empty() {
+			return 0.0;
+		}
+
+		let extract_range = |w: &Weapon| {
+			let upgrades = self.upgrades();
+			match self.type_id {
+				UnitTypeId::Hydralisk => {
+					if upgrades.contains(&UpgradeId::EvolveGroovedSpines) {
+						return w.range + 1.0;
+					}
+				}
+				UnitTypeId::Phoenix => {
+					if upgrades.contains(&UpgradeId::PhoenixRangeUpgrade) {
+						return w.range + 2.0;
+					}
+				}
+				UnitTypeId::PlanetaryFortress | UnitTypeId::MissileTurret | UnitTypeId::AutoTurret => {
+					if upgrades.contains(&UpgradeId::HiSecAutoTracking) {
+						return w.range + 1.0;
+					}
+				}
+				_ => {}
 			}
-		})
+			w.range
+		};
+
+		if target.type_id == UnitTypeId::Colossus {
+			weapons
+				.iter()
+				.map(extract_range)
+				.max_by(|r1, r2| r1.partial_cmp(r2).unwrap())
+				.unwrap_or(0.0)
+		} else {
+			let not_target = {
+				if target.is_flying {
+					TargetType::Ground
+				} else {
+					TargetType::Air
+				}
+			};
+			weapons
+				.iter()
+				.find(|w| w.target != not_target)
+				.map_or(0.0, extract_range)
+		}
 	}
 	pub fn ground_dps(&self) -> f32 {
-		self.weapons().map_or(0.0, |weapons| {
-			weapons
-				.iter()
-				.find(|w| !w.target.is_air())
-				.map_or(0.0, |w| w.damage * (w.attacks as f32) / w.speed)
-		})
+		self.weapons()
+			.iter()
+			.find(|w| !w.target.is_air())
+			.map_or(0.0, |w| w.damage * (w.attacks as f32) / w.speed)
 	}
 	pub fn air_dps(&self) -> f32 {
-		self.weapons().map_or(0.0, |weapons| {
-			weapons
-				.iter()
-				.find(|w| !w.target.is_ground())
-				.map_or(0.0, |w| w.damage * (w.attacks as f32) / w.speed)
-		})
+		self.weapons()
+			.iter()
+			.find(|w| !w.target.is_ground())
+			.map_or(0.0, |w| w.damage * (w.attacks as f32) / w.speed)
 	}
 	pub fn dps_vs(&self, target: &Unit) -> f32 {
-		self.weapons().map_or(0.0, |weapons| {
-			let extract_dps = |w: &Weapon| w.damage * (w.attacks as f32) / w.speed;
+		let weapons = self.weapons();
+		if weapons.is_empty() {
+			return 0.0;
+		}
 
-			if target.type_id == UnitTypeId::Colossus {
-				weapons
-					.iter()
-					.map(extract_dps)
-					.max_by(|d1, d2| d1.partial_cmp(d2).unwrap())
-					.unwrap_or(0.0)
-			} else {
-				let weapon_target = {
-					if target.is_flying {
-						TargetType::Air
-					} else {
-						TargetType::Ground
-					}
-				};
-				weapons
-					.iter()
-					.find(|w| w.target.is_any() || w.target == weapon_target)
-					.map_or(0.0, extract_dps)
-			}
-		})
+		let extract_dps = |w: &Weapon| w.damage * (w.attacks as f32) / w.speed;
+
+		if target.type_id == UnitTypeId::Colossus {
+			weapons
+				.iter()
+				.map(extract_dps)
+				.max_by(|d1, d2| d1.partial_cmp(d2).unwrap())
+				.unwrap_or(0.0)
+		} else {
+			let not_target = {
+				if target.is_flying {
+					TargetType::Ground
+				} else {
+					TargetType::Air
+				}
+			};
+			weapons
+				.iter()
+				.find(|w| w.target != not_target)
+				.map_or(0.0, extract_dps)
+		}
 	}
 
 	// Returns (dps, range)
-	pub fn real_weapon_stats(&self) -> (f32, f32) {
+	pub fn real_weapon(&self, attributes: &[Attribute]) -> (f32, f32) {
 		let (damage, speed, range) =
-			self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Any, None), None);
+			self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Any, attributes));
+		(if speed == 0.0 { 0.0 } else { damage / speed }, range)
+	}
+	pub fn real_ground_weapon(&self, attributes: &[Attribute]) -> (f32, f32) {
+		let (damage, speed, range) =
+			self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Ground, attributes));
+		(if speed == 0.0 { 0.0 } else { damage / speed }, range)
+	}
+	pub fn real_air_weapon(&self, attributes: &[Attribute]) -> (f32, f32) {
+		let (damage, speed, range) =
+			self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Air, attributes));
 		(if speed == 0.0 { 0.0 } else { damage / speed }, range)
 	}
 
-	pub fn calculate_ground_weapon(
-		&self,
-		attributes: Option<&[Attribute]>,
-		upgrades: Option<&FxHashSet<UpgradeId>>,
-	) -> (f32, f32) {
-		let (damage, speed, range) =
-			self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Ground, attributes), upgrades);
-		(if speed == 0.0 { 0.0 } else { damage / speed }, range)
-	}
-	pub fn calculate_air_weapon(
-		&self,
-		attributes: Option<&[Attribute]>,
-		upgrades: Option<&FxHashSet<UpgradeId>>,
-	) -> (f32, f32) {
-		let (damage, speed, range) =
-			self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Air, attributes), upgrades);
+	pub fn real_weapon_vs(&self, target: &Unit) -> (f32, f32) {
+		let (damage, speed, range) = self.calculate_weapon_stats(CalcTarget::Unit(target));
 		(if speed == 0.0 { 0.0 } else { damage / speed }, range)
 	}
 
-	pub fn calculate_weapon_abstract(
-		&self,
-		target_type: TargetType,
-		attributes: Option<&[Attribute]>,
-		upgrades: Option<&FxHashSet<UpgradeId>>,
-	) -> (f32, f32) {
+	pub fn calculate_weapon_abstract(&self, target_type: TargetType, attributes: &[Attribute]) -> (f32, f32) {
 		let (damage, speed, range) =
-			self.calculate_weapon_stats(CalcTarget::Abstract(target_type, attributes), upgrades);
-		(if speed == 0.0 { 0.0 } else { damage / speed }, range)
-	}
-	pub fn calculate_weapon_vs(&self, target: &Unit, upgrades: Option<&FxHashSet<UpgradeId>>) -> (f32, f32) {
-		let (damage, speed, range) = self.calculate_weapon_stats(CalcTarget::Unit(target), upgrades);
+			self.calculate_weapon_stats(CalcTarget::Abstract(target_type, attributes));
 		(if speed == 0.0 { 0.0 } else { damage / speed }, range)
 	}
 
 	// Returns (damage, cooldown, range)
 	#[allow(clippy::mut_range_bound)]
-	pub fn calculate_weapon_stats(
-		&self,
-		target: CalcTarget,
-		upgrades: Option<&FxHashSet<UpgradeId>>,
-	) -> (f32, f32, f32) {
+	pub fn calculate_weapon_stats(&self, target: CalcTarget) -> (f32, f32, f32) {
 		/*
 		if matches!(self.type_id, UnitTypeId::Bunker) && self.is_mine() {
 			return self
@@ -816,14 +756,16 @@ impl Unit {
 		*/
 
 		let (upgrades, target_upgrades) = {
+			let my_upgrade = self.data.upgrades.lock_read();
+			let enemy_upgrades = self.data.enemy_upgrades.lock_read();
 			if self.is_mine() {
-				(Some(&*self.data.upgrades), upgrades)
+				(my_upgrade, enemy_upgrades)
 			} else {
-				(upgrades, Some(&*self.data.upgrades))
+				(enemy_upgrades, my_upgrade)
 			}
 		};
 
-		let (target_type, attributes, target_unit) = match target {
+		let (not_target, attributes, target_unit) = match target {
 			CalcTarget::Unit(target) => {
 				let mut enemy_armor = target.armor() + target.armor_upgrade_level;
 				let mut enemy_shield_armor = target.shield_upgrade_level;
@@ -845,21 +787,18 @@ impl Unit {
 					}
 				});
 
-				if let Some(target_upgrades) = target_upgrades {
-					if !target_upgrades.is_empty() {
-						if target.race().is_terran() {
-							if target.is_structure()
-								&& target_upgrades.contains(&UpgradeId::TerranBuildingArmor)
-							{
-								enemy_armor += 2;
-							}
-						} else if matches!(
-							target.type_id,
-							UnitTypeId::Ultralisk | UnitTypeId::UltraliskBurrowed
-						) && target_upgrades.contains(&UpgradeId::ChitinousPlating)
+				if !target_upgrades.is_empty() {
+					if target.race().is_terran() {
+						if target.is_structure() && target_upgrades.contains(&UpgradeId::TerranBuildingArmor)
 						{
 							enemy_armor += 2;
 						}
+					} else if matches!(
+						target.type_id,
+						UnitTypeId::Ultralisk | UnitTypeId::UltraliskBurrowed
+					) && target_upgrades.contains(&UpgradeId::ChitinousPlating)
+					{
+						enemy_armor += 2;
 					}
 				}
 
@@ -867,9 +806,9 @@ impl Unit {
 					if matches!(target.type_id, UnitTypeId::Colossus) {
 						TargetType::Any
 					} else if target.is_flying {
-						TargetType::Air
-					} else {
 						TargetType::Ground
+					} else {
+						TargetType::Air
 					},
 					target.attributes(),
 					Some((
@@ -880,180 +819,180 @@ impl Unit {
 					)),
 				)
 			}
-			CalcTarget::Abstract(target_type, attributes) => (target_type, attributes, None),
+			CalcTarget::Abstract(target_type, attributes) => (
+				match target_type {
+					TargetType::Any => TargetType::Any,
+					TargetType::Ground => TargetType::Air,
+					TargetType::Air => TargetType::Ground,
+				},
+				attributes,
+				None,
+			),
 		};
 
-		self.weapons().map_or((0.0, 0.0, 0.0), |weapons| {
-			let mut speed_modifier = 1.0;
-			let mut range_modifier = 0.0;
+		let weapons = self.weapons();
+		if weapons.is_empty() {
+			return (0.0, 0.0, 0.0);
+		}
 
-			self.buffs.iter().for_each(|buff| match buff {
-				BuffId::Stimpack | BuffId::StimpackMarauder => speed_modifier /= 1.5,
-				BuffId::TimeWarpProduction => speed_modifier *= 2.0,
+		let mut speed_modifier = 1.0;
+		let mut range_modifier = 0.0;
+
+		self.buffs.iter().for_each(|buff| match buff {
+			BuffId::Stimpack | BuffId::StimpackMarauder => speed_modifier /= 1.5,
+			BuffId::TimeWarpProduction => speed_modifier *= 2.0,
+			_ => {}
+		});
+
+		if !upgrades.is_empty() {
+			match self.type_id {
+				UnitTypeId::Zergling => {
+					if upgrades.contains(&UpgradeId::Zerglingattackspeed) {
+						speed_modifier /= 1.4;
+					}
+				}
+				UnitTypeId::Adept => {
+					if upgrades.contains(&UpgradeId::AdeptPiercingAttack) {
+						speed_modifier /= 1.45;
+					}
+				}
+				UnitTypeId::Hydralisk => {
+					if upgrades.contains(&UpgradeId::EvolveGroovedSpines) {
+						range_modifier += 1.0;
+					}
+				}
+				UnitTypeId::Phoenix => {
+					if upgrades.contains(&UpgradeId::PhoenixRangeUpgrade) {
+						range_modifier += 2.0;
+					}
+				}
+				UnitTypeId::PlanetaryFortress | UnitTypeId::MissileTurret | UnitTypeId::AutoTurret => {
+					if upgrades.contains(&UpgradeId::HiSecAutoTracking) {
+						range_modifier += 1.0;
+					}
+				}
 				_ => {}
-			});
+			}
+		}
 
-			if let Some(upgrades) = upgrades {
-				if !upgrades.is_empty() {
-					match self.type_id {
-						UnitTypeId::Zergling => {
-							if upgrades.contains(&UpgradeId::Zerglingattackspeed) {
-								speed_modifier /= 1.4;
+		let damage_bonus_per_upgrade = DAMAGE_BONUS_PER_UPGRADE.get(&self.type_id);
+		let extract_weapon_stats = |w: &Weapon| {
+			let damage_bonus_per_upgrade = damage_bonus_per_upgrade.and_then(|bonus| bonus.get(&w.target));
+
+			let mut damage = w.damage
+				+ (self.attack_upgrade_level
+					* damage_bonus_per_upgrade.and_then(|bonus| bonus.0).unwrap_or(1)) as f32;
+			let speed = w.speed * speed_modifier;
+			let range = w.range + range_modifier;
+
+			// Bonus damage
+			if let Some(bonus) = w
+				.damage_bonus
+				.iter()
+				.filter_map(|(attribute, bonus)| {
+					if attributes.contains(attribute) {
+						let mut damage_bonus_per_upgrade = damage_bonus_per_upgrade
+							.and_then(|bonus| bonus.1.get(attribute))
+							.copied()
+							.unwrap_or(0);
+
+						if let Attribute::Light = attribute {
+							if upgrades.contains(&UpgradeId::HighCapacityBarrels) {
+								match self.type_id {
+									UnitTypeId::Hellion => damage_bonus_per_upgrade += 5,
+									UnitTypeId::HellionTank => damage_bonus_per_upgrade += 12,
+									_ => {}
+								}
 							}
 						}
-						UnitTypeId::Adept => {
-							if upgrades.contains(&UpgradeId::AdeptPiercingAttack) {
-								speed_modifier /= 1.45;
+
+						let mut bonus_damage =
+							bonus + (self.attack_upgrade_level * damage_bonus_per_upgrade) as f32;
+
+						if let Attribute::Armored = attribute {
+							if self.has_buff(BuffId::VoidRaySwarmDamageBoost) {
+								bonus_damage += 6.0;
 							}
 						}
-						UnitTypeId::Hydralisk => {
-							if upgrades.contains(&UpgradeId::EvolveGroovedSpines) {
-								range_modifier += 1.0;
-							}
-						}
-						UnitTypeId::Phoenix => {
-							if upgrades.contains(&UpgradeId::PhoenixRangeUpgrade) {
-								range_modifier += 2.0;
-							}
-						}
-						UnitTypeId::PlanetaryFortress
-						| UnitTypeId::MissileTurret
-						| UnitTypeId::AutoTurret => {
-							if upgrades.contains(&UpgradeId::HiSecAutoTracking) {
-								range_modifier += 1.0;
-							}
-						}
-						_ => {}
+
+						Some(bonus_damage)
+					} else {
+						None
 					}
-				}
+				})
+				.max_by(|b1, b2| b1.partial_cmp(b2).unwrap())
+			{
+				damage += bonus;
 			}
 
-			let damage_bonus_per_upgrade = DAMAGE_BONUS_PER_UPGRADE.get(&self.type_id);
-			let extract_weapon_stats = |w: &Weapon| {
-				let damage_bonus_per_upgrade =
-					damage_bonus_per_upgrade.and_then(|bonus| bonus.get(&w.target));
+			// Substract damage
+			match target_unit {
+				Some((target, enemy_armor, enemy_shield_armor, target_has_guardian_shield)) => {
+					let mut attacks = w.attacks;
+					let mut shield_damage = 0.0;
+					let mut health_damage = 0.0;
 
-				let mut damage = w.damage
-					+ (self.attack_upgrade_level
-						* damage_bonus_per_upgrade.and_then(|bonus| bonus.0).unwrap_or(1)) as f32;
-				let speed = w.speed * speed_modifier;
-				let range = w.range + range_modifier;
-
-				// Bonus damage
-				if let Some(bonus) = w
-					.damage_bonus
-					.iter()
-					.filter_map(|(attribute, bonus)| {
-						if attributes
-							.as_ref()
-							.map_or(false, |attributes| attributes.contains(attribute))
-						{
-							let mut damage_bonus_per_upgrade = damage_bonus_per_upgrade
-								.and_then(|bonus| bonus.1.get(attribute))
-								.copied()
-								.unwrap_or(0);
-
-							if let Attribute::Light = attribute {
-								if let Some(upgrades) = upgrades {
-									if upgrades.contains(&UpgradeId::HighCapacityBarrels) {
-										match self.type_id {
-											UnitTypeId::Hellion => damage_bonus_per_upgrade += 5,
-											UnitTypeId::HellionTank => damage_bonus_per_upgrade += 12,
-											_ => {}
-										}
-									}
-								}
-							}
-
-							let mut bonus_damage =
-								bonus + (self.attack_upgrade_level * damage_bonus_per_upgrade) as f32;
-
-							if let Attribute::Armored = attribute {
-								if self.has_buff(BuffId::VoidRaySwarmDamageBoost) {
-									bonus_damage += 6.0;
-								}
-							}
-
-							Some(bonus_damage)
+					if let Some(enemy_shield) = target.shield.filter(|shield| shield > &0.0) {
+						let enemy_shield_armor = if target_has_guardian_shield && range >= 2.0 {
+							(enemy_shield_armor + 2) as f32
 						} else {
-							None
-						}
-					})
-					.max_by(|b1, b2| b1.partial_cmp(b2).unwrap())
-				{
-					damage += bonus;
-				}
-
-				// Substract damage
-				match target_unit {
-					Some((target, enemy_armor, enemy_shield_armor, target_has_guardian_shield)) => {
-						let mut attacks = w.attacks;
-						let mut shield_damage = 0.0;
-						let mut health_damage = 0.0;
-
-						if let Some(enemy_shield) = target.shield.filter(|shield| shield > &0.0) {
-							let enemy_shield_armor = if target_has_guardian_shield && range >= 2.0 {
-								(enemy_shield_armor + 2) as f32
-							} else {
-								enemy_shield_armor as f32
-							};
-							for _ in 0..attacks {
-								if shield_damage >= enemy_shield {
-									health_damage = shield_damage - enemy_shield;
-									break;
-								}
-								shield_damage += 0.5_f32.max(damage - enemy_shield_armor);
-								attacks -= 1;
+							enemy_shield_armor as f32
+						};
+						for _ in 0..attacks {
+							if shield_damage >= enemy_shield {
+								health_damage = shield_damage - enemy_shield;
+								break;
 							}
+							shield_damage += 0.5_f32.max(damage - enemy_shield_armor);
+							attacks -= 1;
 						}
-
-						if let Some(enemy_health) = target.health.filter(|health| health > &0.0) {
-							let enemy_armor = if target_has_guardian_shield && range >= 2.0 {
-								(enemy_armor + 2) as f32
-							} else {
-								enemy_armor as f32
-							};
-							for _ in 0..attacks {
-								if health_damage >= enemy_health {
-									break;
-								}
-								health_damage += 0.5_f32.max(damage - enemy_armor);
-							}
-						}
-
-						(shield_damage + health_damage, speed, range)
 					}
-					None => (damage * (w.attacks as f32), speed, range),
+
+					if let Some(enemy_health) = target.health.filter(|health| health > &0.0) {
+						let enemy_armor = if target_has_guardian_shield && range >= 2.0 {
+							(enemy_armor + 2) as f32
+						} else {
+							enemy_armor as f32
+						};
+						for _ in 0..attacks {
+							if health_damage >= enemy_health {
+								break;
+							}
+							health_damage += 0.5_f32.max(damage - enemy_armor);
+						}
+					}
+
+					(shield_damage + health_damage, speed, range)
 				}
-			};
-			if target_type.is_any() {
-				weapons
-					.iter()
-					.map(extract_weapon_stats)
-					.max_by(|(damage1, ..), (damage2, ..)| damage1.partial_cmp(damage2).unwrap())
-					.unwrap_or((0.0, 0.0, 0.0))
-			} else {
-				weapons
-					.iter()
-					.filter(|w| w.target == target_type)
-					.map(extract_weapon_stats)
-					.max_by(|(damage1, ..), (damage2, ..)| damage1.partial_cmp(damage2).unwrap())
-					.unwrap_or((0.0, 0.0, 0.0))
+				None => (damage * (w.attacks as f32), speed, range),
 			}
-		})
+		};
+		if not_target.is_any() {
+			weapons
+				.iter()
+				.map(extract_weapon_stats)
+				.max_by(|(damage1, ..), (damage2, ..)| damage1.partial_cmp(damage2).unwrap())
+				.unwrap_or((0.0, 0.0, 0.0))
+		} else {
+			weapons
+				.iter()
+				.filter(|w| w.target != not_target)
+				.map(extract_weapon_stats)
+				.max_by(|(damage1, ..), (damage2, ..)| damage1.partial_cmp(damage2).unwrap())
+				.unwrap_or((0.0, 0.0, 0.0))
+		}
 	}
+
 	pub fn in_range(&self, target: &Unit, gap: f32) -> bool {
 		let range = {
 			if matches!(target.type_id, UnitTypeId::Colossus) {
-				match self.weapons() {
-					Some(weapons) => match weapons
-						.iter()
-						.map(|w| w.range)
-						.max_by(|r1, r2| r1.partial_cmp(r2).unwrap())
-					{
-						Some(max_range) => max_range,
-						None => return false,
-					},
+				match self
+					.weapons()
+					.iter()
+					.map(|w| w.range)
+					.max_by(|r1, r2| r1.partial_cmp(r2).unwrap())
+				{
+					Some(max_range) => max_range,
 					None => return false,
 				}
 			} else {
@@ -1078,8 +1017,8 @@ impl Unit {
 	pub fn in_range_of(&self, threat: &Unit, gap: f32) -> bool {
 		threat.in_range(self, gap)
 	}
-	pub fn in_real_range(&self, target: &Unit, gap: f32, upgrades: Option<&FxHashSet<UpgradeId>>) -> bool {
-		let range = self.calculate_weapon_vs(target, upgrades).1;
+	pub fn in_real_range(&self, target: &Unit, gap: f32) -> bool {
+		let range = self.real_range_vs(target);
 		if range < f32::EPSILON {
 			return false;
 		}
@@ -1091,16 +1030,14 @@ impl Unit {
 		(self.type_id != UnitTypeId::SiegeTankSieged || distance > 4.0)
 			&& distance <= total_range * total_range
 	}
-	pub fn in_real_range_of(&self, threat: &Unit, gap: f32, upgrades: Option<&FxHashSet<UpgradeId>>) -> bool {
-		threat.in_real_range(self, gap, upgrades)
+	pub fn in_real_range_of(&self, threat: &Unit, gap: f32) -> bool {
+		threat.in_real_range(self, gap)
 	}
 	pub fn damage_bonus(&self) -> Option<(Attribute, f32)> {
-		self.weapons().and_then(|weapons| {
-			weapons
-				.iter()
-				.find(|w| !w.damage_bonus.is_empty())
-				.map(|w| w.damage_bonus[0])
-		})
+		self.weapons()
+			.iter()
+			.find(|w| !w.damage_bonus.is_empty())
+			.map(|w| w.damage_bonus[0])
 	}
 	pub fn target(&self) -> Target {
 		if self.is_idle() {
@@ -1217,12 +1154,10 @@ impl Unit {
 			}
 		}
 
-		#[cfg(feature = "rayon")]
-		let mut commander = self.data.commander.write().unwrap();
-		#[cfg(not(feature = "rayon"))]
-		let mut commander = self.data.commander.borrow_mut();
-
-		commander.command((self.tag, (ability, target, queue)));
+		self.data
+			.commander
+			.lock_write()
+			.command((self.tag, (ability, target, queue)));
 	}
 	pub fn use_ability(&self, ability: AbilityId, queue: bool) {
 		self.command(ability, Target::None, queue)

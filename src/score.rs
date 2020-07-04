@@ -1,6 +1,7 @@
 use crate::{FromProto, IntoSC2};
 use sc2_proto::score::{CategoryScoreDetails, Score as ProtoScore, Score_ScoreType, VitalScoreDetails};
 
+#[variant_checkers]
 #[derive(Clone)]
 pub enum ScoreType {
 	Curriculum,

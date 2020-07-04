@@ -27,9 +27,12 @@ use sc2_proto::{
 use std::{panic, process::Child};
 
 #[cfg(feature = "rayon")]
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 #[cfg(not(feature = "rayon"))]
-use std::{cell::RefCell, rc::Rc};
+use std::{
+	cell::{Ref, RefCell, RefMut},
+	rc::Rc,
+};
 
 #[cfg(feature = "rayon")]
 pub(crate) type Rs<T> = Arc<T>;
@@ -40,6 +43,43 @@ pub(crate) type Rs<T> = Rc<T>;
 pub(crate) type Rw<T> = Arc<RwLock<T>>;
 #[cfg(not(feature = "rayon"))]
 pub(crate) type Rw<T> = Rc<RefCell<T>>;
+
+#[cfg(feature = "rayon")]
+pub(crate) type Reader<'a, T> = RwLockReadGuard<'a, T>;
+#[cfg(not(feature = "rayon"))]
+pub(crate) type Reader<'a, T> = Ref<'a, T>;
+
+#[cfg(feature = "rayon")]
+pub(crate) type Writer<'a, T> = RwLockWriteGuard<'a, T>;
+#[cfg(not(feature = "rayon"))]
+pub(crate) type Writer<'a, T> = RefMut<'a, T>;
+
+pub trait Locked<T> {
+	fn lock_read(&self) -> Reader<T>;
+	fn lock_write(&self) -> Writer<T>;
+}
+impl<T> Locked<T> for Rw<T> {
+	fn lock_read(&self) -> Reader<T> {
+		#[cfg(feature = "rayon")]
+		{
+			self.read().unwrap()
+		}
+		#[cfg(not(feature = "rayon"))]
+		{
+			self.borrow()
+		}
+	}
+	fn lock_write(&self) -> Writer<T> {
+		#[cfg(feature = "rayon")]
+		{
+			self.write().unwrap()
+		}
+		#[cfg(not(feature = "rayon"))]
+		{
+			self.borrow_mut()
+		}
+	}
+}
 
 pub struct PlacementOptions {
 	pub max_distance: isize,
@@ -179,6 +219,7 @@ pub struct Bot {
 	last_units_health: Rs<FxHashMap<u64, f32>>,
 	pub vision_blockers: Vec<Point2>,
 	pub ramps: Ramps,
+	enemy_upgrades: Rw<FxHashSet<UpgradeId>>,
 }
 
 impl Bot {
@@ -224,6 +265,7 @@ impl Bot {
 			last_units_health: Default::default(),
 			vision_blockers: Default::default(),
 			ramps: Default::default(),
+			enemy_upgrades: Default::default(),
 		}
 	}
 	#[inline]
@@ -237,13 +279,8 @@ impl Bot {
 		Rs::clone(&self.data_for_unit)
 	}
 	pub(crate) fn get_actions(&mut self) -> &[Action] {
-		#[cfg(feature = "rayon")]
-		let mut commander = self.commander.write().unwrap();
-		#[cfg(not(feature = "rayon"))]
-		let mut commander = self.commander.borrow_mut();
-
 		let actions = &mut self.actions;
-		let commands = &mut commander.commands;
+		let commands = &mut self.commander.lock_write().commands;
 
 		if !commands.is_empty() {
 			actions.extend(
@@ -335,7 +372,13 @@ impl Bot {
 		self.vespene = self.vespene.saturating_sub(cost.vespene);
 	}
 	pub fn has_upgrade(&self, upgrade: UpgradeId) -> bool {
-		self.state.observation.raw.upgrades.contains(&upgrade)
+		self.state.observation.raw.upgrades.lock_read().contains(&upgrade)
+	}
+	pub fn enemy_has_upgrade(&self, upgrade: UpgradeId) -> bool {
+		self.enemy_upgrades.lock_read().contains(&upgrade)
+	}
+	pub fn enemy_upgrades(&self) -> Writer<FxHashSet<UpgradeId>> {
+		self.enemy_upgrades.lock_write()
 	}
 	pub fn is_ordered_upgrade(&self, upgrade: UpgradeId) -> bool {
 		let ability = self.game_data.upgrades[&upgrade].ability;
@@ -409,9 +452,10 @@ impl Bot {
 			max_cooldowns: Rs::clone(&self.max_cooldowns),
 			last_units_health: Rs::clone(&self.last_units_health),
 			abilities_units: Rs::clone(&self.abilities_units),
-			upgrades: Rs::new(self.state.observation.raw.upgrades.clone()),
-			creep: Rs::new(self.state.observation.raw.creep.clone()),
-			visibility: Rs::new(self.state.observation.raw.visibility.clone()),
+			enemy_upgrades: Rs::clone(&self.enemy_upgrades),
+			upgrades: Rs::clone(&self.state.observation.raw.upgrades),
+			creep: Rs::clone(&self.state.observation.raw.creep),
+			visibility: Rs::clone(&self.state.observation.raw.visibility),
 			game_step: self.game_step,
 		});
 	}
@@ -467,24 +511,22 @@ impl Bot {
 		.0;
 
 		const OFFSET: isize = 7;
-		lazy_static! {
-			static ref OFFSETS: Vec<(isize, isize)> = iproduct!((-OFFSET..=OFFSET), (-OFFSET..=OFFSET))
-				.filter(|(x, y)| x * x + y * y <= 64)
-				.collect();
-		}
+		let offsets = iproduct!((-OFFSET..=OFFSET), (-OFFSET..=OFFSET))
+			.filter(|(x, y)| x * x + y * y <= 64)
+			.collect::<Vec<(isize, isize)>>();
 
 		self.expansions = resource_groups
 			.iter()
 			.map(|group| {
 				let resources = all_resources.find_tags(group.iter().map(|(_, tag)| tag));
-				let center = resources.center().expect("No resources on this map").floor() + 0.5;
+				let center = resources.center().unwrap().floor() + 0.5;
 
-				if center.distance_squared(self.start_center) < 16.0 {
+				if center.is_closer(4.0, self.start_center) {
 					(self.start_location, self.start_center)
-				} else if center.distance_squared(self.enemy_start_center) < 16.0 {
+				} else if center.is_closer(4.0, self.enemy_start_center) {
 					(self.enemy_start, self.enemy_start_center)
 				} else {
-					let location = OFFSETS
+					let location = offsets
 						.iter()
 						.filter_map(|(x, y)| {
 							let pos = center.offset(*x as f32, *y as f32);
@@ -628,8 +670,8 @@ impl Bot {
 		self.update_data_for_unit();
 
 		// Counting units and orders
-		let mut current_units = HashMap::new();
-		let mut orders = HashMap::new();
+		let mut current_units = FxHashMap::default();
+		let mut orders = FxHashMap::default();
 		self.units.my.all.iter().for_each(|u| {
 			u.orders.iter().for_each(|order| {
 				if !order.ability.is_constructing() {
@@ -651,20 +693,9 @@ impl Bot {
 	fn update_units(&mut self) {
 		self.units.clear();
 
-		#[cfg(feature = "rayon")]
-		let mut techlab_tags = self.techlab_tags.write().unwrap();
-		#[cfg(not(feature = "rayon"))]
-		let mut techlab_tags = self.techlab_tags.borrow_mut();
-
-		#[cfg(feature = "rayon")]
-		let mut reactor_tags = self.reactor_tags.write().unwrap();
-		#[cfg(not(feature = "rayon"))]
-		let mut reactor_tags = self.reactor_tags.borrow_mut();
-
-		#[cfg(feature = "rayon")]
-		let mut max_cooldowns = self.max_cooldowns.write().unwrap();
-		#[cfg(not(feature = "rayon"))]
-		let mut max_cooldowns = self.max_cooldowns.borrow_mut();
+		let mut techlab_tags = self.techlab_tags.lock_write();
+		let mut reactor_tags = self.reactor_tags.lock_write();
+		let mut max_cooldowns = self.max_cooldowns.lock_write();
 
 		techlab_tags.clear();
 		reactor_tags.clear();
