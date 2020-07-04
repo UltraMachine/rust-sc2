@@ -3,7 +3,6 @@ use indexmap::{
 	map::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut},
 	IndexMap,
 };
-use itertools::Itertools;
 use rustc_hash::FxHasher;
 use std::{
 	hash::BuildHasherDefault,
@@ -146,9 +145,7 @@ impl Units {
 	pub fn of_type(&self, u_type: UnitTypeId) -> Self {
 		self.filter(|u| u.type_id == u_type)
 	}
-	pub fn of_types<T: Container<UnitTypeId>>(&self, types: T) -> Self {
-		self.filter(|u| types.contains(&u.type_id))
-	}
+
 	pub fn center(&self) -> Option<Point2> {
 		if self.is_empty() {
 			None
@@ -156,43 +153,7 @@ impl Units {
 			Some(self.sum(|u| u.position) / self.len() as f32)
 		}
 	}
-	// Get closest | furthest
-	pub fn closest<P: Into<Point2> + Copy>(&self, target: P) -> Option<&Unit> {
-		self.partial_min(|u| u.distance_squared(target))
-	}
-	pub fn furthest<P: Into<Point2> + Copy>(&self, target: P) -> Option<&Unit> {
-		self.partial_max(|u| u.distance_squared(target))
-	}
-	// Get closest | furthest distance
-	pub fn closest_distance<P: Into<Point2> + Copy>(&self, target: P) -> Option<f32> {
-		self.partial_min_value(|u| u.distance_squared(target))
-			.map(|dist| dist.sqrt())
-	}
-	pub fn furthest_distance<P: Into<Point2> + Copy>(&self, target: P) -> Option<f32> {
-		self.partial_max_value(|u| u.distance_squared(target))
-			.map(|dist| dist.sqrt())
-	}
-	// Squared
-	pub fn closest_distance_squared<P: Into<Point2> + Copy>(&self, target: P) -> Option<f32> {
-		self.partial_min_value(|u| u.distance_squared(target))
-	}
-	pub fn furthest_distance_squared<P: Into<Point2> + Copy>(&self, target: P) -> Option<f32> {
-		self.partial_max_value(|u| u.distance_squared(target))
-	}
-	// Filter closer | further than distance
-	pub fn closer<P: Into<Point2> + Copy>(&self, distance: f32, target: P) -> Units {
-		self.filter(|u| u.is_closer(distance, target))
-	}
-	pub fn further<P: Into<Point2> + Copy>(&self, distance: f32, target: P) -> Units {
-		self.filter(|u| u.is_further(distance, target))
-	}
 
-	pub fn filter<F>(&self, f: F) -> Self
-	where
-		F: Fn(&&Unit) -> bool,
-	{
-		Self(self.iter().filter(f).map(|u| (u.tag, u.clone())).collect())
-	}
 	pub fn ground(&self) -> Self {
 		self.filter(|u| !u.is_flying)
 	}
@@ -223,108 +184,34 @@ impl Units {
 	pub fn in_range(&self, unit: &Unit, gap: f32) -> Self {
 		self.filter(|u| u.in_range(unit, gap))
 	}
+	pub fn in_real_range_of(&self, unit: &Unit, gap: f32) -> Self {
+		self.filter(|u| unit.in_real_range(u, gap))
+	}
+	pub fn in_real_range(&self, unit: &Unit, gap: f32) -> Self {
+		self.filter(|u| u.in_real_range(unit, gap))
+	}
 	pub fn visible(&self) -> Self {
 		self.filter(|u| u.is_visible())
 	}
-	pub fn sum<T, F>(&self, f: F) -> T
-	where
-		T: Sum,
-		F: Fn(&Unit) -> T,
-	{
-		self.iter().map(f).sum::<T>()
-	}
-	pub fn min<T, F>(&self, f: F) -> Option<&Unit>
-	where
-		T: Ord,
-		F: Fn(&&Unit) -> T,
-	{
-		self.iter().min_by_key(f)
-	}
-	pub fn partial_min<T, F>(&self, f: F) -> Option<&Unit>
+
+	pub fn sort<T, F>(&mut self, f: F)
 	where
 		T: PartialOrd,
 		F: Fn(&Unit) -> T,
 	{
-		self.iter().min_by(|u1, u2| f(u1).partial_cmp(&f(u2)).unwrap())
+		self.0.sort_by(cmp_by2(f));
 	}
-	pub fn min_value<T, F>(&self, f: F) -> Option<T>
-	where
-		T: Ord,
-		F: Fn(&Unit) -> T,
-	{
-		self.iter().map(f).min()
-	}
-	pub fn partial_min_value<T, F>(&self, f: F) -> Option<T>
+	pub fn sorted<T, F>(&self, f: F) -> Self
 	where
 		T: PartialOrd,
 		F: Fn(&Unit) -> T,
 	{
-		self.iter().map(f).min_by(|a, b| a.partial_cmp(&b).unwrap())
-	}
-	pub fn max<T, F>(&self, f: F) -> Option<&Unit>
-	where
-		T: Ord,
-		F: Fn(&&Unit) -> T,
-	{
-		self.iter().max_by_key(f)
-	}
-	pub fn partial_max<T, F>(&self, f: F) -> Option<&Unit>
-	where
-		T: PartialOrd,
-		F: Fn(&Unit) -> T,
-	{
-		self.iter().max_by(|u1, u2| f(u1).partial_cmp(&f(u2)).unwrap())
-	}
-	pub fn max_value<T, F>(&self, f: F) -> Option<T>
-	where
-		T: Ord,
-		F: Fn(&Unit) -> T,
-	{
-		self.iter().map(f).max()
-	}
-	pub fn partial_max_value<T, F>(&self, f: F) -> Option<T>
-	where
-		T: PartialOrd,
-		F: Fn(&Unit) -> T,
-	{
-		self.iter().map(f).max_by(|a, b| a.partial_cmp(&b).unwrap())
-	}
-	pub fn sort<T, F>(&self, f: F) -> Self
-	where
-		T: Ord,
-		F: Fn(&&Unit) -> T,
-	{
-		self.iter().sorted_by_key(f).cloned().collect()
-	}
-	pub fn partial_sort<T, F>(&self, f: F) -> Self
-	where
-		T: PartialOrd,
-		F: Fn(&Unit) -> T,
-	{
-		self.iter()
-			.sorted_by(|u1, u2| f(u1).partial_cmp(&f(u2)).unwrap())
-			.cloned()
-			.collect()
-	}
-	pub fn sort_unstable<T, F>(&self, f: F) -> Self
-	where
-		T: Ord,
-		F: Fn(&&Unit) -> T,
-	{
-		let mut v = Vec::from_iter(self.iter());
-		v.sort_unstable_by_key(f);
-		v.into_iter().cloned().collect()
-	}
-	pub fn partial_sort_unstable<T, F>(&self, f: F) -> Self
-	where
-		T: PartialOrd,
-		F: Fn(&Unit) -> T,
-	{
-		let mut v = Vec::from_iter(self.iter());
-		v.sort_unstable_by(|u1, u2| f(u1).partial_cmp(&f(u2)).unwrap());
-		v.into_iter().cloned().collect()
+		let mut sorted = self.clone();
+		sorted.0.sort_by(cmp_by2(f));
+		sorted
 	}
 }
+
 impl FromIterator<Unit> for Units {
 	#[inline]
 	fn from_iter<I: IntoIterator<Item = Unit>>(iter: I) -> Self {
@@ -361,10 +248,131 @@ impl Extend<Unit> for Units {
 	}
 }
 
+use std::cmp::Ordering;
+
+#[inline]
+fn cmp<T: PartialOrd>(a: &T, b: &T) -> Ordering {
+	a.partial_cmp(&b).unwrap()
+}
+
+#[cfg(not(feature = "rayon"))]
+#[inline]
+fn cmp_by<U, T, F>(f: F) -> impl Fn(&&U, &&U) -> Ordering
+where
+	T: PartialOrd,
+	F: Fn(&U) -> T,
+{
+	move |a, b| f(a).partial_cmp(&f(b)).unwrap()
+}
+
+#[inline]
+fn cmp_by2<K, V, T, F>(f: F) -> impl Fn(&K, &V, &K, &V) -> Ordering
+where
+	T: PartialOrd,
+	F: Fn(&V) -> T,
+{
+	move |_, a, _, b| f(a).partial_cmp(&f(b)).unwrap()
+}
+
+#[cfg(not(feature = "rayon"))]
+impl Units {
+	pub fn filter<F>(&self, f: F) -> Self
+	where
+		F: Fn(&&Unit) -> bool,
+	{
+		Self(self.iter().filter(f).map(|u| (u.tag, u.clone())).collect())
+	}
+	pub fn of_types<T: Container<UnitTypeId>>(&self, types: T) -> Self {
+		self.filter(|u| types.contains(&u.type_id))
+	}
+
+	// Filter closer | further than distance
+	pub fn closer<P: Into<Point2> + Copy>(&self, distance: f32, target: P) -> Units {
+		self.filter(|u| u.is_closer(distance, target))
+	}
+	pub fn further<P: Into<Point2> + Copy>(&self, distance: f32, target: P) -> Units {
+		self.filter(|u| u.is_further(distance, target))
+	}
+
+	// Get closest | furthest
+	pub fn closest<P: Into<Point2> + Copy>(&self, target: P) -> Option<&Unit> {
+		self.min(|u| u.distance_squared(target))
+	}
+	pub fn furthest<P: Into<Point2> + Copy>(&self, target: P) -> Option<&Unit> {
+		self.max(|u| u.distance_squared(target))
+	}
+
+	// Get closest | furthest distance
+	pub fn closest_distance<P: Into<Point2> + Copy>(&self, target: P) -> Option<f32> {
+		self.min_value(|u| u.distance_squared(target))
+			.map(|dist| dist.sqrt())
+	}
+	pub fn furthest_distance<P: Into<Point2> + Copy>(&self, target: P) -> Option<f32> {
+		self.max_value(|u| u.distance_squared(target))
+			.map(|dist| dist.sqrt())
+	}
+
+	// Squared
+	pub fn closest_distance_squared<P: Into<Point2> + Copy>(&self, target: P) -> Option<f32> {
+		self.min_value(|u| u.distance_squared(target))
+	}
+	pub fn furthest_distance_squared<P: Into<Point2> + Copy>(&self, target: P) -> Option<f32> {
+		self.max_value(|u| u.distance_squared(target))
+	}
+
+	pub fn sum<T, F>(&self, f: F) -> T
+	where
+		T: Sum,
+		F: Fn(&Unit) -> T,
+	{
+		self.iter().map(f).sum::<T>()
+	}
+
+	pub fn min<T, F>(&self, f: F) -> Option<&Unit>
+	where
+		T: PartialOrd,
+		F: Fn(&Unit) -> T,
+	{
+		self.iter().min_by(cmp_by(f))
+	}
+	pub fn min_value<T, F>(&self, f: F) -> Option<T>
+	where
+		T: PartialOrd,
+		F: Fn(&Unit) -> T,
+	{
+		self.iter().map(f).min_by(cmp)
+	}
+
+	pub fn max<T, F>(&self, f: F) -> Option<&Unit>
+	where
+		T: PartialOrd,
+		F: Fn(&Unit) -> T,
+	{
+		self.iter().max_by(cmp_by(f))
+	}
+	pub fn max_value<T, F>(&self, f: F) -> Option<T>
+	where
+		T: PartialOrd,
+		F: Fn(&Unit) -> T,
+	{
+		self.iter().map(f).max_by(cmp)
+	}
+}
+
 #[cfg(feature = "rayon")]
 use indexmap::map::rayon::{IntoParIter, ParIter, ParIterMut, ParKeys, ParValues, ParValuesMut};
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
+
+#[cfg(feature = "rayon")]
+#[inline]
+fn cmp_by<U, T, F>(f: F) -> impl Fn(&&U, &&U) -> Ordering
+where
+	T: PartialOrd,
+	F: Fn(&U) -> T + Send + Sync,
+{
+	move |a, b| f(a).partial_cmp(&f(b)).unwrap()
+}
 
 #[cfg(feature = "rayon")]
 impl Units {
@@ -391,6 +399,106 @@ impl Units {
 	#[inline]
 	pub fn par_tags(&self) -> ParKeys<u64, Unit> {
 		self.0.par_keys()
+	}
+
+	pub fn filter<F>(&self, f: F) -> Self
+	where
+		F: Fn(&&Unit) -> bool + Sync + Send,
+	{
+		Self(self.par_iter().filter(f).map(|u| (u.tag, u.clone())).collect())
+	}
+
+	pub fn of_types<T: Container<UnitTypeId> + Sync>(&self, types: T) -> Self {
+		self.filter(|u| types.contains(&u.type_id))
+	}
+
+	// Filter closer | further than distance
+	pub fn closer<P: Into<Point2> + Copy + Sync>(&self, distance: f32, target: P) -> Units {
+		self.filter(|u| u.is_closer(distance, target))
+	}
+	pub fn further<P: Into<Point2> + Copy + Sync>(&self, distance: f32, target: P) -> Units {
+		self.filter(|u| u.is_further(distance, target))
+	}
+
+	// Get closest | furthest
+	pub fn closest<P: Into<Point2> + Copy + Sync>(&self, target: P) -> Option<&Unit> {
+		self.min(|u| u.distance_squared(target))
+	}
+	pub fn furthest<P: Into<Point2> + Copy + Sync>(&self, target: P) -> Option<&Unit> {
+		self.max(|u| u.distance_squared(target))
+	}
+
+	// Get closest | furthest distance
+	pub fn closest_distance<P: Into<Point2> + Copy + Sync>(&self, target: P) -> Option<f32> {
+		self.min_value(|u| u.distance_squared(target))
+			.map(|dist| dist.sqrt())
+	}
+	pub fn furthest_distance<P: Into<Point2> + Copy + Sync>(&self, target: P) -> Option<f32> {
+		self.max_value(|u| u.distance_squared(target))
+			.map(|dist| dist.sqrt())
+	}
+
+	// Squared
+	pub fn closest_distance_squared<P: Into<Point2> + Copy + Sync>(&self, target: P) -> Option<f32> {
+		self.min_value(|u| u.distance_squared(target))
+	}
+	pub fn furthest_distance_squared<P: Into<Point2> + Copy + Sync>(&self, target: P) -> Option<f32> {
+		self.max_value(|u| u.distance_squared(target))
+	}
+
+	pub fn sum<T, F>(&self, f: F) -> T
+	where
+		T: Sum + Send,
+		F: Fn(&Unit) -> T + Send + Sync,
+	{
+		self.par_iter().map(f).sum::<T>()
+	}
+
+	pub fn min<T, F>(&self, f: F) -> Option<&Unit>
+	where
+		T: PartialOrd,
+		F: Fn(&Unit) -> T + Send + Sync,
+	{
+		self.par_iter().min_by(cmp_by(f))
+	}
+	pub fn min_value<T, F>(&self, f: F) -> Option<T>
+	where
+		T: PartialOrd + Send,
+		F: Fn(&Unit) -> T + Send + Sync,
+	{
+		self.par_iter().map(f).min_by(cmp)
+	}
+
+	pub fn max<T, F>(&self, f: F) -> Option<&Unit>
+	where
+		T: PartialOrd,
+		F: Fn(&Unit) -> T + Sync + Send,
+	{
+		self.par_iter().max_by(cmp_by(f))
+	}
+	pub fn max_value<T, F>(&self, f: F) -> Option<T>
+	where
+		T: PartialOrd + Send,
+		F: Fn(&Unit) -> T + Sync + Send,
+	{
+		self.par_iter().map(f).max_by(cmp)
+	}
+
+	pub fn par_sort<T, F>(&mut self, f: F)
+	where
+		T: PartialOrd,
+		F: Fn(&Unit) -> T + Sync + Send,
+	{
+		self.0.par_sort_by(cmp_by2(f));
+	}
+	pub fn par_sorted<T, F>(&self, f: F) -> Self
+	where
+		T: PartialOrd,
+		F: Fn(&Unit) -> T + Sync + Send,
+	{
+		let mut sorted = self.clone();
+		sorted.0.par_sort_by(cmp_by2(f));
+		sorted
 	}
 }
 
