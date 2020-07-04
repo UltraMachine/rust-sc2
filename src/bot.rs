@@ -23,7 +23,7 @@ use sc2_proto::{
 	query::{RequestQueryBuildingPlacement, RequestQueryPathing},
 	sc2api::Request,
 };
-use std::{collections::HashMap, panic, process::Child};
+use std::{panic, process::Child};
 
 #[cfg(feature = "rayon")]
 use std::sync::{Arc, RwLock};
@@ -157,8 +157,8 @@ pub struct Bot {
 	data_for_unit: SharedUnitData,
 	pub units: AllUnits,
 	pub abilities_units: Rs<FxHashMap<u64, Vec<AbilityId>>>,
-	pub orders: HashMap<AbilityId, usize>,
-	pub current_units: HashMap<UnitTypeId, usize>,
+	pub orders: FxHashMap<AbilityId, usize>,
+	pub current_units: FxHashMap<UnitTypeId, usize>,
 	pub time: f32,
 	pub minerals: u32,
 	pub vespene: u32,
@@ -174,7 +174,7 @@ pub struct Bot {
 	techlab_tags: Rw<FxHashSet<u64>>,
 	reactor_tags: Rw<FxHashSet<u64>>,
 	pub expansions: Vec<(Point2, Point2)>,
-	max_cooldowns: Rw<HashMap<UnitTypeId, f32>>,
+	max_cooldowns: Rw<FxHashMap<UnitTypeId, f32>>,
 	last_units_health: Rs<FxHashMap<u64, f32>>,
 	pub vision_blockers: Vec<Point2>,
 	pub ramps: Ramps,
