@@ -220,6 +220,8 @@ pub struct Bot {
 	pub vision_blockers: Vec<Point2>,
 	pub ramps: Ramps,
 	enemy_upgrades: Rw<FxHashSet<UpgradeId>>,
+	pub(crate) owned_tags: FxHashSet<u64>,
+	pub(crate) under_construction: FxHashSet<u64>,
 }
 
 impl Bot {
@@ -266,6 +268,8 @@ impl Bot {
 			vision_blockers: Default::default(),
 			ramps: Default::default(),
 			enemy_upgrades: Default::default(),
+			owned_tags: Default::default(),
+			under_construction: Default::default(),
 		}
 	}
 	#[inline]

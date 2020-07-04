@@ -24,7 +24,7 @@ pub mod prelude {
 		sc2_macro::{bot, bot_new},
 		unit::Unit,
 		units::Units,
-		Player, PlayerSettings,
+		Event, Player, PlayerSettings,
 	};
 }
 
@@ -80,6 +80,13 @@ impl PlayerSettings {
 	}
 }
 
+pub enum Event {
+	UnitDestroyed(u64),
+	UnitCreated(u64),
+	ConstructionStarted(u64),
+	ConstructionComplete(u64),
+}
+
 pub trait Player {
 	fn get_player_settings(&self) -> PlayerSettings;
 	fn on_start(&mut self) -> SC2Result<()> {
@@ -89,6 +96,9 @@ pub trait Player {
 		Ok(())
 	}
 	fn on_end(&self, _result: GameResult) -> SC2Result<()> {
+		Ok(())
+	}
+	fn on_event(&mut self, _event: Event) -> SC2Result<()> {
 		Ok(())
 	}
 }
