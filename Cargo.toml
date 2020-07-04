@@ -1,6 +1,6 @@
 [package]
 name = "rust-sc2"
-version = "0.8.5"
+version = "0.9.0"
 authors = ["Armageddon <lunyx1337@gmail.com>"]
 edition = "2018"
 
