@@ -314,14 +314,20 @@ impl Bot {
 			.map_or_else(Default::default, |data| {
 				let mut cost = data.cost();
 				match unit {
-					UnitTypeId::OrbitalCommand => {
+					UnitTypeId::OrbitalCommand | UnitTypeId::PlanetaryFortress => {
 						cost.minerals = 150;
 					}
-					UnitTypeId::Reactor => {
+					UnitTypeId::Reactor
+					| UnitTypeId::BarracksReactor
+					| UnitTypeId::FactoryReactor
+					| UnitTypeId::StarportReactor => {
 						cost.minerals = 50;
 						cost.vespene = 50;
 					}
-					UnitTypeId::TechLab => {
+					UnitTypeId::TechLab
+					| UnitTypeId::BarracksTechLab
+					| UnitTypeId::FactoryTechLab
+					| UnitTypeId::StarportTechLab => {
 						cost.minerals = 50;
 						cost.vespene = 25;
 					}
