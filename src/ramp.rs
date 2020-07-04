@@ -1,4 +1,4 @@
-use crate::{bot::Rs, geometry::Point2, pixel_map::ByteMap};
+use crate::{bot::Rs, distance::*, geometry::Point2, pixel_map::ByteMap};
 use std::{
 	cmp::{Ordering, Reverse},
 	convert::TryInto,
@@ -118,14 +118,7 @@ impl Ramp {
 			let (x, y) = *self.lower().first().unwrap();
 			let lower = Point2::new(x as f32, y as f32);
 
-			return intersects
-				.iter()
-				.max_by(|i1, i2| {
-					i1.distance_squared(lower)
-						.partial_cmp(&i2.distance_squared(lower))
-						.unwrap()
-				})
-				.copied();
+			return intersects.iter().furthest(lower).copied();
 		}
 		None
 	}
@@ -144,14 +137,7 @@ impl Ramp {
 			let (x, y) = *self.lower().first().unwrap();
 			let lower = Point2::new(x as f32, y as f32);
 
-			return intersects
-				.iter()
-				.max_by(|i1, i2| {
-					i1.distance_squared(lower)
-						.partial_cmp(&i2.distance_squared(lower))
-						.unwrap()
-				})
-				.copied();
+			return intersects.iter().furthest(lower).copied();
 		}
 		None
 	}

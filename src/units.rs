@@ -1,4 +1,4 @@
-use crate::{geometry::Point2, ids::UnitTypeId, unit::Unit};
+use crate::{distance::Distance, geometry::Point2, ids::UnitTypeId, unit::Unit};
 use indexmap::{
 	map::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut},
 	IndexMap,

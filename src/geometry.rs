@@ -1,4 +1,4 @@
-use crate::{FromProto, IntoProto};
+use crate::{distance::Distance, FromProto, IntoProto};
 use sc2_proto::common::{Point, Point2D};
 use std::{
 	hash::{Hash, Hasher},
@@ -40,18 +40,6 @@ pub struct Point2 {
 impl Point2 {
 	pub fn new(x: f32, y: f32) -> Self {
 		Self { x, y }
-	}
-	pub fn distance<P: Into<Point2>>(self, other: P) -> f32 {
-		let other = other.into();
-		let dx = self.x - other.x;
-		let dy = self.y - other.y;
-		(dx * dx + dy * dy).sqrt()
-	}
-	pub fn distance_squared<P: Into<Point2>>(self, other: P) -> f32 {
-		let other = other.into();
-		let dx = self.x - other.x;
-		let dy = self.y - other.y;
-		dx * dx + dy * dy
 	}
 	pub fn towards(self, other: Self, offset: f32) -> Self {
 		self + (other - self) / self.distance(other) * offset
@@ -178,6 +166,12 @@ impl Hash for Point2 {
 	fn hash<H: Hasher>(&self, state: &mut H) {
 		((self.x + 0.5) as i32).hash(state);
 		((self.y + 0.5) as i32).hash(state);
+	}
+}
+impl From<&Point2> for Point2 {
+	#[inline]
+	fn from(p: &Point2) -> Self {
+		*p
 	}
 }
 impl From<Point2> for (usize, usize) {
@@ -329,6 +323,7 @@ impl Sum for Point2 {
 		iter.fold(Default::default(), Add::add)
 	}
 }
+
 impl FromProto<&Point2D> for Point2 {
 	fn from_proto(p: &Point2D) -> Self {
 		Self {

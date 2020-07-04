@@ -5,6 +5,7 @@ use crate::{
 		RaceValues, DAMAGE_BONUS_PER_UPGRADE, FRAMES_PER_SECOND, MISSED_WEAPONS, OFF_CREEP_SPEED_UPGRADES,
 		SPEED_BUFFS, SPEED_ON_CREEP, SPEED_UPGRADES, WARPGATE_ABILITIES,
 	},
+	distance::Distance,
 	game_data::{Attribute, GameData, TargetType, UnitTypeData, Weapon},
 	game_state::Alliance,
 	geometry::{Point2, Point3},

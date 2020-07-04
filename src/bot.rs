@@ -4,6 +4,7 @@ use crate::{
 	client::SC2Result,
 	constants::{RaceValues, INHIBITOR_IDS, RACE_VALUES, TECH_ALIAS, UNIT_ALIAS},
 	debug::{DebugCommand, Debugger},
+	distance::*,
 	game_data::{Cost, GameData},
 	game_info::GameInfo,
 	game_state::{Alliance, GameState},
@@ -426,7 +427,9 @@ impl Bot {
 
 		self.update_data_for_unit();
 
-		self.start_location = self.units.my.townhalls.first().unwrap().position;
+		if let Some(townhall) = self.units.my.townhalls.first() {
+			self.start_location = townhall.position;
+		}
 		self.enemy_start = self.game_info.start_locations[0];
 
 		let resources = self.units.resources.closer(11.0, self.start_location);
@@ -881,11 +884,7 @@ impl Bot {
 						return if options.random {
 							valid_positions.choose(&mut thread_rng()).copied()
 						} else {
-							let f = |pos: Point2| near.distance_squared(pos);
-							valid_positions
-								.iter()
-								.min_by(|pos1, pos2| f(**pos1).partial_cmp(&f(**pos2)).unwrap())
-								.copied()
+							valid_positions.iter().closest(near).copied()
 						};
 					}
 				}

@@ -17,6 +17,7 @@ pub mod prelude {
 		bot::PlacementOptions,
 		client::{run_ladder_game, run_vs_computer, run_vs_human, LaunchOptions, SC2Result},
 		constants::{ALL_PRODUCERS, PRODUCERS, RESEARCHERS, TECH_REQUIREMENTS},
+		distance::*,
 		geometry::Point2,
 		ids::*,
 		player::{AIBuild, Computer, Difficulty, GameResult, Race},
@@ -38,6 +39,7 @@ mod score;
 pub mod action;
 pub mod bot;
 pub mod constants;
+pub mod distance;
 pub mod game_data;
 pub mod game_state;
 pub mod geometry;
