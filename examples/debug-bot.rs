@@ -24,14 +24,13 @@ impl Player for DebugAI {
 		});
 
 		// Debug unit types
-		self.state.observation.raw.units.clone().iter().for_each(|u| {
-			self.debug.draw_text_world(
-				&format!("{:?}", u.type_id),
-				u.position3d,
-				Some((255, 128, 128)),
-				None,
-			)
-		});
+		self.units
+			.all
+			.iter()
+			.map(|u| (format!("{:?}", u.type_id), u.position3d))
+			.collect::<Vec<(String, Point3)>>()
+			.into_iter()
+			.for_each(|(s, pos)| self.debug.draw_text_world(s, pos, Some((255, 128, 128)), None));
 		Ok(())
 	}
 
