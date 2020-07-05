@@ -400,7 +400,6 @@ where
 	runner.realtime = options.realtime;
 	runner.save_replay_as = options.save_replay_as;
 	runner.run_game()?;
-	runner.close();
 	Ok(())
 }
 
@@ -464,7 +463,6 @@ where
 	runner.realtime = options.realtime;
 	runner.save_replay_as = options.save_replay_as;
 	runner.run_game()?;
-	runner.close();
 	Ok(())
 }
 
