@@ -30,7 +30,7 @@ pub(crate) struct DataForUnit {
 	pub race_values: Rs<RaceValues>,
 	pub max_cooldowns: Rw<FxHashMap<UnitTypeId, f32>>,
 	pub last_units_health: Rs<FxHashMap<u64, f32>>,
-	pub abilities_units: Rs<FxHashMap<u64, Vec<AbilityId>>>,
+	pub abilities_units: Rs<FxHashMap<u64, FxHashSet<AbilityId>>>,
 	pub upgrades: Rw<FxHashSet<UpgradeId>>,
 	pub enemy_upgrades: Rw<FxHashSet<UpgradeId>>,
 	pub creep: Rs<PixelMap>,
@@ -63,7 +63,7 @@ pub struct Unit {
 	pub radius: f32,
 	pub build_progress: f32, // Range 0..1
 	pub cloak: CloakState,
-	pub buffs: Vec<BuffId>,
+	pub buffs: FxHashSet<BuffId>,
 	pub detect_range: f32,
 	pub radar_range: f32,
 	pub is_selected: bool,
@@ -173,11 +173,8 @@ impl Unit {
 		};
 		last_hits - hits
 	}
-	pub fn abilities(&self) -> &[AbilityId] {
-		match self.data.abilities_units.get(&self.tag) {
-			Some(abilities) => abilities,
-			None => &[],
-		}
+	pub fn abilities(&self) -> Option<&FxHashSet<AbilityId>> {
+		self.data.abilities_units.get(&self.tag)
 	}
 	pub fn has_ability(&self, ability: AbilityId) -> bool {
 		self.data

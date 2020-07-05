@@ -197,7 +197,7 @@ pub struct Bot {
 	pub race_values: Rs<RaceValues>,
 	data_for_unit: SharedUnitData,
 	pub units: AllUnits,
-	pub abilities_units: Rs<FxHashMap<u64, Vec<AbilityId>>>,
+	pub abilities_units: Rs<FxHashMap<u64, FxHashSet<AbilityId>>>,
 	pub orders: FxHashMap<AbilityId, usize>,
 	pub current_units: FxHashMap<UnitTypeId, usize>,
 	pub time: f32,
@@ -312,36 +312,35 @@ impl Bot {
 			.map_or_else(Default::default, |data| data.cost())
 	}
 	pub fn get_unit_cost(&self, unit: UnitTypeId) -> Cost {
-		self.game_data
+		let mut cost = self
+			.game_data
 			.units
 			.get(&unit)
-			.map_or_else(Default::default, |data| {
-				let mut cost = data.cost();
-				match unit {
-					UnitTypeId::OrbitalCommand | UnitTypeId::PlanetaryFortress => {
-						cost.minerals = 150;
-					}
-					UnitTypeId::Reactor
-					| UnitTypeId::BarracksReactor
-					| UnitTypeId::FactoryReactor
-					| UnitTypeId::StarportReactor => {
-						cost.minerals = 50;
-						cost.vespene = 50;
-					}
-					UnitTypeId::TechLab
-					| UnitTypeId::BarracksTechLab
-					| UnitTypeId::FactoryTechLab
-					| UnitTypeId::StarportTechLab => {
-						cost.minerals = 50;
-						cost.vespene = 25;
-					}
-					UnitTypeId::Zergling => {
-						cost.minerals *= 2;
-					}
-					_ => {}
-				}
-				cost
-			})
+			.map_or_else(Default::default, |data| data.cost());
+		match unit {
+			UnitTypeId::OrbitalCommand | UnitTypeId::PlanetaryFortress => {
+				cost.minerals = 150;
+			}
+			UnitTypeId::Reactor
+			| UnitTypeId::BarracksReactor
+			| UnitTypeId::FactoryReactor
+			| UnitTypeId::StarportReactor => {
+				cost.minerals = 50;
+				cost.vespene = 50;
+			}
+			UnitTypeId::TechLab
+			| UnitTypeId::BarracksTechLab
+			| UnitTypeId::FactoryTechLab
+			| UnitTypeId::StarportTechLab => {
+				cost.minerals = 50;
+				cost.vespene = 25;
+			}
+			UnitTypeId::Zergling => {
+				cost.minerals *= 2;
+			}
+			_ => {}
+		}
+		cost
 	}
 	pub fn can_afford(&self, unit: UnitTypeId, check_supply: bool) -> bool {
 		let cost = self.get_unit_cost(unit);
@@ -496,8 +495,7 @@ impl Bot {
 
 		// Calculating expansion locations
 
-		const RESOURCE_SPREAD: f32 = 8.5;
-		const RESOURCE_SPREAD_SQUARED: f32 = RESOURCE_SPREAD * RESOURCE_SPREAD;
+		const RESOURCE_SPREAD: f32 = 72.25; // 8.5
 
 		let all_resources = self
 			.units
@@ -514,7 +512,7 @@ impl Bot {
 			range_query(
 				&positions,
 				|(p1, _), (p2, _)| p1.distance_squared(*p2),
-				RESOURCE_SPREAD_SQUARED,
+				RESOURCE_SPREAD,
 			),
 			4,
 		)
@@ -540,7 +538,7 @@ impl Bot {
 						.iter()
 						.filter_map(|(x, y)| {
 							let pos = center.offset(*x as f32, *y as f32);
-							if self.game_info.placement_grid[pos].is_empty() {
+							if self.is_placeable((pos.x as usize, pos.y as usize)) {
 								let mut distance_sum = 0_f32;
 								let far_enough = |r: &Unit| {
 									let dist = pos.distance_squared(r);
