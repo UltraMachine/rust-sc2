@@ -29,6 +29,56 @@ pub type SC2Result<T> = Result<T, Box<dyn Error>>;
 
 const HOST: &str = "127.0.0.1";
 const PORT: i32 = 5000;
+const SC2_BINARY: &str = {
+	#[cfg(target_os = "windows")]
+	{
+		#[cfg(target_arch = "x86_64")]
+		{
+			"SC2_x64.exe"
+		}
+		#[cfg(target_arch = "x86")]
+		{
+			"SC2.exe"
+		}
+		#[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
+		{
+			compile_error!("Unsupported Arch");
+		}
+	}
+	#[cfg(target_os = "linux")]
+	{
+		#[cfg(target_arch = "x86_64")]
+		{
+			"SC2_x64"
+		}
+		#[cfg(target_arch = "x86")]
+		{
+			"SC2"
+		}
+		#[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
+		{
+			compile_error!("Unsupported Arch");
+		}
+	}
+	#[cfg(not(any(target_os = "windows", target_os = "linux")))]
+	{
+		compile_error!("Unsupported OS");
+	}
+};
+const SC2_SUPPORT: &str = {
+	#[cfg(target_arch = "x86_64")]
+	{
+		"Support64"
+	}
+	#[cfg(target_arch = "x86")]
+	{
+		"Support"
+	}
+	#[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
+	{
+		compile_error!("Unsupported Arch");
+	}
+};
 
 pub struct RunnerSingle<'a, B>
 where
@@ -706,34 +756,13 @@ fn launch_client(sc2_path: &str, port: i32, sc2_version: Option<&str>) -> SC2Res
 		Some(ver) => get_version_info(ver),
 		None => (get_latest_base_version(sc2_path), ""),
 	};
-	let (sc2_binary, sc2_support) = {
-		if cfg!(target_os = "windows") {
-			if cfg!(target_arch = "x86_64") {
-				("SC2_x64.exe", "Support64")
-			} else if cfg!(target_arch = "x86") {
-				("SC2.exe", "Support")
-			} else {
-				panic!("Unsupported Arch");
-			}
-		} else if cfg!(target_os = "linux") {
-			if cfg!(target_arch = "x86_64") {
-				("SC2_x64", "Support64")
-			} else if cfg!(target_arch = "x86") {
-				("SC2", "Support")
-			} else {
-				panic!("Unsupported Arch");
-			}
-		} else {
-			panic!("Unsupported OS");
-		}
-	};
 
 	let mut process = Command::new(format!(
 		"{}/Versions/Base{}/{}",
-		sc2_path, base_version, sc2_binary
+		sc2_path, base_version, SC2_BINARY
 	));
 	process
-		.current_dir(format!("{}/{}", sc2_path, sc2_support))
+		.current_dir(format!("{}/{}", sc2_path, SC2_SUPPORT))
 		.arg("-listen")
 		.arg(HOST)
 		.arg("-port")

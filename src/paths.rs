@@ -2,6 +2,21 @@ use dirs::home_dir;
 use regex::Regex;
 use std::{env::var_os, fs, path::Path};
 
+const DEFAULT_SC2_PATH: &str = {
+	#[cfg(target_os = "windows")]
+	{
+		"C:/Program Files (x86)/StarCraft II"
+	}
+	#[cfg(target_os = "linux")]
+	{
+		"~/StarCraftII"
+	}
+	#[cfg(not(any(target_os = "windows", target_os = "linux")))]
+	{
+		compile_error!("Unsupported OS");
+	}
+};
+
 pub fn get_path_to_sc2() -> String {
 	match var_os("SC2PATH") {
 		Some(path) => path.to_str().unwrap().to_string(),
@@ -19,15 +34,7 @@ pub fn get_path_to_sc2() -> String {
 					return path.to_str().unwrap().replace("\\", "/");
 				}
 			}
-
-			if cfg!(target_os = "windows") {
-				"C:/Program Files (x86)/StarCraft II"
-			} else if cfg!(target_os = "linux") {
-				"~/StarCraftII"
-			} else {
-				panic!("Unsupported OS")
-			}
-			.to_string()
+			DEFAULT_SC2_PATH.to_string()
 		}
 	}
 }
