@@ -519,7 +519,7 @@ fn create_player_setup(settings: &PlayerSettings, req_create_game: &mut RequestC
 	setup.set_race(settings.race.into_proto());
 	setup.set_field_type(PlayerType::Participant);
 	if let Some(name) = &settings.name {
-		setup.set_player_name(name.clone());
+		setup.set_player_name(name.to_string());
 	}
 	req_create_game.mut_player_setup().push(setup);
 }
@@ -557,7 +557,7 @@ fn join_game2(settings: &PlayerSettings, api: &mut API, ports: Option<&Ports>) -
 	options.set_raw_affects_selection(settings.raw_affects_selection);
 	// options.set_raw_crop_to_playable_area(bool);
 	if let Some(name) = &settings.name {
-		req_join_game.set_player_name(name.clone());
+		req_join_game.set_player_name(name.to_string());
 	}
 
 	if let Some(ports) = ports {

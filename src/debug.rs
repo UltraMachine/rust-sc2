@@ -207,7 +207,7 @@ impl IntoProto<ProtoDebugDraw> for &[DebugDraw] {
 		self.iter().for_each(|drawing| match drawing {
 			DebugDraw::Text(text, pos, color, size) => {
 				let mut proto_text = DebugText::new();
-				proto_text.set_text(text.clone());
+				proto_text.set_text(text.to_string());
 				match pos {
 					DebugPos::Screen((x, y)) => {
 						let pos = proto_text.mut_virtual_pos();
