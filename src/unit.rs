@@ -429,22 +429,31 @@ impl Unit {
 
 	#[inline]
 	fn weapons(&self) -> &[Weapon] {
-		self.type_data()
-			.map(|data| data.weapons.as_slice())
-			.filter(|weapons| !weapons.is_empty())
-			.or_else(|| match self.type_id {
-				UnitTypeId::BanelingBurrowed | UnitTypeId::BanelingCocoon => {
-					MISSED_WEAPONS.get(&UnitTypeId::Baneling).map(|ws| ws.as_slice())
-				}
-				UnitTypeId::RavagerCocoon => self
-					.data
-					.game_data
-					.units
-					.get(&UnitTypeId::Ravager)
-					.map(|data| data.weapons.as_slice()),
-				unit_type => MISSED_WEAPONS.get(&unit_type).map(|ws| ws.as_slice()),
-			})
-			.unwrap_or_default()
+		match self.type_id {
+			UnitTypeId::Changeling
+			| UnitTypeId::ChangelingZealot
+			| UnitTypeId::ChangelingMarineShield
+			| UnitTypeId::ChangelingMarine
+			| UnitTypeId::ChangelingZerglingWings
+			| UnitTypeId::ChangelingZergling => &[],
+			_ => self
+				.type_data()
+				.map(|data| data.weapons.as_slice())
+				.filter(|weapons| !weapons.is_empty())
+				.or_else(|| match self.type_id {
+					UnitTypeId::BanelingBurrowed | UnitTypeId::BanelingCocoon => {
+						MISSED_WEAPONS.get(&UnitTypeId::Baneling).map(|ws| ws.as_slice())
+					}
+					UnitTypeId::RavagerCocoon => self
+						.data
+						.game_data
+						.units
+						.get(&UnitTypeId::Ravager)
+						.map(|data| data.weapons.as_slice()),
+					unit_type => MISSED_WEAPONS.get(&unit_type).map(|ws| ws.as_slice()),
+				})
+				.unwrap_or_default(),
+		}
 	}
 	pub fn weapon_target(&self) -> Option<TargetType> {
 		let weapons = self.weapons();
