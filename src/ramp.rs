@@ -1,9 +1,5 @@
 use crate::{bot::Rs, distance::*, geometry::Point2, pixel_map::ByteMap};
-use std::{
-	cmp::{Ordering, Reverse},
-	convert::TryInto,
-	fmt,
-};
+use std::{cmp::Ordering, convert::TryInto, fmt};
 
 #[derive(Default)]
 pub struct Ramps {
@@ -96,7 +92,7 @@ impl Ramp {
 		}
 		match upper.len().cmp(&2) {
 			Ordering::Greater => self.bottom_center().and_then(|(center_x, center_y)| {
-				upper.sort_unstable_by_key(|(x, y)| Reverse(center_x * x + center_y * y));
+				upper.sort_unstable_by_key(|(x, y)| center_x * x + center_y * y);
 				upper[..2].try_into().ok()
 			}),
 			Ordering::Equal => upper.as_slice().try_into().ok(),
