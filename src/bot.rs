@@ -81,6 +81,7 @@ impl<T> Locked<T> for Rw<T> {
 	}
 }
 
+#[derive(Clone, Copy)]
 pub struct PlacementOptions {
 	pub max_distance: isize,
 	pub step: isize,

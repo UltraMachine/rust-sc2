@@ -117,6 +117,27 @@ where
 			realtime: false,
 		})
 	}
+	pub fn with_map(bot: &'a mut B, sc2_version: Option<&'a str>, map: &'a str) -> SC2Result<Self> {
+		debug!("Starting game vs computer");
+
+		let sc2_path = get_path_to_sc2();
+		let _ = get_map_path(&sc2_path, &map);
+
+		debug!("Launching SC2 process");
+		bot.process = Some(launch_client(&sc2_path, PORT, sc2_version)?);
+		debug!("Connecting to websocket");
+		bot.api = Some(API(connect_to_websocket(HOST, PORT)?));
+
+		Ok(Self {
+			bot,
+			sc2_path,
+			sc2_version,
+			computer: Computer::new(Race::Random, Difficulty::VeryEasy, None),
+			map,
+			save_replay_as: None,
+			realtime: false,
+		})
+	}
 
 	pub fn run_game(&mut self) -> SC2Result<()> {
 		let settings = self.bot.get_player_settings();
@@ -238,6 +259,35 @@ where
 			sc2_version,
 			human_settings: PlayerSettings::new(Race::Random, None),
 			map: "",
+			save_replay_as: None,
+			realtime: false,
+		})
+	}
+	pub fn with_map(bot: &'a mut B, sc2_version: Option<&'a str>, map: &'a str) -> SC2Result<Self> {
+		debug!("Starting human vs bot");
+		let sc2_path = get_path_to_sc2();
+		let _ = get_map_path(&sc2_path, &map);
+		let (port_bot, port_human) = (PORT, PORT + 1);
+
+		let mut human = Human::new();
+
+		debug!("Launching host SC2 process");
+		human.process = Some(launch_client(&sc2_path, port_human, sc2_version)?);
+		debug!("Launching client SC2 process");
+		bot.process = Some(launch_client(&sc2_path, port_bot, sc2_version)?);
+
+		debug!("Connecting to host websocket");
+		human.api = Some(API(connect_to_websocket(HOST, port_human)?));
+		debug!("Connecting to client websocket");
+		bot.api = Some(API(connect_to_websocket(HOST, port_bot)?));
+
+		Ok(Self {
+			bot,
+			human,
+			sc2_path,
+			sc2_version,
+			human_settings: PlayerSettings::new(Race::Random, None),
+			map,
 			save_replay_as: None,
 			realtime: false,
 		})
@@ -394,9 +444,8 @@ pub fn run_vs_computer<B>(
 where
 	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
 {
-	let mut runner = RunnerSingle::new(bot, options.sc2_version)?;
+	let mut runner = RunnerSingle::with_map(bot, options.sc2_version, map_name)?;
 	runner.computer = computer;
-	runner.map = map_name;
 	runner.realtime = options.realtime;
 	runner.save_replay_as = options.save_replay_as;
 	runner.run_game()?;
@@ -457,9 +506,8 @@ pub fn run_vs_human<B>(
 where
 	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
 {
-	let mut runner = RunnerMulti::new(bot, options.sc2_version)?;
+	let mut runner = RunnerMulti::with_map(bot, options.sc2_version, map_name)?;
 	runner.human_settings = human_settings;
-	runner.map = map_name;
 	runner.realtime = options.realtime;
 	runner.save_replay_as = options.save_replay_as;
 	runner.run_game()?;
