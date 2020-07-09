@@ -1,5 +1,9 @@
 use crate::{bot::Rs, distance::*, geometry::Point2, pixel_map::ByteMap};
-use std::{cmp::Ordering, convert::TryInto, fmt};
+use std::{
+	cmp::{Ordering, Reverse},
+	convert::TryInto,
+	fmt,
+};
 
 #[derive(Default)]
 pub struct Ramps {
@@ -92,7 +96,11 @@ impl Ramp {
 		}
 		match upper.len().cmp(&2) {
 			Ordering::Greater => self.bottom_center().and_then(|(center_x, center_y)| {
-				upper.sort_unstable_by_key(|(x, y)| center_x * x + center_y * y);
+				upper.sort_unstable_by_key(|(x, y)| {
+					let dx = x.checked_sub(center_x).unwrap_or_else(|| center_x - x);
+					let dy = y.checked_sub(center_y).unwrap_or_else(|| center_y - y);
+					Reverse(dx * dx + dy * dy)
+				});
 				upper[..2].try_into().ok()
 			}),
 			Ordering::Equal => upper.as_slice().try_into().ok(),
@@ -111,7 +119,7 @@ impl Ramp {
 			let p2 = Point2::new(x as f32 + 0.5, y as f32 + 0.5);
 
 			let intersects = p1.circle_intersection(p2, 2.236_068); // 5_f32.sqrt()
-			let (x, y) = *self.lower().first().unwrap();
+			let (x, y) = *self.lower().first()?;
 			let lower = Point2::new(x as f32, y as f32);
 
 			return intersects.iter().furthest(lower).copied();
@@ -130,7 +138,7 @@ impl Ramp {
 			let p2 = Point2::new(x as f32 + 0.5, y as f32 + 0.5);
 
 			let intersects = p1.circle_intersection(p2, 1.581_138_8); // 2.5_f32.sqrt()
-			let (x, y) = *self.lower().first().unwrap();
+			let (x, y) = *self.lower().first()?;
 			let lower = Point2::new(x as f32, y as f32);
 
 			return intersects.iter().furthest(lower).copied();
