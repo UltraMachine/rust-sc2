@@ -1144,11 +1144,29 @@ impl Unit {
 			&& matches!(
 				self.orders[0].ability,
 				AbilityId::BuildTechLabBarracks
-					| AbilityId::BuildReactorBarracks
-					| AbilityId::BuildTechLabFactory
-					| AbilityId::BuildReactorFactory
-					| AbilityId::BuildTechLabStarport
-					| AbilityId::BuildReactorStarport
+				| AbilityId::BuildReactorBarracks
+				| AbilityId::BuildTechLabFactory
+				| AbilityId::BuildReactorFactory
+				| AbilityId::BuildTechLabStarport
+				| AbilityId::BuildReactorStarport
+			)
+	}
+	pub fn is_making_techlab(&self) -> bool {
+		!self.is_idle()
+			&& matches!(
+				self.orders[0].ability,
+				AbilityId::BuildTechLabBarracks
+				| AbilityId::BuildTechLabFactory
+				| AbilityId::BuildTechLabStarport
+			)
+	}
+	pub fn is_making_reactor(&self) -> bool {
+		!self.is_idle()
+			&& matches!(
+				self.orders[0].ability,
+				AbilityId::BuildReactorBarracks
+				| AbilityId::BuildReactorFactory
+				| AbilityId::BuildReactorStarport
 			)
 	}
 	// Actions
