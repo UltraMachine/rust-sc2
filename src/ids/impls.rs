@@ -56,7 +56,6 @@ impl UnitTypeId {
 			| UnitTypeId::Ultralisk
 			| UnitTypeId::UltraliskBurrowed
 			| UnitTypeId::HellionTank
-			| UnitTypeId::Interceptor
 		)
 	}
 	#[rustfmt::skip::macros(matches)]

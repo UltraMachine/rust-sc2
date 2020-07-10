@@ -185,6 +185,12 @@ impl Unit {
 	pub fn race(&self) -> Race {
 		self.type_data().map_or(Race::Random, |data| data.race)
 	}
+	pub fn has_cargo(&self) -> bool {
+		self.cargo_space_taken.map_or(false, |taken| taken > 0)
+	}
+	pub fn cargo_left(&self) -> Option<u32> {
+		Some(self.cargo_space_max? - self.cargo_space_taken?)
+	}
 	pub fn footprint_radius(&self) -> Option<f32> {
 		self.type_data().and_then(|data| {
 			data.ability.and_then(|ability| {
