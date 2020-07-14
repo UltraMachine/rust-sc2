@@ -130,20 +130,24 @@ impl Units {
 		self.0.clear()
 	}
 
-	// Units methods
+	#[inline]
 	pub fn contains_tag(&self, tag: u64) -> bool {
 		self.0.contains_key(&tag)
 	}
+
+	#[inline]
 	pub fn find_tag(&self, tag: u64) -> Option<&Unit> {
 		self.0.get(&tag)
 	}
+
+	// Units methods
 	pub fn find_tags<'a, T: IntoIterator<Item = &'a u64>>(&self, tags: T) -> Self {
 		tags.into_iter()
 			.filter_map(|tag| self.0.get(tag).cloned())
 			.collect()
 	}
-	pub fn of_type(&self, u_type: UnitTypeId) -> Self {
-		self.filter(|u| u.type_id == u_type)
+	pub fn of_type(&self, unit_type: UnitTypeId) -> Self {
+		self.filter(|u| u.type_id == unit_type)
 	}
 
 	pub fn center(&self) -> Option<Point2> {
@@ -568,3 +572,150 @@ impl<T: Ord, V> Container<T> for BTreeMap<T, V> {
 		self.contains_key(item)
 	}
 }
+
+use std::iter::Filter;
+
+pub trait UnitsIterator<'a>: Iterator<Item = &'a Unit> + Sized {
+	fn find_tag(mut self, tag: u64) -> Option<&'a Unit> {
+		self.find(|u| u.tag == tag)
+	}
+	fn find_tags<T: Container<u64> + 'a>(self, tags: T) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
+		self.filter(Box::new(move |u| tags.contains(&u.tag)))
+	}
+	fn of_type(self, unit_type: UnitTypeId) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
+		self.filter(Box::new(move |u| u.type_id == unit_type))
+	}
+	fn of_types<T>(self, types: T) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>>
+	where
+		T: Container<UnitTypeId> + 'a,
+	{
+		self.filter(Box::new(move |u| types.contains(&u.type_id)))
+	}
+	fn ground(self) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
+		self.filter(Box::new(|u| !u.is_flying))
+	}
+	fn flying(self) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
+		self.filter(Box::new(|u| u.is_flying))
+	}
+	fn ready(self) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
+		self.filter(Box::new(|u| u.is_ready()))
+	}
+	fn not_ready(self) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
+		self.filter(Box::new(|u| !u.is_ready()))
+	}
+	fn idle(self) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
+		self.filter(Box::new(|u| u.is_idle()))
+	}
+	fn almost_idle(self) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
+		self.filter(Box::new(|u| u.is_almost_idle()))
+	}
+	fn unused(self) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
+		self.filter(Box::new(|u| u.is_unused()))
+	}
+	fn almost_unused(self) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
+		self.filter(Box::new(|u| u.is_almost_unused()))
+	}
+	fn in_range_of(self, unit: &'a Unit, gap: f32) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
+		self.filter(Box::new(move |u| unit.in_range(u, gap)))
+	}
+	fn in_range(self, unit: &'a Unit, gap: f32) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
+		self.filter(Box::new(move |u| u.in_range(unit, gap)))
+	}
+	fn in_real_range_of(self, unit: &'a Unit, gap: f32) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
+		self.filter(Box::new(move |u| unit.in_real_range(u, gap)))
+	}
+	fn in_real_range(self, unit: &'a Unit, gap: f32) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
+		self.filter(Box::new(move |u| u.in_real_range(unit, gap)))
+	}
+	fn visible(self) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
+		self.filter(Box::new(|u| u.is_visible()))
+	}
+}
+
+#[cfg(feature = "rayon")]
+use rayon::iter::Filter as ParFilter;
+
+#[cfg(feature = "rayon")]
+pub trait ParUnitsIterator<'a>: ParallelIterator<Item = &'a Unit> {
+	fn find_tag(self, tag: u64) -> Option<&'a Unit> {
+		self.find_any(|u| u.tag == tag)
+	}
+	fn find_tags<T: Container<u64> + Send + Sync + 'a>(
+		self,
+		tags: T,
+	) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
+		self.filter(Box::new(move |u| tags.contains(&u.tag)))
+	}
+	fn of_type(
+		self,
+		unit_type: UnitTypeId,
+	) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
+		self.filter(Box::new(move |u| u.type_id == unit_type))
+	}
+	fn of_types<T>(self, types: T) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>>
+	where
+		T: Container<UnitTypeId> + Send + Sync + 'a,
+	{
+		self.filter(Box::new(move |u| types.contains(&u.type_id)))
+	}
+	fn ground(self) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
+		self.filter(Box::new(|u| !u.is_flying))
+	}
+	fn flying(self) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
+		self.filter(Box::new(|u| u.is_flying))
+	}
+	fn ready(self) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
+		self.filter(Box::new(|u| u.is_ready()))
+	}
+	fn not_ready(self) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
+		self.filter(Box::new(|u| !u.is_ready()))
+	}
+	fn idle(self) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
+		self.filter(Box::new(|u| u.is_idle()))
+	}
+	fn almost_idle(self) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
+		self.filter(Box::new(|u| u.is_almost_idle()))
+	}
+	fn unused(self) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
+		self.filter(Box::new(|u| u.is_unused()))
+	}
+	fn almost_unused(self) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
+		self.filter(Box::new(|u| u.is_almost_unused()))
+	}
+	fn in_range_of(
+		self,
+		unit: &'a Unit,
+		gap: f32,
+	) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
+		self.filter(Box::new(move |u| unit.in_range(u, gap)))
+	}
+	fn in_range(
+		self,
+		unit: &'a Unit,
+		gap: f32,
+	) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
+		self.filter(Box::new(move |u| u.in_range(unit, gap)))
+	}
+	fn in_real_range_of(
+		self,
+		unit: &'a Unit,
+		gap: f32,
+	) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
+		self.filter(Box::new(move |u| unit.in_real_range(u, gap)))
+	}
+	fn in_real_range(
+		self,
+		unit: &'a Unit,
+		gap: f32,
+	) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
+		self.filter(Box::new(move |u| u.in_real_range(unit, gap)))
+	}
+	fn visible(self) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
+		self.filter(Box::new(|u| u.is_visible()))
+	}
+}
+
+impl<'a, I> UnitsIterator<'a> for I where I: Iterator<Item = &'a Unit> + Sized {}
+
+#[cfg(feature = "rayon")]
+impl<'a, I> ParUnitsIterator<'a> for I where I: ParallelIterator<Item = &'a Unit> {}

@@ -12,6 +12,8 @@ extern crate maplit;
 extern crate log;
 
 pub mod prelude {
+	#[cfg(feature = "rayon")]
+	pub use crate::units::ParUnitsIterator;
 	pub use crate::{
 		action::Target,
 		bot::PlacementOptions,
@@ -26,7 +28,7 @@ pub mod prelude {
 		player::{AIBuild, Computer, Difficulty, GameResult, Race},
 		sc2_macro::{bot, bot_new},
 		unit::Unit,
-		units::Units,
+		units::{Units, UnitsIterator},
 		Event, Player, PlayerSettings,
 	};
 }
