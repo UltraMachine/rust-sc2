@@ -412,7 +412,7 @@ impl Units {
 		Self(self.par_iter().filter(f).map(|u| (u.tag, u.clone())).collect())
 	}
 
-	pub fn of_types<T: Container<UnitTypeId> + Sync>(&self, types: T) -> Self {
+	pub fn of_types<T: Container<UnitTypeId> + Copy + Send + Sync>(&self, types: T) -> Self {
 		self.filter(|u| types.contains(&u.type_id))
 	}
 
@@ -534,7 +534,7 @@ impl FromParallelIterator<Unit> for Units {
 }
 
 pub trait Container<T> {
-	fn contains(&self, item: &T) -> bool;
+	fn contains(self, item: &T) -> bool;
 }
 
 use std::{
@@ -542,33 +542,33 @@ use std::{
 	hash::{BuildHasher, Hash},
 };
 
-impl<T: PartialEq> Container<T> for [T] {
-	fn contains(&self, other: &T) -> bool {
+impl<T: PartialEq> Container<T> for &[T] {
+	fn contains(self, other: &T) -> bool {
 		self.iter().any(|item| item == other)
 	}
 }
-impl<T: PartialEq> Container<T> for Vec<T> {
-	fn contains(&self, other: &T) -> bool {
+impl<T: PartialEq> Container<T> for &Vec<T> {
+	fn contains(self, other: &T) -> bool {
 		self.iter().any(|item| item == other)
 	}
 }
-impl<T: Eq + Hash, S: BuildHasher> Container<T> for HashSet<T, S> {
-	fn contains(&self, item: &T) -> bool {
+impl<T: Eq + Hash, S: BuildHasher> Container<T> for &HashSet<T, S> {
+	fn contains(self, item: &T) -> bool {
 		self.contains(item)
 	}
 }
-impl<T: Eq + Hash, V, S: BuildHasher> Container<T> for HashMap<T, V, S> {
-	fn contains(&self, item: &T) -> bool {
+impl<T: Eq + Hash, V, S: BuildHasher> Container<T> for &HashMap<T, V, S> {
+	fn contains(self, item: &T) -> bool {
 		self.contains_key(item)
 	}
 }
-impl<T: Ord> Container<T> for BTreeSet<T> {
-	fn contains(&self, item: &T) -> bool {
+impl<T: Ord> Container<T> for &BTreeSet<T> {
+	fn contains(self, item: &T) -> bool {
 		self.contains(item)
 	}
 }
-impl<T: Ord, V> Container<T> for BTreeMap<T, V> {
-	fn contains(&self, item: &T) -> bool {
+impl<T: Ord, V> Container<T> for &BTreeMap<T, V> {
+	fn contains(self, item: &T) -> bool {
 		self.contains_key(item)
 	}
 }
@@ -579,7 +579,10 @@ pub trait UnitsIterator<'a>: Iterator<Item = &'a Unit> + Sized {
 	fn find_tag(mut self, tag: u64) -> Option<&'a Unit> {
 		self.find(|u| u.tag == tag)
 	}
-	fn find_tags<T: Container<u64> + 'a>(self, tags: T) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
+	fn find_tags<T>(self, tags: T) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>>
+	where
+		T: Container<u64> + Copy + 'a,
+	{
 		self.filter(Box::new(move |u| tags.contains(&u.tag)))
 	}
 	fn of_type(self, unit_type: UnitTypeId) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
@@ -587,7 +590,7 @@ pub trait UnitsIterator<'a>: Iterator<Item = &'a Unit> + Sized {
 	}
 	fn of_types<T>(self, types: T) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>>
 	where
-		T: Container<UnitTypeId> + 'a,
+		T: Container<UnitTypeId> + Copy + 'a,
 	{
 		self.filter(Box::new(move |u| types.contains(&u.type_id)))
 	}
@@ -640,21 +643,18 @@ pub trait ParUnitsIterator<'a>: ParallelIterator<Item = &'a Unit> {
 	fn find_tag(self, tag: u64) -> Option<&'a Unit> {
 		self.find_any(|u| u.tag == tag)
 	}
-	fn find_tags<T: Container<u64> + Send + Sync + 'a>(
-		self,
-		tags: T,
-	) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
+	fn find_tags<T>(self, tags: T) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>>
+	where
+		T: Container<u64> + Copy + Send + Sync + 'a,
+	{
 		self.filter(Box::new(move |u| tags.contains(&u.tag)))
 	}
-	fn of_type(
-		self,
-		unit_type: UnitTypeId,
-	) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
-		self.filter(Box::new(move |u| u.type_id == unit_type))
+	fn of_type(self, type_id: UnitTypeId) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
+		self.filter(Box::new(move |u| u.type_id == type_id))
 	}
 	fn of_types<T>(self, types: T) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>>
 	where
-		T: Container<UnitTypeId> + Send + Sync + 'a,
+		T: Container<UnitTypeId> + Copy + Send + Sync + 'a,
 	{
 		self.filter(Box::new(move |u| types.contains(&u.type_id)))
 	}
