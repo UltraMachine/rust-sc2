@@ -17,6 +17,7 @@ use std::{
 	fmt,
 	fs::File,
 	io::Write,
+	net::TcpListener,
 	ops::{Deref, DerefMut},
 	panic,
 	process::{Child, Command},
@@ -28,7 +29,6 @@ pub type WS = WebSocket<AutoStream>;
 pub type SC2Result<T> = Result<T, Box<dyn Error>>;
 
 const HOST: &str = "127.0.0.1";
-const PORT: i32 = 5000;
 const SC2_BINARY: &str = {
 	#[cfg(target_os = "windows")]
 	{
@@ -112,10 +112,11 @@ where
 	}
 
 	pub fn launch(&mut self) -> SC2Result<()> {
+		let port = get_unused_port();
 		debug!("Launching SC2 process");
-		self.bot.process = Some(launch_client(&self.sc2_path, PORT, self.sc2_version)?);
+		self.bot.process = Some(launch_client(&self.sc2_path, port, self.sc2_version)?);
 		debug!("Connecting to websocket");
-		self.bot.api = Some(API(connect_to_websocket(HOST, PORT)?));
+		self.bot.api = Some(API(connect_to_websocket(HOST, port)?));
 		Ok(())
 	}
 
@@ -178,27 +179,6 @@ where
 	pub fn close(&mut self) {
 		self.bot.close_client();
 	}
-
-	pub fn into_multi(self) -> SC2Result<RunnerMulti<'a, B>> {
-		let mut human = Human::default();
-		let port = PORT + 1;
-
-		debug!("Launching human SC2 process");
-		human.process = Some(launch_client(&self.sc2_path, port, self.sc2_version)?);
-		debug!("Connecting to human websocket");
-		human.api = Some(API(connect_to_websocket(HOST, port)?));
-
-		Ok(RunnerMulti {
-			bot: self.bot,
-			human,
-			sc2_path: self.sc2_path,
-			sc2_version: self.sc2_version,
-			human_settings: PlayerSettings::new(Race::Random, None),
-			map_path: self.map_path,
-			save_replay_as: self.save_replay_as,
-			realtime: self.realtime,
-		})
-	}
 }
 
 pub struct RunnerMulti<'a, B>
@@ -236,7 +216,9 @@ where
 	}
 
 	pub fn launch(&mut self) -> SC2Result<()> {
-		let (port_bot, port_human) = (PORT, PORT + 1);
+		// let (port_bot, port_human) = (PORT, PORT + 1);
+		let ports = get_unused_ports(2);
+		let (port_bot, port_human) = (ports[0], ports[1]);
 
 		debug!("Launching host SC2 process");
 		self.human.process = Some(launch_client(&self.sc2_path, port_human, self.sc2_version)?);
@@ -284,10 +266,15 @@ where
 		}
 
 		debug!("Sending JoinGame request to both processes");
-		let ports = Ports {
+		/*let ports = Ports {
 			// shared: PORT + 2,
 			server: (PORT + 3, PORT + 4),
 			client: vec![(PORT + 5, PORT + 6), (PORT + 7, PORT + 8)],
+		};*/
+		let ports = get_unused_ports(6);
+		let ports = Ports {
+			server: (ports[0], ports[1]),
+			client: vec![(ports[2], ports[3]), (ports[4], ports[5])],
 		};
 		join_game2(&self.human_settings, human_api, Some(&ports))?;
 		join_game2(&bot_settings, self.bot.api(), Some(&ports))?;
@@ -317,18 +304,6 @@ where
 	pub fn close(&mut self) {
 		self.bot.close_client();
 		self.human.close_client();
-	}
-
-	pub fn into_single(self) -> RunnerSingle<'a, B> {
-		RunnerSingle {
-			bot: self.bot,
-			sc2_path: self.sc2_path,
-			sc2_version: self.sc2_version,
-			computer: Computer::new(Race::Random, Difficulty::VeryEasy, None),
-			map_path: self.map_path,
-			save_replay_as: self.save_replay_as,
-			realtime: self.realtime,
-		}
 	}
 }
 
@@ -477,16 +452,15 @@ where
 	Ok(())
 }
 
-// Mini Helpers
-/*
+// Portpicker
 fn get_unused_port() -> i32 {
 	(5000..65535)
 		.find(|port| TcpListener::bind((HOST, *port)).is_ok())
-		.expect("Can't find available port") as i32
+		.unwrap() as i32
 }
 
 fn get_unused_ports(n: usize) -> Vec<i32> {
-	let mut ports = Vec::new();
+	let mut ports = Vec::with_capacity(n);
 	for port in 5000..65535 {
 		if TcpListener::bind((HOST, port)).is_ok() {
 			ports.push(port as i32);
@@ -497,7 +471,6 @@ fn get_unused_ports(n: usize) -> Vec<i32> {
 	}
 	ports
 }
-*/
 
 // Helpers
 fn set_static_data(bot: &mut Bot) -> SC2Result<()> {
