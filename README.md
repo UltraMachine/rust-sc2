@@ -129,7 +129,7 @@ impl MyBot {
 ```
 The rest is to run it:
 ```rust
-fn main() {
+fn main() -> SC2Result<()> {
     let mut bot = MyBot::new();
     run_vs_computer(
         &mut bot,
@@ -140,6 +140,6 @@ fn main() {
         ),
         "EternalEmpireLE", // Map name
         LaunchOptions::default(),
-    ).unwrap();
+    )?;
 }
 ```
