@@ -35,14 +35,14 @@ impl Player for WorkerRush {
     }
 }
 
-fn main() {
+fn main() -> SC2Result<()> {
     let mut bot = WorkerRush::default();
     run_vs_computer(
         &mut bot,
         Computer::new(Race::Random, Difficulty::Medium, None),
         "EternalEmpireLE",
         Default::default(),
-    ).unwrap();
+    )
 }
 ```
 
@@ -140,6 +140,6 @@ fn main() -> SC2Result<()> {
         ),
         "EternalEmpireLE", // Map name
         LaunchOptions::default(),
-    )?;
+    )
 }
 ```
