@@ -77,10 +77,11 @@ def parse_data(data, version=None):
 			abilities[key] = v["id"]
 
 	# fixes for wrong ids
-	if version == "4.10":
-		upgrades["EnhancedShockwaves"] = 296
-		abilities["GhostAcademyResearchEnhancedShockwaves"] = 822
-	elif version is None:
+	# if version == "4.10":
+	# 	upgrades["EnhancedShockwaves"] = 296
+	# 	abilities["GhostAcademyResearchEnhancedShockwaves"] = 822
+	# elif version is None:
+	if version is None:
 		abilities["TerranBuildRefinery"] = 320
 
 	return (
