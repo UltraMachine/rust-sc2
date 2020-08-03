@@ -322,17 +322,11 @@ impl Bot {
 			UnitTypeId::OrbitalCommand | UnitTypeId::PlanetaryFortress => {
 				cost.minerals = 150;
 			}
-			UnitTypeId::Reactor
-			| UnitTypeId::BarracksReactor
-			| UnitTypeId::FactoryReactor
-			| UnitTypeId::StarportReactor => {
+			UnitTypeId::Reactor => {
 				cost.minerals = 50;
 				cost.vespene = 50;
 			}
-			UnitTypeId::TechLab
-			| UnitTypeId::BarracksTechLab
-			| UnitTypeId::FactoryTechLab
-			| UnitTypeId::StarportTechLab => {
+			UnitTypeId::TechLab => {
 				cost.minerals = 50;
 				cost.vespene = 25;
 			}

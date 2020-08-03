@@ -61,8 +61,6 @@ use unit::SharedUnitData;
 pub use client::{run_ladder_game, run_vs_computer, run_vs_human, SC2Result};
 pub use sc2_proto::sc2api::Request;
 
-pub type PlayerBox = Box<dyn Player>;
-
 pub struct PlayerSettings {
 	race: Race,
 	name: Option<String>,

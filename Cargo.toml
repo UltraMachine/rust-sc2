@@ -5,7 +5,8 @@ authors = ["Armageddon <lunyx1337@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-sc2-proto = { git = "https://github.com/UltraMachine/sc2-proto-rs.git" }
+sc2-proto = { git = "https://github.com/UltraMachine/sc2-proto-rs" }
+# sc2-proto = { path = "../sc2-proto-rs" }
 sc2-macro = { path = "sc2-macro" }
 tungstenite = "^0.11.0"
 url = "^2.1.1"
