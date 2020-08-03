@@ -3,6 +3,10 @@ name = "rust-sc2"
 version = "0.9.0"
 authors = ["Armageddon <lunyx1337@gmail.com>"]
 edition = "2018"
+description = "Rust implementation of StarCraft II API"
+repository = "https://github.com/UltraMachine/rust-sc2"
+readme = "README.md"
+license-file = "LICENSE"
 
 [dependencies]
 sc2-proto = { git = "https://github.com/UltraMachine/sc2-proto-rs" }
