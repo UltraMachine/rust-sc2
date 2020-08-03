@@ -67,6 +67,7 @@ pub struct PlayerSettings {
 	race: Race,
 	name: Option<String>,
 	raw_affects_selection: bool,
+	raw_crop_to_playable_area: bool,
 }
 impl PlayerSettings {
 	pub fn new(race: Race, name: Option<&str>) -> Self {
@@ -74,13 +75,20 @@ impl PlayerSettings {
 			race,
 			name: name.map(|n| n.to_string()),
 			raw_affects_selection: false,
+			raw_crop_to_playable_area: false,
 		}
 	}
-	pub fn configured(race: Race, name: Option<&str>, raw_affects_selection: bool) -> Self {
+	pub fn configured(
+		race: Race,
+		name: Option<&str>,
+		raw_affects_selection: bool,
+		raw_crop_to_playable_area: bool,
+	) -> Self {
 		Self {
 			race,
 			name: name.map(|n| n.to_string()),
 			raw_affects_selection,
+			raw_crop_to_playable_area,
 		}
 	}
 }

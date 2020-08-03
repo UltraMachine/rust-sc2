@@ -537,7 +537,7 @@ fn join_game2(settings: &PlayerSettings, api: &mut API, ports: Option<&Ports>) -
 	options.set_show_burrowed_shadows(true);
 	options.set_show_placeholders(true);
 	options.set_raw_affects_selection(settings.raw_affects_selection);
-	// options.set_raw_crop_to_playable_area(bool);
+	options.set_raw_crop_to_playable_area(settings.raw_crop_to_playable_area);
 	if let Some(name) = &settings.name {
 		req_join_game.set_player_name(name.to_string());
 	}
