@@ -743,8 +743,8 @@ lazy_static! {
 	pub(crate) static ref MISSED_WEAPONS: HashMap<UnitTypeId, Vec<Weapon>> = hashmap![
 		UnitTypeId::Baneling => vec![Weapon {
 			target: TargetType::Ground,
-			damage: 20.0,
-			damage_bonus: vec![(Attribute::Light, 15.0), (Attribute::Structure, 60.0)],
+			damage: 20,
+			damage_bonus: vec![(Attribute::Light, 15), (Attribute::Structure, 60)],
 			attacks: 1,
 			range: 2.2,
 			speed: 1.0,
@@ -752,7 +752,7 @@ lazy_static! {
 		UnitTypeId::Battlecruiser => vec![
 			Weapon {
 				target: TargetType::Ground,
-				damage: 8.0,
+				damage: 8,
 				damage_bonus: vec![],
 				attacks: 1,
 				range: 6.0,
@@ -760,7 +760,7 @@ lazy_static! {
 			},
 			Weapon {
 				target: TargetType::Air,
-				damage: 5.0,
+				damage: 5,
 				damage_bonus: vec![],
 				attacks: 1,
 				range: 6.0,
@@ -769,7 +769,7 @@ lazy_static! {
 		],
 		UnitTypeId::Sentry => vec![Weapon {
 			target: TargetType::Any,
-			damage: 6.0,
+			damage: 6,
 			damage_bonus: vec![],
 			attacks: 1,
 			range: 5.0,
@@ -777,7 +777,7 @@ lazy_static! {
 		}],
 		UnitTypeId::VoidRay => vec![Weapon {
 			target: TargetType::Any,
-			damage: 6.0,
+			damage: 6,
 			damage_bonus: vec![],
 			attacks: 1,
 			range: 6.0,
@@ -785,7 +785,7 @@ lazy_static! {
 		}],
 		UnitTypeId::Bunker => vec![Weapon {
 			target: TargetType::Any,
-			damage: 6.0, // Marine damage
+			damage: 6, // Marine damage
 			damage_bonus: vec![],
 			attacks: 4,   // 4 Marines inside
 			range: 6.0,   // Marine range + 1
@@ -793,7 +793,7 @@ lazy_static! {
 		}],
 		UnitTypeId::Carrier => vec![Weapon {
 			target: TargetType::Any,
-			damage: 5.0,
+			damage: 5,
 			damage_bonus: vec![],
 			attacks: 16,
 			range: 8.0, // Interceptors launch range
@@ -801,15 +801,15 @@ lazy_static! {
 		}],
 		UnitTypeId::Oracle => vec![Weapon {
 			target: TargetType::Ground,
-			damage: 15.0,
-			damage_bonus: vec![(Attribute::Light, 7.0)],
+			damage: 15,
+			damage_bonus: vec![(Attribute::Light, 7)],
 			attacks: 1,
 			range: 4.0,
 			speed: 0.854,
 		}],
 		UnitTypeId::WidowMineBurrowed => vec![Weapon {
 			target: TargetType::Any,
-			damage: 125.0,
+			damage: 125,
 			damage_bonus: vec![],
 			attacks: 1,
 			range: 5.0,

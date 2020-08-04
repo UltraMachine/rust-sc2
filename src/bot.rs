@@ -217,7 +217,7 @@ pub struct Bot {
 	reactor_tags: Rw<FxHashSet<u64>>,
 	pub expansions: Vec<(Point2, Point2)>,
 	max_cooldowns: Rw<FxHashMap<UnitTypeId, f32>>,
-	last_units_health: Rs<FxHashMap<u64, f32>>,
+	last_units_health: Rs<FxHashMap<u64, u32>>,
 	pub vision_blockers: Vec<Point2>,
 	pub ramps: Ramps,
 	enemy_upgrades: Rw<FxHashSet<UpgradeId>>,

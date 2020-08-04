@@ -135,8 +135,8 @@ impl FromProto<Weapon_TargetType> for TargetType {
 #[derive(Clone)]
 pub struct Weapon {
 	pub target: TargetType,
-	pub damage: f32,
-	pub damage_bonus: Vec<(Attribute, f32)>,
+	pub damage: u32,
+	pub damage_bonus: Vec<(Attribute, u32)>,
 	pub attacks: u32,
 	pub range: f32,
 	pub speed: f32,
@@ -145,11 +145,11 @@ impl FromProto<&ProtoWeapon> for Weapon {
 	fn from_proto(weapon: &ProtoWeapon) -> Self {
 		Self {
 			target: TargetType::from_proto(weapon.get_field_type()),
-			damage: weapon.get_damage(),
+			damage: weapon.get_damage() as u32,
 			damage_bonus: weapon
 				.get_damage_bonus()
 				.iter()
-				.map(|db| (Attribute::from_proto(db.get_attribute()), db.get_bonus()))
+				.map(|db| (Attribute::from_proto(db.get_attribute()), db.get_bonus() as u32))
 				.collect(),
 			attacks: weapon.get_attacks(),
 			range: weapon.get_range(),

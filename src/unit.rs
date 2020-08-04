@@ -29,7 +29,7 @@ pub(crate) struct DataForUnit {
 	pub reactor_tags: Rw<FxHashSet<u64>>,
 	pub race_values: Rs<RaceValues>,
 	pub max_cooldowns: Rw<FxHashMap<UnitTypeId, f32>>,
-	pub last_units_health: Rs<FxHashMap<u64, f32>>,
+	pub last_units_health: Rs<FxHashMap<u64, u32>>,
 	pub abilities_units: Rs<FxHashMap<u64, FxHashSet<AbilityId>>>,
 	pub upgrades: Rw<FxHashSet<UpgradeId>>,
 	pub enemy_upgrades: Rw<FxHashSet<UpgradeId>>,
@@ -76,12 +76,12 @@ pub struct Unit {
 	pub shield_upgrade_level: i32,
 
 	// Not populated for snapshots
-	pub health: Option<f32>,
-	pub health_max: Option<f32>,
-	pub shield: Option<f32>,
-	pub shield_max: Option<f32>,
-	pub energy: Option<f32>,
-	pub energy_max: Option<f32>,
+	pub health: Option<u32>,
+	pub health_max: Option<u32>,
+	pub shield: Option<u32>,
+	pub shield_max: Option<u32>,
+	pub energy: Option<u32>,
+	pub energy_max: Option<u32>,
 	pub mineral_contents: Option<u32>,
 	pub vespene_contents: Option<u32>,
 	pub is_flying: bool,
@@ -162,16 +162,16 @@ impl Unit {
 	pub fn is_attacked(&self) -> bool {
 		self.hits() < self.data.last_units_health.get(&self.tag).copied()
 	}
-	pub fn damage_taken(&self) -> f32 {
+	pub fn damage_taken(&self) -> u32 {
 		let hits = match self.hits() {
 			Some(hits) => hits,
-			None => return 0.0,
+			None => return 0,
 		};
 		let last_hits = match self.data.last_units_health.get(&self.tag) {
 			Some(hits) => hits,
-			None => return 0.0,
+			None => return 0,
 		};
-		last_hits - hits
+		last_hits.saturating_sub(hits)
 	}
 	pub fn abilities(&self) -> Option<&FxHashSet<AbilityId>> {
 		self.data.abilities_units.get(&self.tag)
@@ -268,28 +268,28 @@ impl Unit {
 	pub fn health_percentage(&self) -> Option<f32> {
 		let current = self.health?;
 		let max = self.health_max?;
-		if max < f32::EPSILON {
+		if max == 0 {
 			return None;
 		}
-		Some(current / max)
+		Some(current as f32 / max as f32)
 	}
 	pub fn shield_percentage(&self) -> Option<f32> {
 		let current = self.shield?;
 		let max = self.shield_max?;
-		if max < f32::EPSILON {
+		if max == 0 {
 			return None;
 		}
-		Some(current / max)
+		Some(current as f32 / max as f32)
 	}
 	pub fn energy_percentage(&self) -> Option<f32> {
 		let current = self.energy?;
 		let max = self.energy_max?;
-		if max < f32::EPSILON {
+		if max == 0 {
 			return None;
 		}
-		Some(current / max)
+		Some(current as f32 / max as f32)
 	}
-	pub fn hits(&self) -> Option<f32> {
+	pub fn hits(&self) -> Option<u32> {
 		match (self.health, self.shield) {
 			(Some(health), Some(shield)) => Some(health + shield),
 			(Some(health), None) => Some(health),
@@ -297,7 +297,7 @@ impl Unit {
 			(None, None) => None,
 		}
 	}
-	pub fn hits_max(&self) -> Option<f32> {
+	pub fn hits_max(&self) -> Option<u32> {
 		match (self.health_max, self.shield_max) {
 			(Some(health), Some(shield)) => Some(health + shield),
 			(Some(health), None) => Some(health),
@@ -308,10 +308,10 @@ impl Unit {
 	pub fn hits_percentage(&self) -> Option<f32> {
 		let current = self.hits()?;
 		let max = self.hits_max()?;
-		if max < f32::EPSILON {
+		if max == 0 {
 			return None;
 		}
-		Some(current / max)
+		Some(current as f32 / max as f32)
 	}
 	pub fn speed(&self) -> f32 {
 		self.type_data().map_or(0.0, |data| data.movement_speed)
@@ -689,13 +689,13 @@ impl Unit {
 		self.weapons()
 			.iter()
 			.find(|w| !w.target.is_air())
-			.map_or(0.0, |w| w.damage * (w.attacks as f32) / w.speed)
+			.map_or(0.0, |w| w.damage as f32 * (w.attacks as f32) / w.speed)
 	}
 	pub fn air_dps(&self) -> f32 {
 		self.weapons()
 			.iter()
 			.find(|w| !w.target.is_ground())
-			.map_or(0.0, |w| w.damage * (w.attacks as f32) / w.speed)
+			.map_or(0.0, |w| w.damage as f32 * (w.attacks as f32) / w.speed)
 	}
 	pub fn dps_vs(&self, target: &Unit) -> f32 {
 		let weapons = self.weapons();
@@ -703,7 +703,7 @@ impl Unit {
 			return 0.0;
 		}
 
-		let extract_dps = |w: &Weapon| w.damage * (w.attacks as f32) / w.speed;
+		let extract_dps = |w: &Weapon| w.damage as f32 * (w.attacks as f32) / w.speed;
 
 		if target.type_id == UnitTypeId::Colossus {
 			weapons
@@ -728,35 +728,26 @@ impl Unit {
 
 	// Returns (dps, range)
 	pub fn real_weapon(&self, attributes: &[Attribute]) -> (f32, f32) {
-		let (damage, speed, range) =
-			self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Any, attributes));
-		(if speed == 0.0 { 0.0 } else { damage / speed }, range)
+		self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Any, attributes))
 	}
 	pub fn real_ground_weapon(&self, attributes: &[Attribute]) -> (f32, f32) {
-		let (damage, speed, range) =
-			self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Ground, attributes));
-		(if speed == 0.0 { 0.0 } else { damage / speed }, range)
+		self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Ground, attributes))
 	}
 	pub fn real_air_weapon(&self, attributes: &[Attribute]) -> (f32, f32) {
-		let (damage, speed, range) =
-			self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Air, attributes));
-		(if speed == 0.0 { 0.0 } else { damage / speed }, range)
+		self.calculate_weapon_stats(CalcTarget::Abstract(TargetType::Air, attributes))
 	}
 
 	pub fn real_weapon_vs(&self, target: &Unit) -> (f32, f32) {
-		let (damage, speed, range) = self.calculate_weapon_stats(CalcTarget::Unit(target));
-		(if speed == 0.0 { 0.0 } else { damage / speed }, range)
+		self.calculate_weapon_stats(CalcTarget::Unit(target))
 	}
 
 	pub fn calculate_weapon_abstract(&self, target_type: TargetType, attributes: &[Attribute]) -> (f32, f32) {
-		let (damage, speed, range) =
-			self.calculate_weapon_stats(CalcTarget::Abstract(target_type, attributes));
-		(if speed == 0.0 { 0.0 } else { damage / speed }, range)
+		self.calculate_weapon_stats(CalcTarget::Abstract(target_type, attributes))
 	}
 
 	// Returns (damage, cooldown, range)
 	#[allow(clippy::mut_range_bound)]
-	pub fn calculate_weapon_stats(&self, target: CalcTarget) -> (f32, f32, f32) {
+	pub fn calculate_weapon_stats(&self, target: CalcTarget) -> (f32, f32) {
 		/*
 		if matches!(self.type_id, UnitTypeId::Bunker) && self.is_mine() {
 			return self
@@ -844,7 +835,7 @@ impl Unit {
 
 		let weapons = self.weapons();
 		if weapons.is_empty() {
-			return (0.0, 0.0, 0.0);
+			return (0.0, 0.0);
 		}
 
 		let mut speed_modifier = 1.0;
@@ -893,7 +884,7 @@ impl Unit {
 
 			let mut damage = w.damage
 				+ (self.attack_upgrade_level
-					* damage_bonus_per_upgrade.and_then(|bonus| bonus.0).unwrap_or(1)) as f32;
+					* damage_bonus_per_upgrade.and_then(|bonus| bonus.0).unwrap_or(1));
 			let speed = w.speed * speed_modifier;
 			let range = w.range + range_modifier;
 
@@ -918,12 +909,11 @@ impl Unit {
 							}
 						}
 
-						let mut bonus_damage =
-							bonus + (self.attack_upgrade_level * damage_bonus_per_upgrade) as f32;
+						let mut bonus_damage = bonus + (self.attack_upgrade_level * damage_bonus_per_upgrade);
 
 						if let Attribute::Armored = attribute {
 							if self.has_buff(BuffId::VoidRaySwarmDamageBoost) {
-								bonus_damage += 6.0;
+								bonus_damage += 6;
 							}
 						}
 
@@ -941,58 +931,63 @@ impl Unit {
 			match target_unit {
 				Some((target, enemy_armor, enemy_shield_armor, target_has_guardian_shield)) => {
 					let mut attacks = w.attacks;
-					let mut shield_damage = 0.0;
-					let mut health_damage = 0.0;
+					let mut shield_damage = 0;
+					let mut health_damage = 0;
 
-					if let Some(enemy_shield) = target.shield.filter(|shield| shield > &0.0) {
+					if let Some(enemy_shield) = target.shield.filter(|shield| shield > &0) {
 						let enemy_shield_armor = if target_has_guardian_shield && range >= 2.0 {
-							(enemy_shield_armor + 2) as f32
+							enemy_shield_armor + 2
 						} else {
-							enemy_shield_armor as f32
+							enemy_shield_armor
 						};
+						let exact_damage = 1.max(damage as i32 - enemy_shield_armor) as u32;
+
 						for _ in 0..attacks {
 							if shield_damage >= enemy_shield {
 								health_damage = shield_damage - enemy_shield;
 								break;
 							}
-							shield_damage += 0.5_f32.max(damage - enemy_shield_armor);
+							shield_damage += exact_damage;
 							attacks -= 1;
 						}
 					}
 
-					if let Some(enemy_health) = target.health.filter(|health| health > &0.0) {
+					if let Some(enemy_health) = target.health.filter(|health| health > &0) {
 						let enemy_armor = if target_has_guardian_shield && range >= 2.0 {
-							(enemy_armor + 2) as f32
+							enemy_armor + 2
 						} else {
-							enemy_armor as f32
+							enemy_armor
 						};
+						let exact_damage = 1.max(damage as i32 - enemy_armor) as u32;
+
 						for _ in 0..attacks {
 							if health_damage >= enemy_health {
 								break;
 							}
-							health_damage += 0.5_f32.max(damage - enemy_armor);
+							health_damage += exact_damage;
 						}
 					}
 
 					(shield_damage + health_damage, speed, range)
 				}
-				None => (damage * (w.attacks as f32), speed, range),
+				None => (damage * w.attacks, speed, range),
 			}
 		};
-		if not_target.is_any() {
+		let (damage, speed, range) = if not_target.is_any() {
 			weapons
 				.iter()
 				.map(extract_weapon_stats)
-				.max_by(|(damage1, ..), (damage2, ..)| damage1.partial_cmp(damage2).unwrap())
-				.unwrap_or((0.0, 0.0, 0.0))
+				.max_by_key(|k| k.0)
+				.unwrap_or((0, 0.0, 0.0))
 		} else {
 			weapons
 				.iter()
 				.filter(|w| w.target != not_target)
 				.map(extract_weapon_stats)
-				.max_by(|(damage1, ..), (damage2, ..)| damage1.partial_cmp(damage2).unwrap())
-				.unwrap_or((0.0, 0.0, 0.0))
-		}
+				.max_by_key(|k| k.0)
+				.unwrap_or((0, 0.0, 0.0))
+		};
+		(if speed == 0.0 { 0.0 } else { damage as f32 / speed }, range)
 	}
 
 	pub fn in_range(&self, target: &Unit, gap: f32) -> bool {
@@ -1045,7 +1040,7 @@ impl Unit {
 	pub fn in_real_range_of(&self, threat: &Unit, gap: f32) -> bool {
 		threat.in_real_range(self, gap)
 	}
-	pub fn damage_bonus(&self) -> Option<(Attribute, f32)> {
+	pub fn damage_bonus(&self) -> Option<(Attribute, u32)> {
 		self.weapons()
 			.iter()
 			.find(|w| !w.damage_bonus.is_empty())
@@ -1150,11 +1145,11 @@ impl Unit {
 			&& matches!(
 				self.orders[0].ability,
 				AbilityId::BuildTechLabBarracks
-				| AbilityId::BuildReactorBarracks
-				| AbilityId::BuildTechLabFactory
-				| AbilityId::BuildReactorFactory
-				| AbilityId::BuildTechLabStarport
-				| AbilityId::BuildReactorStarport
+					| AbilityId::BuildReactorBarracks
+					| AbilityId::BuildTechLabFactory
+					| AbilityId::BuildReactorFactory
+					| AbilityId::BuildTechLabStarport
+					| AbilityId::BuildReactorStarport
 			)
 	}
 	pub fn is_making_techlab(&self) -> bool {
@@ -1162,8 +1157,8 @@ impl Unit {
 			&& matches!(
 				self.orders[0].ability,
 				AbilityId::BuildTechLabBarracks
-				| AbilityId::BuildTechLabFactory
-				| AbilityId::BuildTechLabStarport
+					| AbilityId::BuildTechLabFactory
+					| AbilityId::BuildTechLabStarport
 			)
 	}
 	pub fn is_making_reactor(&self) -> bool {
@@ -1171,8 +1166,8 @@ impl Unit {
 			&& matches!(
 				self.orders[0].ability,
 				AbilityId::BuildReactorBarracks
-				| AbilityId::BuildReactorFactory
-				| AbilityId::BuildReactorStarport
+					| AbilityId::BuildReactorFactory
+					| AbilityId::BuildReactorStarport
 			)
 	}
 	// Actions
@@ -1329,12 +1324,12 @@ impl FromProtoData<&ProtoUnit> for Unit {
 			armor_upgrade_level: u.get_armor_upgrade_level(),
 			shield_upgrade_level: u.get_shield_upgrade_level(),
 			// Not populated for snapshots
-			health: u.health,
-			health_max: u.health_max,
-			shield: u.shield,
-			shield_max: u.shield_max,
-			energy: u.energy,
-			energy_max: u.energy_max,
+			health: u.health.map(|x| x as u32),
+			health_max: u.health_max.map(|x| x as u32),
+			shield: u.shield.map(|x| x as u32),
+			shield_max: u.shield_max.map(|x| x as u32),
+			energy: u.energy.map(|x| x as u32),
+			energy_max: u.energy_max.map(|x| x as u32),
 			mineral_contents: u.mineral_contents.map(|x| x as u32),
 			vespene_contents: u.vespene_contents.map(|x| x as u32),
 			is_flying: u.get_is_flying(),
