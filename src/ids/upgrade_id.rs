@@ -606,5 +606,4 @@ pub enum UpgradeId {
 	DiggingClaws = 293,
 	CarrierCarrierCapacity = 294,
 	CarrierLeashRangeUpgrade = 295,
-	EnhancedShockwaves = 296,
 }
