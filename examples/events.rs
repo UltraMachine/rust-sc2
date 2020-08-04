@@ -11,7 +11,7 @@ impl Player for EmptyBot {
 	}
 
 	// Use it like here
-	fn on_event(&mut self, event: Enent) -> SC2Result<()> {
+	fn on_event(&mut self, event: Event) -> SC2Result<()> {
 		match event {
 			Event::UnitDestroyed(tag) => { /* your code here */ }
 			Event::UnitCreated(tag) => {
