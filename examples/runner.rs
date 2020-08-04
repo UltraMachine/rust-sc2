@@ -14,22 +14,24 @@ fn main() -> SC2Result<()> {
 	let mut bot = EmptyBot::default();
 
 	// Bot vs Computer
+	// 1. Initialize runner
+	let mut runner = RunnerSingle::new(
+		&mut bot,
+		Computer::new(Race::Random, Difficulty::VeryEasy, None),
+		"EverDreamLE",
+		Some("4.10"), // Client version can be specified, otherwise will be used latest available version
+	);
 
-	// Initialize single runner
-	// Client version can be specified, otherwise will be used latest available version
-	let mut runner = RunnerSingle::new(&mut bot, Some("4.10"));
-
-	// Configure runner
-	runner.set_map("EternalEmpireLE"); // Must be specified
-
-	// Default: Computer(Race::Random, Difficulty::VeryEasy, AIBuild::Random)
+	// 2. Configure runner
+	runner.set_map("EternalEmpireLE");
 	runner.computer = Computer::new(Race::Protoss, Difficulty::VeryHard, Some(AIBuild::Air));
 	runner.realtime = true; // Default: false
 	runner.save_replay_as = Some("path/to/replay/MyReplay.SC2Replay"); // Default: None == don't save replay
 
-	// Launch SC2
+	// 3. Launch SC2
 	runner.launch()?;
 
+	// 4. Run games
 	// Run game once
 	runner.run_game()?;
 
@@ -56,23 +58,25 @@ fn main() -> SC2Result<()> {
 	other.close();
 
 	// Human vs Bot
+	// 1. Initialize runner
+	let mut runner = RunnerMulti::new(
+		&mut bot,
+		PlayerSettings::new(Race::Random, Some("Name")),
+		"PillarsofGoldLE",
+		None,
+	);
 
-	// Initialize multi runner
-	let mut multi_runner = RunnerMulti::new(&mut bot, None);
+	// 2. Configure runner
+	runner.set_map("PillarsofGoldLE");
+	runner.human_settings = PlayerSettings::new(Race::Random, Some("Name"));
+	runner.realtime = false;
+	runner.save_replay_as = None;
 
-	// Configured as single runner
-	multi_runner.set_map("PillarsofGoldLE");
-	multi_runner.realtime = false; // Unnecessary line - This is default value
-	multi_runner.save_replay_as = None; // Unnecessary line - This is default value
+	// 3. Launch SC2
+	runner.launch()?;
 
-	// There is human's config instead of computer
-	multi_runner.human_settings = PlayerSettings::new(Race::Random, Some("Name"));
-
-	// Launch 2 SC2 clients
-	multi_runner.launch()?;
-
-	// Run games
-	multi_runner.run_game()?;
+	// 4. Run games
+	runner.run_game()?;
 
 	// Runners dropped here:
 	// Any launched sc2 clients will be closed automatically

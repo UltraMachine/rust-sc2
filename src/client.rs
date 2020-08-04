@@ -4,7 +4,7 @@ use crate::{
 	game_state::GameState,
 	ids::{AbilityId, UnitTypeId},
 	paths::*,
-	player::{Computer, Difficulty, Race},
+	player::Computer,
 	Event, FromProtoData, IntoProto, IntoSC2, Player, PlayerSettings,
 };
 use num_traits::FromPrimitive;
@@ -97,15 +97,17 @@ impl<'a, B> RunnerSingle<'a, B>
 where
 	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
 {
-	pub fn new(bot: &'a mut B, sc2_version: Option<&'a str>) -> Self {
+	pub fn new(bot: &'a mut B, computer: Computer, map: &str, sc2_version: Option<&'a str>) -> Self {
 		debug!("Starting game vs computer");
+		let sc2_path = get_path_to_sc2();
+		let map_path = get_map_path(&sc2_path, map);
 
 		Self {
 			bot,
-			sc2_path: get_path_to_sc2(),
+			sc2_path,
 			sc2_version,
-			computer: Computer::new(Race::Random, Difficulty::VeryEasy, None),
-			map_path: String::new(),
+			computer,
+			map_path,
 			save_replay_as: None,
 			realtime: false,
 		}
@@ -128,11 +130,6 @@ where
 		let mut req = Request::new();
 		let req_create_game = req.mut_create_game();
 
-		if self.map_path.is_empty() {
-			let err = "Map name is not specified, but required to run game.";
-			error!("{}", err);
-			panic!("{}", err);
-		}
 		req_create_game
 			.mut_local_map()
 			.set_map_path(self.map_path.clone());
@@ -199,17 +196,23 @@ impl<'a, B> RunnerMulti<'a, B>
 where
 	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
 {
-	pub fn new(bot: &'a mut B, sc2_version: Option<&'a str>) -> Self {
+	pub fn new(
+		bot: &'a mut B,
+		human_settings: PlayerSettings,
+		map: &str,
+		sc2_version: Option<&'a str>,
+	) -> Self {
 		debug!("Starting human vs bot");
 		let sc2_path = get_path_to_sc2();
+		let map_path = get_map_path(&sc2_path, map);
 
 		Self {
 			bot,
 			human: Human::default(),
 			sc2_path,
 			sc2_version,
-			human_settings: PlayerSettings::new(Race::Random, None),
-			map_path: String::new(),
+			human_settings,
+			map_path,
 			save_replay_as: None,
 			realtime: false,
 		}
@@ -241,11 +244,6 @@ where
 		let mut req = Request::new();
 		let req_create_game = req.mut_create_game();
 
-		if self.map_path.is_empty() {
-			let err = "Map name is not specified, but required to run game.";
-			error!("{}", err);
-			panic!("{}", err);
-		}
 		req_create_game
 			.mut_local_map()
 			.set_map_path(self.map_path.clone());
@@ -378,10 +376,8 @@ pub fn run_vs_computer<B>(
 where
 	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
 {
-	let mut runner = RunnerSingle::new(bot, options.sc2_version);
-	runner.set_map(map_name);
+	let mut runner = RunnerSingle::new(bot, computer, map_name, options.sc2_version);
 	runner.launch()?;
-	runner.computer = computer;
 	runner.realtime = options.realtime;
 	runner.save_replay_as = options.save_replay_as;
 	runner.run_game()?;
@@ -442,10 +438,8 @@ pub fn run_vs_human<B>(
 where
 	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
 {
-	let mut runner = RunnerMulti::new(bot, options.sc2_version);
-	runner.set_map(map_name);
+	let mut runner = RunnerMulti::new(bot, human_settings, map_name, options.sc2_version);
 	runner.launch()?;
-	runner.human_settings = human_settings;
 	runner.realtime = options.realtime;
 	runner.save_replay_as = options.save_replay_as;
 	runner.run_game()?;
