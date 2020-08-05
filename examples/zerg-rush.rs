@@ -363,7 +363,7 @@ impl ZergRushAI {
 				let target = {
 					let close_targets = targets.in_range_of(u, 0.0);
 					if !close_targets.is_empty() {
-						close_targets.partial_min(|t| t.hits()).unwrap().position
+						close_targets.min(|t| t.hits()).unwrap().position
 					} else {
 						targets.closest(u).unwrap().position
 					}

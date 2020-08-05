@@ -52,8 +52,12 @@ fn main() -> SC2Result<()> {
 	// Better to close runner manually before launching other
 	runner.close();
 
-	let mut other = RunnerSingle::new(&mut bot, None);
-	other.set_map("Flat32");
+	let mut other = RunnerSingle::new(
+		&mut bot,
+		Computer::new(Race::Random, Difficulty::VeryEasy, None),
+		"Flat32",
+		None,
+	);
 	other.run_game()?;
 	other.close();
 

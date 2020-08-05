@@ -280,12 +280,10 @@ impl ReaperRushAI {
 		reapers.iter().for_each(|u| {
 			let is_retreating = self.reapers_retreat.contains(&u.tag);
 			if is_retreating {
-				// health > 75%
-				if u.health.unwrap() > u.health_max.unwrap() * 0.75 {
+				if u.health_percentage().unwrap() > 0.75 {
 					self.reapers_retreat.remove(&u.tag);
 				}
-			// health < 50%
-			} else if u.health.unwrap() * 2.0 < u.health_max.unwrap() {
+			} else if u.health_percentage().unwrap() < 0.5 {
 				self.reapers_retreat.insert(u.tag);
 			}
 
@@ -329,14 +327,9 @@ impl ReaperRushAI {
 								}
 							}
 						} else {
-							let close_targets = targets.in_range_of(u, 0.0);
-							if !close_targets.is_empty() {
-								u.attack(
-									Target::Tag(close_targets.partial_min(|t| t.hits()).unwrap().tag),
-									false,
-								);
-							} else {
-								u.move_to(Target::Pos(targets.closest(u).unwrap().position), false);
+							match targets.in_range_of(u, 0.0).min(|t| t.hits()) {
+								Some(target) => u.attack(Target::Tag(target.tag), false),
+								None => u.move_to(Target::Pos(targets.closest(u).unwrap().position), false),
 							}
 						}
 					}

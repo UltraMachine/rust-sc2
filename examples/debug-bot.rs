@@ -2,6 +2,7 @@
 extern crate clap;
 
 use rand::prelude::{thread_rng, SliceRandom};
+use rust_sc2::geometry::Point3;
 use rust_sc2::prelude::*;
 
 #[bot]
@@ -30,7 +31,7 @@ impl Player for DebugAI {
 			.map(|u| (format!("{:?}", u.type_id), u.position3d))
 			.collect::<Vec<(String, Point3)>>()
 			.into_iter()
-			.for_each(|(s, pos)| self.debug.draw_text_world(s, pos, Some((255, 128, 128)), None));
+			.for_each(|(s, pos)| self.debug.draw_text_world(&s, pos, Some((255, 128, 128)), None));
 		Ok(())
 	}
 

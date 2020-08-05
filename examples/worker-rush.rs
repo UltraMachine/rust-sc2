@@ -46,7 +46,7 @@ impl Player for WorkerRushAI {
 			let mineral_forward = self.mineral_forward;
 			self.units.my.workers.iter().for_each(|u| {
 				let closest = ground_attackers.closest(u).unwrap();
-				if u.shield > Some(5.0) {
+				if u.shield > Some(5) {
 					if !u.on_cooldown() {
 						u.attack(Target::Tag(closest.tag), false);
 					} else {
