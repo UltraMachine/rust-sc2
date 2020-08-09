@@ -80,7 +80,7 @@ impl Debugger {
 	}
 	pub fn set_unit_values<'a, T>(&mut self, cmds: T)
 	where
-		T: IntoIterator<Item = &'a (u64, DebugUnitValue, f32)>,
+		T: IntoIterator<Item = &'a (u64, UnitValue, u32)>,
 	{
 		self.debug_commands.extend(
 			cmds.into_iter()
@@ -166,7 +166,7 @@ pub enum DebugCommand {
 	// TestProcess,
 	// SetScore,
 	EndGame(bool),
-	SetUnitValue(u64, DebugUnitValue, f32),
+	SetUnitValue(u64, UnitValue, u32),
 }
 impl IntoProto<ProtoDebugCommand> for &DebugCommand {
 	fn into_proto(self) -> ProtoDebugCommand {
@@ -194,7 +194,7 @@ impl IntoProto<ProtoDebugCommand> for &DebugCommand {
 				let cmd = proto.mut_unit_value();
 				cmd.set_unit_tag(*tag);
 				cmd.set_unit_value(unit_value.into_proto());
-				cmd.set_value(*value);
+				cmd.set_value(*value as f32);
 			}
 		}
 		proto
@@ -284,17 +284,17 @@ pub enum DebugDraw {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum DebugUnitValue {
+pub enum UnitValue {
 	Energy,
 	Health,
 	Shield,
 }
-impl IntoProto<DebugSetUnitValue_UnitValue> for DebugUnitValue {
+impl IntoProto<DebugSetUnitValue_UnitValue> for UnitValue {
 	fn into_proto(self) -> DebugSetUnitValue_UnitValue {
 		match self {
-			DebugUnitValue::Energy => DebugSetUnitValue_UnitValue::Energy,
-			DebugUnitValue::Health => DebugSetUnitValue_UnitValue::Life,
-			DebugUnitValue::Shield => DebugSetUnitValue_UnitValue::Shields,
+			UnitValue::Energy => DebugSetUnitValue_UnitValue::Energy,
+			UnitValue::Health => DebugSetUnitValue_UnitValue::Life,
+			UnitValue::Shield => DebugSetUnitValue_UnitValue::Shields,
 		}
 	}
 }
