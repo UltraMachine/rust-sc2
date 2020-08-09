@@ -226,53 +226,6 @@ pub struct Bot {
 }
 
 impl Bot {
-	pub fn new() -> Self {
-		Self {
-			game_step: 1,
-			disable_fog: false,
-			race: Race::Random,
-			enemy_race: Race::Random,
-			process: None,
-			api: None,
-			player_id: Default::default(),
-			enemy_player_id: Default::default(),
-			opponent_id: Default::default(),
-			actions: Default::default(),
-			commander: Default::default(),
-			debug: Default::default(),
-			game_info: Default::default(),
-			game_data: Default::default(),
-			state: Default::default(),
-			race_values: Default::default(),
-			data_for_unit: Default::default(),
-			units: Default::default(),
-			abilities_units: Default::default(),
-			orders: Default::default(),
-			current_units: Default::default(),
-			time: Default::default(),
-			minerals: Default::default(),
-			vespene: Default::default(),
-			supply_army: Default::default(),
-			supply_workers: Default::default(),
-			supply_cap: Default::default(),
-			supply_used: Default::default(),
-			supply_left: Default::default(),
-			start_location: Default::default(),
-			enemy_start: Default::default(),
-			start_center: Default::default(),
-			enemy_start_center: Default::default(),
-			techlab_tags: Default::default(),
-			reactor_tags: Default::default(),
-			expansions: Default::default(),
-			max_cooldowns: Default::default(),
-			last_units_health: Default::default(),
-			vision_blockers: Default::default(),
-			ramps: Default::default(),
-			enemy_upgrades: Default::default(),
-			owned_tags: Default::default(),
-			under_construction: Default::default(),
-		}
-	}
 	#[inline]
 	pub fn api(&mut self) -> &mut API {
 		self.api.as_mut().expect("API is not initialized")
@@ -1112,7 +1065,51 @@ impl Bot {
 
 impl Default for Bot {
 	fn default() -> Self {
-		Self::new()
+		Self {
+			game_step: 1,
+			disable_fog: false,
+			race: Race::Random,
+			enemy_race: Race::Random,
+			process: None,
+			api: None,
+			player_id: Default::default(),
+			enemy_player_id: Default::default(),
+			opponent_id: Default::default(),
+			actions: Default::default(),
+			commander: Default::default(),
+			debug: Default::default(),
+			game_info: Default::default(),
+			game_data: Default::default(),
+			state: Default::default(),
+			race_values: Default::default(),
+			data_for_unit: Default::default(),
+			units: Default::default(),
+			abilities_units: Default::default(),
+			orders: Default::default(),
+			current_units: Default::default(),
+			time: Default::default(),
+			minerals: Default::default(),
+			vespene: Default::default(),
+			supply_army: Default::default(),
+			supply_workers: Default::default(),
+			supply_cap: Default::default(),
+			supply_used: Default::default(),
+			supply_left: Default::default(),
+			start_location: Default::default(),
+			enemy_start: Default::default(),
+			start_center: Default::default(),
+			enemy_start_center: Default::default(),
+			techlab_tags: Default::default(),
+			reactor_tags: Default::default(),
+			expansions: Default::default(),
+			max_cooldowns: Default::default(),
+			last_units_health: Default::default(),
+			vision_blockers: Default::default(),
+			ramps: Default::default(),
+			enemy_upgrades: Default::default(),
+			owned_tags: Default::default(),
+			under_construction: Default::default(),
+		}
 	}
 }
 
