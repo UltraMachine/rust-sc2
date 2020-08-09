@@ -798,6 +798,19 @@ impl Bot {
 		)
 		.unwrap()[0] == ActionResult::Success
 	}
+	pub fn can_place_some(&mut self, places: Vec<(UnitTypeId, Point2)>) -> Vec<bool> {
+		self.query_placement(
+			places
+				.into_iter()
+				.map(|(building, pos)| (self.game_data.units[&building].ability.unwrap(), pos, None))
+				.collect(),
+			false,
+		)
+		.unwrap()
+		.into_iter()
+		.map(|r| r == ActionResult::Success)
+		.collect()
+	}
 
 	pub fn find_placement(
 		&mut self,
