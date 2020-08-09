@@ -1053,6 +1053,12 @@ impl Bot {
 			.collect())
 	}
 
+	pub fn leave(&mut self) -> SC2Result<()> {
+		let mut req = Request::new();
+		req.mut_leave_game();
+		self.api().send_request(req)
+	}
+
 	pub(crate) fn close_client(&mut self) {
 		if let Some(api) = &mut self.api {
 			let mut req = Request::new();
