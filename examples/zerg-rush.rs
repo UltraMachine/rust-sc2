@@ -202,7 +202,7 @@ impl ZergRushAI {
 		{
 			if let Some(larva) = self.units.my.larvas.pop() {
 				larva.train(over, false);
-				self.substract_resources(over);
+				self.subtract_resources(over, false);
 			}
 		}
 
@@ -212,7 +212,7 @@ impl ZergRushAI {
 		{
 			if let Some(larva) = self.units.my.larvas.pop() {
 				larva.train(drone, false);
-				self.substract_resources(drone);
+				self.subtract_resources(drone, true);
 			}
 		}
 
@@ -221,7 +221,7 @@ impl ZergRushAI {
 			let townhalls = self.units.my.townhalls.clone();
 			if !townhalls.is_empty() {
 				townhalls.first().unwrap().train(queen, false);
-				self.substract_resources(queen);
+				self.subtract_resources(queen, true);
 			}
 		}
 
@@ -229,7 +229,7 @@ impl ZergRushAI {
 		if self.can_afford(zergling, true) {
 			if let Some(larva) = self.units.my.larvas.pop() {
 				larva.train(zergling, false);
-				self.substract_resources(zergling);
+				self.subtract_resources(zergling, true);
 			}
 		}
 	}
@@ -261,7 +261,7 @@ impl ZergRushAI {
 			if let Some(location) = self.find_placement(pool, place, Default::default()) {
 				if let Some(builder) = self.get_builder(location, &mineral_tags) {
 					builder.build(pool, location, false);
-					self.substract_resources(pool);
+					self.subtract_resources(pool, false);
 				}
 			}
 		}
@@ -272,7 +272,7 @@ impl ZergRushAI {
 			if let Some(geyser) = self.find_gas_placement(start_location) {
 				if let Some(builder) = self.get_builder(geyser.position, &mineral_tags) {
 					builder.build_gas(geyser.tag, false);
-					self.substract_resources(extractor);
+					self.subtract_resources(extractor, false);
 				}
 			}
 		}
@@ -282,7 +282,7 @@ impl ZergRushAI {
 			if let Some((location, _resource_center)) = self.get_expansion() {
 				if let Some(builder) = self.get_builder(location, &mineral_tags) {
 					builder.build(hatchery, location, false);
-					self.substract_resources(hatchery);
+					self.subtract_resources(hatchery, false);
 				}
 			}
 		}
@@ -297,7 +297,7 @@ impl ZergRushAI {
 			let pool = self.units.my.structures.of_type(UnitTypeId::SpawningPool);
 			if !pool.is_empty() {
 				pool.first().unwrap().research(speed_upgrade, false);
-				self.substract_upgrade_cost(speed_upgrade);
+				self.subtract_upgrade_cost(speed_upgrade);
 			}
 		}
 	}
@@ -395,7 +395,7 @@ impl Player for ZergRushAI {
 			.first()
 			.unwrap()
 			.train(UnitTypeId::Drone, false);
-		self.substract_resources(UnitTypeId::Drone);
+		self.subtract_resources(UnitTypeId::Drone, true);
 
 		let minerals_near_base = self.units.mineral_fields.closer(11.0, &townhall);
 		self.units.my.workers.clone().iter().for_each(|u| {

@@ -179,7 +179,7 @@ impl ReaperRushAI {
 			if let Some(geyser) = self.find_gas_placement(start_location) {
 				if let Some(builder) = self.get_builder(geyser.position, &mineral_tags) {
 					builder.build_gas(geyser.tag, false);
-					self.substract_resources(UnitTypeId::Refinery);
+					self.subtract_resources(UnitTypeId::Refinery, false);
 				}
 			}
 		}
@@ -194,7 +194,7 @@ impl ReaperRushAI {
 			{
 				if let Some(builder) = self.get_builder(location, &mineral_tags) {
 					builder.build(UnitTypeId::SupplyDepot, location, false);
-					self.substract_resources(UnitTypeId::SupplyDepot);
+					self.subtract_resources(UnitTypeId::SupplyDepot, false);
 					return;
 				}
 			}
@@ -213,7 +213,7 @@ impl ReaperRushAI {
 			) {
 				if let Some(builder) = self.get_builder(location, &mineral_tags) {
 					builder.build(UnitTypeId::Barracks, location, false);
-					self.substract_resources(UnitTypeId::Barracks);
+					self.subtract_resources(UnitTypeId::Barracks, false);
 				}
 			}
 		}
@@ -226,7 +226,7 @@ impl ReaperRushAI {
 				let ccs = townhalls.filter(|u| u.is_ready() && u.is_almost_idle());
 				if !ccs.is_empty() {
 					ccs.first().unwrap().train(UnitTypeId::SCV, false);
-					self.substract_resources(UnitTypeId::SCV);
+					self.subtract_resources(UnitTypeId::SCV, true);
 				}
 			}
 		}
@@ -238,7 +238,7 @@ impl ReaperRushAI {
 					.filter(|u| u.type_id == UnitTypeId::Barracks && u.is_ready() && u.is_almost_idle());
 				if !barracks.is_empty() {
 					barracks.first().unwrap().train(UnitTypeId::Reaper, false);
-					self.substract_resources(UnitTypeId::Reaper);
+					self.subtract_resources(UnitTypeId::Reaper, true);
 				}
 			}
 		}
@@ -354,7 +354,7 @@ impl Player for ReaperRushAI {
 		let townhall = self.units.my.townhalls.first().unwrap().clone();
 		townhall.smart(Target::Pos(self.start_center), false);
 		townhall.train(UnitTypeId::SCV, false);
-		self.substract_resources(UnitTypeId::SCV);
+		self.subtract_resources(UnitTypeId::SCV, true);
 
 		let minerals_near_base = self.units.mineral_fields.closer(11.0, &townhall);
 		self.units.my.workers.clone().iter().for_each(|u| {

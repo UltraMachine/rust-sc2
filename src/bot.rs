@@ -362,15 +362,17 @@ impl Bot {
 		unimplemented!()
 	}
 	*/
-	pub fn substract_resources(&mut self, unit: UnitTypeId) {
+	pub fn subtract_resources(&mut self, unit: UnitTypeId, subtract_supply: bool) {
 		let cost = self.get_unit_cost(unit);
 		self.minerals = self.minerals.saturating_sub(cost.minerals);
 		self.vespene = self.vespene.saturating_sub(cost.vespene);
-		let supply_cost = cost.supply as u32;
-		self.supply_used += supply_cost;
-		self.supply_left = self.supply_left.saturating_sub(supply_cost);
+		if subtract_supply {
+			let supply_cost = cost.supply as u32;
+			self.supply_used += supply_cost;
+			self.supply_left = self.supply_left.saturating_sub(supply_cost);
+		}
 	}
-	pub fn substract_upgrade_cost(&mut self, upgrade: UpgradeId) {
+	pub fn subtract_upgrade_cost(&mut self, upgrade: UpgradeId) {
 		let cost = self.get_upgrade_cost(upgrade);
 		self.minerals = self.minerals.saturating_sub(cost.minerals);
 		self.vespene = self.vespene.saturating_sub(cost.vespene);

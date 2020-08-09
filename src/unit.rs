@@ -927,7 +927,7 @@ impl Unit {
 				damage += bonus;
 			}
 
-			// Substract damage
+			// Subtract damage
 			match target_unit {
 				Some((target, enemy_armor, enemy_shield_armor, target_has_guardian_shield)) => {
 					let mut attacks = w.attacks;
