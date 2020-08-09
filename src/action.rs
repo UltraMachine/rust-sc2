@@ -17,12 +17,6 @@ pub type Command = (u64, (AbilityId, Target, bool));
 pub struct Commander {
 	pub commands: HashMap<(AbilityId, Target, bool), Vec<u64>>,
 }
-impl Commander {
-	pub fn command(&mut self, cmd: Command) {
-		let (tag, order) = cmd;
-		self.commands.entry(order).or_default().push(tag);
-	}
-}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Target {

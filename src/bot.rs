@@ -939,23 +939,11 @@ impl Bot {
 			)
 			.unwrap();
 
-		let valid_geysers = geysers
+		geysers
 			.iter()
 			.zip(results.iter())
-			.filter_map(|(geyser, res)| {
-				if *res == ActionResult::Success {
-					Some(geyser)
-				} else {
-					None
-				}
-			})
-			.collect::<Vec<&Unit>>();
-
-		if valid_geysers.is_empty() {
-			None
-		} else {
-			Some(valid_geysers[0].clone())
-		}
+			.find(|(_, res)| **res == ActionResult::Success)
+			.map(|(geyser, _)| geyser.clone())
 	}
 	pub fn get_expansion(&mut self) -> Option<(Point2, Point2)> {
 		let expansions = self

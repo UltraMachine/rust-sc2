@@ -1182,7 +1182,10 @@ impl Unit {
 		self.data
 			.commander
 			.lock_write()
-			.command((self.tag, (ability, target, queue)));
+			.commands
+			.entry((ability, target, queue))
+			.or_default()
+			.push(self.tag);
 	}
 	pub fn use_ability(&self, ability: AbilityId, queue: bool) {
 		self.command(ability, Target::None, queue)
