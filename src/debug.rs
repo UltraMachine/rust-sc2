@@ -1,3 +1,6 @@
+//! Items for interacting with Debug API.
+#![warn(missing_docs)]
+
 use crate::{
 	geometry::{Point2, Point3},
 	ids::UnitTypeId,
@@ -13,6 +16,10 @@ use sc2_proto::debug::{
 type Color = (u32, u32, u32);
 type ScreenPos = (f32, f32);
 
+/// Helper struct for interacting with Debug API.
+/// Can be accessed through [`debug`] field of bot.
+///
+/// [`debug`]: crate::bot::Bot::debug
 #[derive(Default)]
 pub struct Debugger {
 	debug_commands: Vec<DebugCommand>,
@@ -20,7 +27,7 @@ pub struct Debugger {
 	kill_tags: FxHashSet<u64>,
 }
 impl Debugger {
-	pub fn get_commands(&mut self) -> &[DebugCommand] {
+	pub(crate) fn get_commands(&mut self) -> &[DebugCommand] {
 		let commands = &mut self.debug_commands;
 
 		if !self.debug_drawings.is_empty() {
@@ -32,16 +39,19 @@ impl Debugger {
 
 		commands
 	}
-	pub fn clear_commands(&mut self) {
+	pub(crate) fn clear_commands(&mut self) {
 		self.debug_commands.clear();
 	}
-	pub fn draw_text(&mut self, text: &str, pos: DebugPos, color: Option<Color>, size: Option<u32>) {
+
+	fn draw_text(&mut self, text: &str, pos: DebugPos, color: Option<Color>, size: Option<u32>) {
 		self.debug_drawings
 			.push(DebugDraw::Text(text.to_string(), pos, color, size));
 	}
+	/// Draws text in game world with 3d coordinates.
 	pub fn draw_text_world(&mut self, text: &str, pos: Point3, color: Option<Color>, size: Option<u32>) {
 		self.draw_text(text, DebugPos::World(pos), color, size);
 	}
+	/// Draws text in game window with 2d coordinates, where (0, 0) is left upper corner.
 	pub fn draw_text_screen(
 		&mut self,
 		text: &str,
@@ -51,20 +61,25 @@ impl Debugger {
 	) {
 		self.draw_text(text, DebugPos::Screen(pos.unwrap_or((0.0, 0.0))), color, size);
 	}
+	/// Draws line in game world from `p0` to `p1`.
 	pub fn draw_line(&mut self, p0: Point3, p1: Point3, color: Option<Color>) {
 		self.debug_drawings.push(DebugDraw::Line(p0, p1, color));
 	}
+	/// Draws box in game world with corners `p0` and `p1`.
 	pub fn draw_box(&mut self, p0: Point3, p1: Point3, color: Option<Color>) {
 		self.debug_drawings.push(DebugDraw::Box(p0, p1, color));
 	}
+	/// Draws cube in game world with given half size of edge.
 	pub fn draw_cube(&mut self, pos: Point3, half_edge: f32, color: Option<Color>) {
 		let offset = Point3::new(half_edge, half_edge, half_edge);
 		self.debug_drawings
 			.push(DebugDraw::Box(pos - offset, pos + offset, color));
 	}
+	/// Draws sphere in game world with given radius.
 	pub fn draw_sphere(&mut self, pos: Point3, radius: f32, color: Option<Color>) {
 		self.debug_drawings.push(DebugDraw::Sphere(pos, radius, color));
 	}
+	/// Spawns units using given commands in format: (unit type, owner's player id, position, count).
 	pub fn create_units<'a, T>(&mut self, cmds: T)
 	where
 		T: IntoIterator<Item = &'a (UnitTypeId, Option<u32>, Point2, u32)>,
@@ -75,9 +90,11 @@ impl Debugger {
 				.map(|(type_id, owner, pos, count)| DebugCommand::CreateUnit(type_id, owner, pos, count)),
 		);
 	}
+	/// Kills units with given tags.
 	pub fn kill_units<'a, T: IntoIterator<Item = &'a u64>>(&mut self, tags: T) {
 		self.kill_tags.extend(tags);
 	}
+	/// Sets values for units using given commands in format: (unit tag, value type, value).
 	pub fn set_unit_values<'a, T>(&mut self, cmds: T)
 	where
 		T: IntoIterator<Item = &'a (u64, UnitValue, u32)>,
@@ -88,69 +105,76 @@ impl Debugger {
 				.map(|(tag, unit_value, value)| DebugCommand::SetUnitValue(tag, unit_value, value)),
 		);
 	}
+	/// Ends game with Victory for bot
 	pub fn win_game(&mut self) {
 		self.debug_commands.push(DebugCommand::EndGame(true));
 	}
+	/// Ends game with Defeat for bot
 	pub fn end_game(&mut self) {
 		self.debug_commands.push(DebugCommand::EndGame(false));
 	}
+	/// Disables fog of war, makes all map visible
 	pub fn show_map(&mut self) {
 		self.debug_commands
 			.push(DebugCommand::GameState(DebugGameState::ShowMap));
 	}
+	/// Gives ability to control enemy units
 	pub fn control_enemy(&mut self) {
 		self.debug_commands
 			.push(DebugCommand::GameState(DebugGameState::ControlEnemy));
 	}
-	// Disables supply usage
+	/// Disables supply usage
 	pub fn cheat_supply(&mut self) {
 		self.debug_commands
 			.push(DebugCommand::GameState(DebugGameState::Food));
 	}
-	// Makes free all units, structures and upgrades
+	/// Makes free all units, structures and upgrades
 	pub fn cheat_free_build(&mut self) {
 		self.debug_commands
 			.push(DebugCommand::GameState(DebugGameState::Free));
 	}
-	// Gives 5000 minerals and gas to the bot
+	/// Gives 5000 minerals and gas to the bot
 	pub fn cheat_resources(&mut self) {
 		self.debug_commands
 			.push(DebugCommand::GameState(DebugGameState::AllResources));
 	}
-	// Gives 5000 minerals to the bot
+	/// Gives 5000 minerals to the bot
 	pub fn cheat_minerals(&mut self) {
 		self.debug_commands
 			.push(DebugCommand::GameState(DebugGameState::Minerals));
 	}
-	// Gives 5000 gas to the bot
+	/// Gives 5000 gas to the bot
 	pub fn cheat_gas(&mut self) {
 		self.debug_commands
 			.push(DebugCommand::GameState(DebugGameState::Gas));
 	}
-	// Makes all bot's units invincible and significantly increases their damage
+	/// Makes all bot's units invincible and significantly increases their damage
 	pub fn cheat_god(&mut self) {
 		self.debug_commands
 			.push(DebugCommand::GameState(DebugGameState::God));
 	}
-	// Removes cooldown of abilities of bot's units
+	/// Removes cooldown of abilities of bot's units
 	pub fn cheat_cooldown(&mut self) {
 		self.debug_commands
 			.push(DebugCommand::GameState(DebugGameState::Cooldown));
 	}
-	// Removes all tech requirements for bot
+	/// Removes all tech requirements for bot
 	pub fn cheat_tech_tree(&mut self) {
 		self.debug_commands
 			.push(DebugCommand::GameState(DebugGameState::TechTree));
 	}
-	// First use: researches all upgrades for units and sets level 1 of damage and armor upgrades
-	// Second use: sets level 2 of damage and armor upgrades
-	// Third use: sets level 3 of damage and armor upgrades
-	// Fourth use: disables all upgrades researched with this command
+	/// First use: researches all upgrades for units and sets level 1 of damage and armor upgrades
+	///
+	/// Second use: sets level 2 of damage and armor upgrades
+	///
+	/// Third use: sets level 3 of damage and armor upgrades
+	///
+	/// Fourth use: disables all upgrades researched with this command
 	pub fn cheat_upgrades(&mut self) {
 		self.debug_commands
 			.push(DebugCommand::GameState(DebugGameState::Upgrade));
 	}
-	// Significantly speeds up making units, structures and upgrades
+	/// Significantly increases speed of making units, structures and upgrades
 	pub fn cheat_fast_build(&mut self) {
 		self.debug_commands
 			.push(DebugCommand::GameState(DebugGameState::FastBuild));
@@ -158,7 +182,7 @@ impl Debugger {
 }
 
 #[derive(Debug, Clone)]
-pub enum DebugCommand {
+pub(crate) enum DebugCommand {
 	Draw(Vec<DebugDraw>),
 	GameState(DebugGameState),
 	CreateUnit(UnitTypeId, Option<u32>, Point2, u32),
@@ -270,19 +294,21 @@ impl IntoProto<ProtoDebugDraw> for &[DebugDraw] {
 }
 
 #[derive(Debug, Clone)]
-pub enum DebugPos {
+pub(crate) enum DebugPos {
 	Screen(ScreenPos), // Coordinates on screen (0..1, 0..1)
 	World(Point3),     // Position in game world
 }
 
 #[derive(Debug, Clone)]
-pub enum DebugDraw {
+pub(crate) enum DebugDraw {
 	Text(String, DebugPos, Option<Color>, Option<u32>),
 	Line(Point3, Point3, Option<Color>),
 	Box(Point3, Point3, Option<Color>),
 	Sphere(Point3, f32, Option<Color>),
 }
 
+/// Value type used in [`set_unit_values`](Debugger::set_unit_values) commands.
+#[allow(missing_docs)]
 #[derive(Debug, Clone, Copy)]
 pub enum UnitValue {
 	Energy,
@@ -300,7 +326,7 @@ impl IntoProto<DebugSetUnitValue_UnitValue> for UnitValue {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum DebugGameState {
+pub(crate) enum DebugGameState {
 	ShowMap,
 	ControlEnemy,
 	Food,
