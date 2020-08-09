@@ -285,13 +285,25 @@ impl Bot {
 	}
 	pub(crate) fn get_actions(&mut self) -> &[Action] {
 		let actions = &mut self.actions;
-		let commands = &mut self.commander.lock_write().commands;
 
-		if !commands.is_empty() {
+		let mut commander = self.commander.lock_write();
+
+		if !commander.commands.is_empty() {
 			actions.extend(
-				commands.drain().map(|((ability, target, queue), units)| {
-					Action::UnitCommand(ability, target, units, queue)
-				}),
+				commander
+					.commands
+					.drain()
+					.map(|((ability, target, queue), units)| {
+						Action::UnitCommand(ability, target, units, queue)
+					}),
+			);
+		}
+		if !commander.autocast.is_empty() {
+			actions.extend(
+				commander
+					.autocast
+					.drain()
+					.map(|(ability, units)| Action::ToggleAutocast(ability, units)),
 			);
 		}
 

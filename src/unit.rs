@@ -1171,6 +1171,15 @@ impl Unit {
 			)
 	}
 	// Actions
+	pub fn toggle_autocast(&self, ability: AbilityId) {
+		self.data
+			.commander
+			.lock_write()
+			.autocast
+			.entry(ability)
+			.or_default()
+			.push(self.tag);
+	}
 	pub fn command(&self, ability: AbilityId, target: Target, queue: bool) {
 		if !(queue || self.allow_spam || self.is_idle()) {
 			let last_order = &self.orders[0];

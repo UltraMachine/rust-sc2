@@ -16,6 +16,7 @@ pub type Command = (u64, (AbilityId, Target, bool));
 #[derive(Default, Clone)]
 pub struct Commander {
 	pub commands: HashMap<(AbilityId, Target, bool), Vec<u64>>,
+	pub autocast: HashMap<AbilityId, Vec<u64>>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
