@@ -2,6 +2,10 @@ from json import load
 from pathlib import Path
 from sys import argv
 
+HEAD = """\
+#[cfg(feature = "serde")]
+use serde::{Serialize, Deserialize};
+"""
 DERIVES = """\
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, FromPrimitive, ToPrimitive, Copy, Clone, PartialEq, Eq, Hash)]\
@@ -110,7 +114,9 @@ def generate():
 	):
 		if enum == enum_linux:
 			generated = (
-				f"{DERIVES}\npub enum {name} {{\n"
+				HEAD
+				+ "\n"
+				+ f"{DERIVES}\npub enum {name} {{\n"
 				+ "".join(
 					f"\t{k} = {v},\n"
 					for k, v in sorted(enum.items(), key=lambda x: x[1])
@@ -119,7 +125,9 @@ def generate():
 			)
 		else:
 			generated = (
-				f'#[cfg(target_os = "windows")]\n{DERIVES}\npub enum {name} {{\n'
+				HEAD
+				+ "\n"
+				+ f'#[cfg(target_os = "windows")]\n{DERIVES}\npub enum {name} {{\n'
 				+ "".join(
 					f"\t{k} = {v},\n"
 					for k, v in sorted(enum.items(), key=lambda x: x[1])

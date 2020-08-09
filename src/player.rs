@@ -7,6 +7,8 @@ use sc2_proto::{
 		Result as ProtoGameResult,
 	},
 };
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 #[variant_checkers]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
