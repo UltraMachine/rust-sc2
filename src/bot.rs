@@ -1,3 +1,6 @@
+//! [`Bot`] struct and it's helpers.
+#![warn(missing_docs)]
+
 use crate::{
 	action::{Action, ActionResult, Commander, Target},
 	api::API,
@@ -54,7 +57,7 @@ pub(crate) type Writer<'a, T> = RwLockWriteGuard<'a, T>;
 #[cfg(not(feature = "rayon"))]
 pub(crate) type Writer<'a, T> = RefMut<'a, T>;
 
-pub trait Locked<T> {
+pub(crate) trait Locked<T> {
 	fn lock_read(&self) -> Reader<T>;
 	fn lock_write(&self) -> Writer<T>;
 }
@@ -81,11 +84,16 @@ impl<T> Locked<T> for Rw<T> {
 	}
 }
 
+/// Additional options for [`find_placement`](Bot::find_placement).
 #[derive(Clone, Copy)]
 pub struct PlacementOptions {
+	/// Maximum distance of checked points from given position. [Default: `15`]
 	pub max_distance: isize,
+	/// Step between each checked position.  [Default: `2`]
 	pub step: isize,
+	/// Return random found point if `true`, or closest to given position. [Default: `false`]
 	pub random: bool,
+	/// Filter positions where addon can fit. [Default: `false`]
 	pub addon: bool,
 }
 impl Default for PlacementOptions {
@@ -99,35 +107,87 @@ impl Default for PlacementOptions {
 	}
 }
 
+/**
+Options used to configure which units are counted.
+Constructed with [`counter`] method.
+
+# Examples
+Count all ready marines:
+```rust
+let count = self.counter().count(UnitTypeId::Marine);
+```
+
+Count all supplies in progress:
+```rust
+let count = self.counter().ordered().count(UnitTypeId::SupplyDepot);
+```
+
+Count all ready and ordered nexuses:
+```rust
+let count = self.counter().all().count(UnitTypeId::Nexus);
+```
+
+Count all ready zerglings, taking burrowed ones into accont:
+```rust
+let count = self.counter().alias().count(UnitTypeId::Zergling);
+```
+
+Count all terran bases and alias (orbital, planetary fortress), including ccs in progress:
+```rust
+let count = self.counter().all().tech().count(UnitTypeId::CommandCenter);
+```
+
+[`counter`]: Bot::counter
+*/
+#[derive(Clone, Copy)]
 pub struct CountOptions<'a> {
 	bot: &'a Bot,
+	/// State of counted units.
+	/// Can be:
+	/// - `Complete` - only complete units
+	/// - `Ordered` - only units in progress
+	/// - `All` - both compete and ordered units
+	///
+	/// [Default: `Complete`]
 	pub completion: Completion,
+	/// Alias of counted units.
+	/// Can be:
+	/// - `None` - don't count alias
+	/// - `Unit` - count unit-alias, used when unit has 2 forms
+	/// - `Tech` - count tech-alias, used when unit has more than 2 forms (usually structures)
+	///
+	/// [Default: `None`]
 	pub alias: UnitAlias,
 }
 impl<'a> CountOptions<'a> {
-	pub fn new(bot: &'a Bot) -> Self {
+	pub(crate) fn new(bot: &'a Bot) -> Self {
 		Self {
 			bot,
 			completion: Default::default(),
 			alias: Default::default(),
 		}
 	}
+	/// Sets [`completion`](Self::completion) to `Ordered`.
 	pub fn ordered(&mut self) -> &mut Self {
 		self.completion = Completion::Ordered;
 		self
 	}
+	/// Sets [`completion`](Self::completion) to `All`.
 	pub fn all(&mut self) -> &mut Self {
 		self.completion = Completion::All;
 		self
 	}
+	/// Sets [`alias`](Self::alias) to `Unit`.
 	pub fn alias(&mut self) -> &mut Self {
 		self.alias = UnitAlias::Unit;
 		self
 	}
+	/// Sets [`alias`](Self::alias) to `Tech`.
 	pub fn tech(&mut self) -> &mut Self {
 		self.alias = UnitAlias::Tech;
 		self
 	}
+	/// Counts units of given type and returns the result.
 	pub fn count(&self, unit_id: UnitTypeId) -> usize {
 		let bot = self.bot;
 		let count: Box<dyn Fn(UnitTypeId) -> usize> = match self.completion {
@@ -158,9 +218,15 @@ impl<'a> CountOptions<'a> {
 		}
 	}
 }
+
+/// Alias of counted units, used in [`CountOptions`].
+#[derive(Clone, Copy)]
 pub enum UnitAlias {
+	/// Don't count alias.
 	None,
+	/// Count unit-alias, used when unit has 2 forms.
 	Unit,
+	/// Count tech-alias, used when unit has more than 2 forms (usually structures).
 	Tech,
 }
 impl Default for UnitAlias {
@@ -168,9 +234,15 @@ impl Default for UnitAlias {
 		Self::None
 	}
 }
+
+/// State of counted units, used in [`CountOptions`].
+#[derive(Clone, Copy)]
 pub enum Completion {
+	/// Only complete units.
 	Complete,
+	/// Only units in progress.
 	Ordered,
+	/// Both compete and ordered units.
 	All,
 }
 impl Default for Completion {
@@ -179,46 +251,77 @@ impl Default for Completion {
 	}
 }
 
+/// Main bot struct.
+/// Structs with `#[bot]` attribute will get all it's fields and methods
+/// through `Deref` and `DerefMut` traits.
 pub struct Bot {
 	pub(crate) process: Option<Child>,
 	pub(crate) api: Option<API>,
+	/// Sets number of frames between every [`on_step`](crate::Player::on_step). Must be bigger than `0`.
 	pub game_step: u32,
+	#[doc(hidden)]
 	pub disable_fog: bool,
+	/// Actual race of your bot.
 	pub race: Race,
+	/// Requested race of your opponent.
 	pub enemy_race: Race,
+	/// Your in-game id.
 	pub player_id: u32,
+	/// Opponent in-game id.
 	pub enemy_player_id: u32,
+	/// Opponent id on ladder, filled by `--OpponentId`.
 	pub opponent_id: String,
-	pub actions: Vec<Action>,
-	pub commander: Rw<Commander>,
+	actions: Vec<Action>,
+	commander: Rw<Commander>,
+	/// Debug API
 	pub debug: Debugger,
+	/// Information about map.
 	pub game_info: GameInfo,
+	/// Constant information about abilities, unit types, upgrades, buffs and effects.
 	pub game_data: Rs<GameData>,
+	/// Information about current state, updated each step.
 	pub state: GameState,
+	/// Values, which depend on bot's race
 	pub race_values: Rs<RaceValues>,
 	data_for_unit: SharedUnitData,
+	/// Structured collection of units.
 	pub units: AllUnits,
-	pub abilities_units: Rs<FxHashMap<u64, FxHashSet<AbilityId>>>,
-	pub orders: FxHashMap<AbilityId, usize>,
-	pub current_units: FxHashMap<UnitTypeId, usize>,
+	pub(crate) abilities_units: Rs<FxHashMap<u64, FxHashSet<AbilityId>>>,
+	orders: FxHashMap<AbilityId, usize>,
+	current_units: FxHashMap<UnitTypeId, usize>,
+	/// In-game time in seconds.
 	pub time: f32,
+	/// Amount of minerals bot has.
 	pub minerals: u32,
+	/// Amount of gas bot has.
 	pub vespene: u32,
+	/// Amount of supply used by army.
 	pub supply_army: u32,
+	/// Amount of supply used by workers.
 	pub supply_workers: u32,
+	/// The supply limit.
 	pub supply_cap: u32,
+	/// Total supply used.
 	pub supply_used: u32,
+	/// Amount of free supply.
 	pub supply_left: u32,
+	/// Bot's starting location.
 	pub start_location: Point2,
+	/// Opponent's starting location.
 	pub enemy_start: Point2,
+	/// Bot's resource center on start location.
 	pub start_center: Point2,
+	/// Opponents's resource center on start location.
 	pub enemy_start_center: Point2,
 	techlab_tags: Rw<FxHashSet<u64>>,
 	reactor_tags: Rw<FxHashSet<u64>>,
+	/// All expansions stored in (location, resource center) pairs.
 	pub expansions: Vec<(Point2, Point2)>,
 	max_cooldowns: Rw<FxHashMap<UnitTypeId, f32>>,
 	last_units_health: Rs<FxHashMap<u64, u32>>,
+	/// Obstacles on map which block vision of ground units, but still pathable.
 	pub vision_blockers: Vec<Point2>,
+	/// Ramps on map.
 	pub ramps: Ramps,
 	enemy_upgrades: Rw<FxHashSet<UpgradeId>>,
 	pub(crate) owned_tags: FxHashSet<u64>,
@@ -226,10 +329,12 @@ pub struct Bot {
 }
 
 impl Bot {
+	/// Interface for interacting with SC2 API through Request/Response.
 	#[inline]
 	pub fn api(&mut self) -> &mut API {
 		self.api.as_mut().expect("API is not initialized")
 	}
+	/// Constructs new [`CountOptions`], used to count units fast and easy.
 	pub fn counter(&self) -> CountOptions {
 		CountOptions::new(self)
 	}
@@ -271,12 +376,14 @@ impl Bot {
 	pub(crate) fn clear_debug_commands(&mut self) {
 		self.debug.clear_commands();
 	}
+	/// Returns full cost of building given unit type, without any corrections.
 	pub fn get_unit_api_cost(&self, unit: UnitTypeId) -> Cost {
 		self.game_data
 			.units
 			.get(&unit)
 			.map_or_else(Default::default, |data| data.cost())
 	}
+	/// Returns correct cost of building given unit type.
 	pub fn get_unit_cost(&self, unit: UnitTypeId) -> Cost {
 		let mut cost = self
 			.game_data
@@ -302,6 +409,7 @@ impl Bot {
 		}
 		cost
 	}
+	/// Checks if bot has enough resources and supply to build given unit type.
 	pub fn can_afford(&self, unit: UnitTypeId, check_supply: bool) -> bool {
 		let cost = self.get_unit_cost(unit);
 		if self.minerals < cost.minerals || self.vespene < cost.vespene {
@@ -312,12 +420,14 @@ impl Bot {
 		}
 		true
 	}
+	/// Checks cost of making given upgrade.
 	pub fn get_upgrade_cost(&self, upgrade: UpgradeId) -> Cost {
 		self.game_data
 			.upgrades
 			.get(&upgrade)
 			.map_or_else(Default::default, |data| data.cost())
 	}
+	/// Checks if bot has enough resources to make given upgrade.
 	pub fn can_afford_upgrade(&self, upgrade: UpgradeId) -> bool {
 		let cost = self.get_upgrade_cost(upgrade);
 		self.minerals >= cost.minerals && self.vespene >= cost.vespene
@@ -327,6 +437,12 @@ impl Bot {
 		unimplemented!()
 	}
 	*/
+	/// Subtracts cost of given unit type from [`minerals`], [`vespene`], [`supply_left`] and adds to [`supply_used`].
+	///
+	/// [`minerals`]: Self::minerals
+	/// [`vespene`]: Self::vespene
+	/// [`supply_left`]: Self::supply_left
+	/// [`supply_used`]: Self::supply_used
 	pub fn subtract_resources(&mut self, unit: UnitTypeId, subtract_supply: bool) {
 		let cost = self.get_unit_cost(unit);
 		self.minerals = self.minerals.saturating_sub(cost.minerals);
@@ -337,20 +453,28 @@ impl Bot {
 			self.supply_left = self.supply_left.saturating_sub(supply_cost);
 		}
 	}
+	/// Subtracts cost of given upgrade from [`minerals`] and [`vespene`].
+	///
+	/// [`minerals`]: Self::minerals
+	/// [`vespene`]: Self::vespene
 	pub fn subtract_upgrade_cost(&mut self, upgrade: UpgradeId) {
 		let cost = self.get_upgrade_cost(upgrade);
 		self.minerals = self.minerals.saturating_sub(cost.minerals);
 		self.vespene = self.vespene.saturating_sub(cost.vespene);
 	}
+	/// Checks if given upgrade is complete.
 	pub fn has_upgrade(&self, upgrade: UpgradeId) -> bool {
 		self.state.observation.raw.upgrades.lock_read().contains(&upgrade)
 	}
+	/// Checks if predicted opponent's upgrades contains given upgrade.
 	pub fn enemy_has_upgrade(&self, upgrade: UpgradeId) -> bool {
 		self.enemy_upgrades.lock_read().contains(&upgrade)
 	}
+	/// Returns mutable set of predicted opponent's upgrades.
 	pub fn enemy_upgrades(&self) -> Writer<FxHashSet<UpgradeId>> {
 		self.enemy_upgrades.lock_write()
 	}
+	/// Checks if upgrade is in progress.
 	pub fn is_ordered_upgrade(&self, upgrade: UpgradeId) -> bool {
 		let ability = self.game_data.upgrades[&upgrade].ability;
 		self.orders
@@ -358,6 +482,10 @@ impl Bot {
 			.copied()
 			.map_or(false, |count| count > 0)
 	}
+	/// Returns progress of making given upgrade.
+	/// - `1` - complete
+	/// - `0` - not even ordered
+	/// - `0..1` - in progress
 	pub fn upgrade_progress(&self, upgrade: UpgradeId) -> f32 {
 		if self.has_upgrade(upgrade) {
 			return 1.0;
@@ -380,36 +508,48 @@ impl Bot {
 			})
 			.unwrap_or(0.0)
 	}
+	/// Sends message to in-game chat.
 	pub fn chat(&mut self, message: &str) {
 		self.actions.push(Action::Chat(message.to_string(), false));
 	}
+	/// Returns actual terrain height on given position in 3D space.
 	pub fn get_z_height<P: Into<(usize, usize)>>(&self, pos: P) -> f32 {
 		self.game_info.terrain_height[pos.into()] as f32 * 32.0 / 255.0 - 16.0
 	}
+	/// Returns terrain height on given position.
 	pub fn get_height<P: Into<(usize, usize)>>(&self, pos: P) -> u8 {
 		self.game_info.terrain_height[pos.into()]
 	}
+	/// Checks if it's possible to build on given position.
 	pub fn is_placeable<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
 		self.game_info.placement_grid[pos.into()].is_empty()
 	}
+	/// Checks if it's possible for ground units to walk through given position.
 	pub fn is_pathable<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
 		self.game_info.pathing_grid[pos.into()].is_empty()
 	}
+	/// Checks if given position is hidden (weren't explored before).
 	pub fn is_hidden<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
 		self.state.observation.raw.visibility[pos.into()].is_hidden()
 	}
+	/// Checks if given position is in fog of war (was explored before).
 	pub fn is_fogged<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
 		self.state.observation.raw.visibility[pos.into()].is_fogged()
 	}
+	/// Checks if given position is visible now.
 	pub fn is_visible<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
 		self.state.observation.raw.visibility[pos.into()].is_visible()
 	}
+	/// Checks if given position is fully hidden
+	/// (terrain isn't visible, only darkness; only in campain and custom maps).
 	pub fn is_full_hidden<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
 		self.state.observation.raw.visibility[pos.into()].is_full_hidden()
 	}
+	/// Checks if given position is not hidden (was explored before).
 	pub fn is_explored<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
 		self.state.observation.raw.visibility[pos.into()].is_explored()
 	}
+	/// Checks if given position has zerg's creep.
 	pub fn has_creep<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
 		self.state.observation.raw.creep[pos.into()].is_empty()
 	}
@@ -791,6 +931,9 @@ impl Bot {
 		});
 		units.all = self.state.observation.raw.units.clone();
 	}
+
+	/// Simple wrapper around [`query_placement`](Self::query_placement).
+	/// Checks if it's possible to build given building on given position.
 	pub fn can_place(&mut self, building: UnitTypeId, pos: Point2) -> bool {
 		self.query_placement(
 			vec![(self.game_data.units[&building].ability.unwrap(), pos, None)],
@@ -798,6 +941,8 @@ impl Bot {
 		)
 		.unwrap()[0] == ActionResult::Success
 	}
+	/// Simple wrapper around [`query_placement`](Self::query_placement).
+	/// Multi-version of [`can_place`](Self::can_place).
 	pub fn can_place_some(&mut self, places: Vec<(UnitTypeId, Point2)>) -> Vec<bool> {
 		self.query_placement(
 			places
@@ -812,6 +957,9 @@ impl Bot {
 		.collect()
 	}
 
+	/// Nice wrapper around [`query_placement`](Self::query_placement).
+	/// Returns correct position where it is possible to build given `building`,
+	/// or `None` if position is not found or `building` can't be built by a worker.
 	pub fn find_placement(
 		&mut self,
 		building: UnitTypeId,
@@ -906,6 +1054,10 @@ impl Bot {
 		}
 		None
 	}
+	/// Another wrapper around [`query_placement`](Self::query_placement),
+	/// used to find free geyser near given base.
+	///
+	/// Returns `Unit` of geyser or `None` if there're no free geysers around given base.
 	pub fn find_gas_placement(&mut self, base: Point2) -> Option<Unit> {
 		let ability = self.game_data.units[&self.race_values.gas].ability.unwrap();
 
@@ -923,6 +1075,9 @@ impl Bot {
 			.find(|(_, res)| **res == ActionResult::Success)
 			.map(|(geyser, _)| geyser.clone())
 	}
+
+	/// Returns next possible location from [`expansions`](Self::expansions) closest to bot's start location
+	/// or `None` if there aren't any free locations.
 	pub fn get_expansion(&mut self) -> Option<(Point2, Point2)> {
 		let expansions = self
 			.expansions
@@ -949,6 +1104,8 @@ impl Bot {
 			.min_by(|(_, path1), (_, path2)| path1.partial_cmp(&path2).unwrap())
 			.map(|(loc, _path)| *loc)
 	}
+	/// Returns next possible location from [`expansions`](Self::expansions) closest to opponent's start location
+	/// or `None` if there aren't any free locations.
 	pub fn get_enemy_expansion(&mut self) -> Option<(Point2, Point2)> {
 		let expansions = self
 			.expansions
@@ -972,6 +1129,7 @@ impl Bot {
 			.min_by(|(_, path1), (_, path2)| path1.partial_cmp(&path2).unwrap())
 			.map(|(loc, _path)| *loc)
 	}
+	/// Returns all [`expansions`](Self::expansions) taken by bot.
 	pub fn owned_expansions(&self) -> Vec<(Point2, Point2)> {
 		self.expansions
 			.iter()
@@ -979,6 +1137,7 @@ impl Bot {
 			.copied()
 			.collect()
 	}
+	/// Returns all [`expansions`](Self::expansions) taken by opponent.
 	pub fn enemy_expansions(&self) -> Vec<(Point2, Point2)> {
 		self.expansions
 			.iter()
@@ -986,6 +1145,7 @@ impl Bot {
 			.copied()
 			.collect()
 	}
+	/// Returns all avaliable [`expansions`](Self::expansions).
 	pub fn free_expansions(&self) -> Vec<(Point2, Point2)> {
 		self.expansions
 			.iter()
@@ -1001,6 +1161,12 @@ impl Bot {
 			.copied()
 			.collect()
 	}
+	/// Sends pathing requests to API.
+	///
+	/// Takes `Vec` of (start, goal), where `start` is position or unit tag and `goal` is position.
+	///
+	/// Returns `Vec` ordered by input values,
+	/// where element is distance of path from start to goal or `None` if there's no path.
 	pub fn query_pathing(&mut self, paths: Vec<(Target, Point2)>) -> SC2Result<Vec<Option<f32>>> {
 		let mut req = Request::new();
 		let req_pathing = req.mut_query().mut_pathing();
@@ -1024,6 +1190,18 @@ impl Bot {
 			.map(|result| result.distance)
 			.collect())
 	}
+	/// Sends placement requests to API.
+	/// Takes creep, psionic matrix, and other stuff into account.
+	///
+	/// Returned results will be successful when:
+	/// - given ability can be used by worker
+	/// - `check_resources` is `false` or bot has enough resources to use given ability
+	/// - worker tag is `None` or worker can reach given position
+	/// - given place is free of obstacles
+	///
+	/// Takes `Vec` of (build ability, position, tag of worker or `None`).
+	///
+	/// Returns `Vec` of [`ActionResult`] ordered by input values.
 	pub fn query_placement(
 		&mut self,
 		places: Vec<(AbilityId, Point2, Option<u64>)>,
@@ -1053,6 +1231,12 @@ impl Bot {
 			.collect())
 	}
 
+	/// Leaves current game, which is counted as Defeat for bot.
+	///
+	/// Note: [`on_end`] will not be called, if needed use [`debug.end_game`] instead.
+	///
+	/// [`on_end`]: crate::Player::on_end
+	/// [`debug.end_game`]: Debugger::end_game
 	pub fn leave(&mut self) -> SC2Result<()> {
 		let mut req = Request::new();
 		req.mut_leave_game();
