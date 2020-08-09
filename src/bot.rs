@@ -1016,7 +1016,7 @@ impl Bot {
 			req_pathing.push(pathing);
 		});
 
-		let res = self.api.as_mut().expect("API is not initialized").send(req)?;
+		let res = self.api().send(req)?;
 		Ok(res
 			.get_query()
 			.get_pathing()
@@ -1044,7 +1044,7 @@ impl Bot {
 			req_placement.push(placement);
 		});
 
-		let res = self.api.as_mut().expect("API is not initialized").send(req)?;
+		let res = self.api().send(req)?;
 		Ok(res
 			.get_query()
 			.get_placements()
