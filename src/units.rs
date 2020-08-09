@@ -67,7 +67,30 @@ impl Units {
 	// HashMap methods
 	#[inline]
 	pub fn new() -> Self {
-		Units(FxIndexMap::default())
+		Self(Default::default())
+	}
+
+	#[inline]
+	pub fn with_capacity(n: usize) -> Self {
+		Self(IndexMap::with_capacity_and_hasher(
+			n,
+			BuildHasherDefault::<FxHasher>::default(),
+		))
+	}
+
+	#[inline]
+	pub fn capacity(&self) -> usize {
+		self.0.capacity()
+	}
+
+	#[inline]
+	pub fn reserve(&mut self, additional: usize) {
+		self.0.reserve(additional);
+	}
+
+	#[inline]
+	pub fn shrink_to_fit(&mut self) {
+		self.0.shrink_to_fit();
 	}
 
 	#[inline]
