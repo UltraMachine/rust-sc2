@@ -12,31 +12,31 @@ license-file = "LICENSE"
 sc2-proto = { git = "https://github.com/UltraMachine/sc2-proto-rs" }
 # sc2-proto = { path = "../sc2-proto-rs" }
 sc2-macro = { path = "sc2-macro" }
-tungstenite = "^0.11.0"
+tungstenite = "^0.11.1"
 url = "^2.1.1"
 protobuf = "~2.14.0"
 ndarray = "^0.13.1"
 num-traits = "^0.2.12"
-num-derive = "^0.3.0"
+num-derive = "^0.3.1"
 regex = "^1.3.9"
-dirs = "^3.0.0"
+dirs = "^3.0.1"
 itertools = "^0.9.0"
 lazy_static = "^1.4.0"
 maplit = "^1.0.2"
 rand = "^0.7.3"
-log = "^0.4.8"
+log = "^0.4.11"
 rustc-hash = "^1.1.0"
 rayon = { version = "^1.3.1", optional = true }
-indexmap = "^1.4.0"
+indexmap = "^1.5.1"
 serde = { version = "^1.0.114", features = ["derive"], optional = true }
 
 [dev-dependencies]
-clap = "^2.33.1"
+clap = "^2.33.2"
 
 [features]
 protoc = ["sc2-proto/protoc-rust"]
 
 # hack: change when found better solution
 [target.'cfg(feature = "rayon")'.dependencies]
-indexmap = { version = "^1.4.0", features = ["rayon"] }
+indexmap = { version = "^1.5.1", features = ["rayon"] }
 ndarray = { version = "^0.13.1", features = ["rayon"] }
