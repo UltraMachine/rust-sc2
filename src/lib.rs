@@ -1,3 +1,5 @@
+// #![warn(missing_docs)]
+
 #[macro_use]
 extern crate num_derive;
 #[macro_use]
@@ -11,6 +13,8 @@ extern crate maplit;
 #[macro_use]
 extern crate log;
 
+/// The most frequent used items and various traits here.
+/// Prefered usage: `use::rust_sc2::prelude::*;`.
 pub mod prelude {
 	#[cfg(feature = "rayon")]
 	pub use crate::units::ParUnitsIterator;
@@ -35,22 +39,22 @@ pub mod prelude {
 
 mod api;
 mod client;
-mod debug;
-mod game_info;
 mod paths;
-mod ramp;
 mod score;
 
 pub mod action;
 pub mod bot;
 pub mod constants;
+pub mod debug;
 pub mod distance;
 pub mod game_data;
+pub mod game_info;
 pub mod game_state;
 pub mod geometry;
 pub mod ids;
 pub mod pixel_map;
 pub mod player;
+pub mod ramp;
 pub mod unit;
 pub mod units;
 pub mod utils;
