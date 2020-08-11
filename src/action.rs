@@ -1,3 +1,5 @@
+//! Data structures for executing actions and analyzing actions failure.
+
 use crate::{
 	geometry::{Point2, Point3},
 	ids::AbilityId,
@@ -11,21 +13,26 @@ use sc2_proto::{
 };
 use std::collections::HashMap;
 
-pub type Command = (u64, (AbilityId, Target, bool));
+// pub(crate) type Command = (u64, (AbilityId, Target, bool));
 
 #[derive(Default, Clone)]
-pub struct Commander {
+pub(crate) struct Commander {
 	pub commands: HashMap<(AbilityId, Target, bool), Vec<u64>>,
 	pub autocast: HashMap<AbilityId, Vec<u64>>,
 }
 
+/// Target of ability used by unit.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Target {
+	/// Ability target is position (move, build, ...).
 	Pos(Point2),
+	/// Ability target is unit (attack, repair, heal, ...).
 	Tag(u64),
+	/// Ability don't require target (train, morph, research, ...).
 	None,
 }
 
+#[doc(hidden)]
 #[derive(Debug, Clone)]
 pub enum Action {
 	UnitCommand(AbilityId, Target, Vec<u64>, bool),
@@ -114,10 +121,15 @@ impl FromProto<&ProtoAction> for Option<Action> {
 	}
 }
 
+/// Structure used to analyze actions failed on previous game step.
+/// Stored in [`state.action_errors`](crate::game_state::GameState::action_errors).
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ActionError {
+	/// Tag of unit that was executing action.
 	pub unit: u64,
+	/// Ability that was used by this unit.
 	pub ability: AbilityId,
+	/// Result of executed action.
 	pub result: ActionResult,
 }
 impl FromProto<&ProtoActionError> for ActionError {
@@ -130,6 +142,8 @@ impl FromProto<&ProtoActionError> for ActionError {
 	}
 }
 
+/// Result of executed action.
+#[allow(missing_docs)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ActionResult {
 	Success,
