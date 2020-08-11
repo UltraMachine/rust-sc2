@@ -1,3 +1,5 @@
+//! Useful constants and static values.
+
 use crate::{
 	game_data::{Attribute, TargetType, Weapon},
 	ids::*,
@@ -5,8 +7,11 @@ use crate::{
 };
 use std::collections::HashMap;
 
-pub const GAME_SPEED: f32 = 1.4; // Faster
-pub const FRAMES_PER_SECOND: f32 = 22.4; // 16 (default frames per second) * 1.4 (game speed)
+/// Default in-game speed modifier (on *Faster* game speed).
+/// See [page on liquipedia](https://liquipedia.net/starcraft2/Game_Speed) for more info.
+pub const GAME_SPEED: f32 = 1.4;
+/// Frames per second, calculated by `16 (default frames per second) * 1.4 (game speed)`.
+pub const FRAMES_PER_SECOND: f32 = 22.4;
 
 #[cfg(windows)]
 pub(crate) const INHIBITOR_IDS: [UnitTypeId; 6] = [
@@ -24,13 +29,20 @@ pub(crate) const INHIBITOR_IDS: [UnitTypeId; 3] = [
 	UnitTypeId::InhibitorZoneLarge,
 ];
 
+/// Structured values, specific for each race.
 #[derive(Clone)]
 pub struct RaceValues {
+	/// Default townhall without any upgrades, which can be built by a worker.
 	pub start_townhall: UnitTypeId,
+	/// All possible forms of townhall.
 	pub townhalls: Vec<UnitTypeId>,
+	/// Building used to extract gas from vespene geysers.
 	pub gas: UnitTypeId,
+	/// Building used to extract gas from rich vespene geysers.
 	pub rich_gas: UnitTypeId,
+	/// Supply provider for this race.
 	pub supply: UnitTypeId,
+	/// Worker of this race.
 	pub worker: UnitTypeId,
 }
 impl Default for RaceValues {
@@ -50,6 +62,7 @@ type BonusesForTarget = HashMap<TargetType, BonusesByAttribute>;
 type BonusesByAttribute = (Option<u32>, HashMap<Attribute, u32>);
 
 lazy_static! {
+	/// [`RaceValues`] mapped to each race.
 	pub static ref RACE_VALUES: HashMap<Race, RaceValues> = hashmap![
 		Race::Terran => RaceValues {
 			start_townhall: UnitTypeId::CommandCenter,
@@ -82,7 +95,7 @@ lazy_static! {
 			worker: UnitTypeId::Probe,
 		},
 	];
-	pub static ref TECH_ALIAS: HashMap<UnitTypeId, Vec<UnitTypeId>> = hashmap![
+	pub(crate) static ref TECH_ALIAS: HashMap<UnitTypeId, Vec<UnitTypeId>> = hashmap![
 		UnitTypeId::Assimilator => vec![UnitTypeId::AssimilatorRich],
 		UnitTypeId::AssimilatorRich => vec![UnitTypeId::Assimilator],
 		UnitTypeId::Barracks => vec![UnitTypeId::BarracksFlying],
@@ -172,7 +185,7 @@ lazy_static! {
 		UnitTypeId::WidowMine => vec![UnitTypeId::WidowMineBurrowed],
 		UnitTypeId::WidowMineBurrowed => vec![UnitTypeId::WidowMine],
 	];
-	pub static ref UNIT_ALIAS: HashMap<UnitTypeId, UnitTypeId> = hashmap![
+	pub(crate) static ref UNIT_ALIAS: HashMap<UnitTypeId, UnitTypeId> = hashmap![
 		UnitTypeId::Adept => UnitTypeId::AdeptPhaseShift,
 		UnitTypeId::AdeptPhaseShift => UnitTypeId::Adept,
 		UnitTypeId::Assimilator => UnitTypeId::AssimilatorRich,
@@ -256,6 +269,14 @@ lazy_static! {
 		UnitTypeId::Zergling => UnitTypeId::ZerglingBurrowed,
 		UnitTypeId::ZerglingBurrowed => UnitTypeId::Zergling,
 	];
+	/// Tech requirements mapped to different units.
+	///
+	/// Basic usage:
+	/// ```rust
+	/// if let Some(requirment) = TECH_REQUIREMENTS.get(unit_type) {
+	///     /* do what you like */
+	/// }
+	/// ```
 	pub static ref TECH_REQUIREMENTS: HashMap<UnitTypeId, UnitTypeId> = hashmap![
 		// Terran
 		UnitTypeId::MissileTurret => UnitTypeId::EngineeringBay,
@@ -322,6 +343,7 @@ lazy_static! {
 		UnitTypeId::GreaterSpire => UnitTypeId::Hive,
 		UnitTypeId::BroodLord => UnitTypeId::GreaterSpire,
 	];
+	/// Producers mapped to different units.
 	pub static ref PRODUCERS: HashMap<UnitTypeId, UnitTypeId> = hashmap![
 		UnitTypeId::Adept => UnitTypeId::Gateway,
 		UnitTypeId::Armory => UnitTypeId::SCV,
@@ -431,6 +453,7 @@ lazy_static! {
 		UnitTypeId::Zealot => UnitTypeId::Gateway,
 		UnitTypeId::Zergling => UnitTypeId::Larva,
 	];
+	/// Producers and their alias mapped to different units.
 	pub static ref ALL_PRODUCERS: HashMap<UnitTypeId, Vec<UnitTypeId>> = hashmap![
 		UnitTypeId::Adept => vec![UnitTypeId::Gateway, UnitTypeId::WarpGate],
 		UnitTypeId::Armory => vec![UnitTypeId::SCV],
@@ -549,6 +572,7 @@ lazy_static! {
 		UnitTypeId::Zealot => vec![UnitTypeId::Gateway, UnitTypeId::WarpGate],
 		UnitTypeId::Zergling => vec![UnitTypeId::Larva],
 	];
+	/// Researchers mapped to upgrades.
 	pub static ref RESEARCHERS: HashMap<UpgradeId, UnitTypeId> = {
 		let mut map = hashmap![
 			UpgradeId::AdeptPiercingAttack => UnitTypeId::TwilightCouncil,
@@ -822,6 +846,7 @@ lazy_static! {
 			speed: 1.0,
 		}],
 	];
+	/// Radiuses of Inhibitor Zones mapped to their ids.
 	pub static ref INHIBITOR_ZONE_RADIUS: HashMap<UnitTypeId, f32> = {
 		let mut map = hashmap![
 			UnitTypeId::InhibitorZoneSmall => 4.0,
