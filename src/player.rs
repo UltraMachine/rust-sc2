@@ -1,3 +1,6 @@
+//! Items representing various player's data.
+#![allow(missing_docs)]
+
 use crate::{FromProto, IntoProto};
 use num_traits::FromPrimitive;
 use sc2_proto::{
@@ -10,13 +13,18 @@ use sc2_proto::{
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
+/// Representation of game races (your gender in SC2).
 #[variant_checkers]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FromStr)]
 pub enum Race {
+	/// Brutal mens, who try to survive in this world.
 	Terran,
+	/// Ruthless insects of incredibly big size. What a nightmare?
 	Zerg,
+	/// High-tech guys, who build cannons and batteries to scout and defend you.
 	Protoss,
+	/// Use when you didn't decide your race yet or just want to play them all.
 	Random,
 }
 impl FromProto<ProtoRace> for Race {
@@ -46,6 +54,7 @@ impl Default for Race {
 	}
 }
 
+/// Difficulty of in-game AI.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Copy, Clone, FromPrimitive, FromStr)]
 #[enum_from_str(use_primitives)]
@@ -94,6 +103,7 @@ impl IntoProto<ProtoDifficulty> for Difficulty {
 	}
 }
 
+/// Strategy build of in-game AI.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Copy, Clone, FromStr)]
 pub enum AIBuild {
@@ -134,10 +144,14 @@ impl Default for AIBuild {
 	}
 }
 
+/// Type of the player, used when joining a game.
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum PlayerType {
+	/// Bot or Human.
 	Participant,
+	/// In-game AI (aka Computer).
 	Computer,
+	/// Player who just watch game or replay.
 	Observer,
 }
 impl FromProto<ProtoPlayerType> for PlayerType {
@@ -159,6 +173,7 @@ impl IntoProto<ProtoPlayerType> for PlayerType {
 	}
 }
 
+/// Computer opponent configuration used in [`run_vs_computer`](crate::client::run_vs_computer).
 pub struct Computer {
 	pub race: Race,
 	pub difficulty: Difficulty,
@@ -174,6 +189,7 @@ impl Computer {
 	}
 }
 
+/// Result for bot passed to [`on_end`](crate::Player::on_end).
 #[variant_checkers]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
