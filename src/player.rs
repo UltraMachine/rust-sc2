@@ -189,7 +189,7 @@ impl Computer {
 	}
 }
 
-/// Result for bot passed to [`on_end`](crate::Player::on_end).
+/// Game result for bot passed to [`on_end`](crate::Player::on_end).
 #[variant_checkers]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

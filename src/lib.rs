@@ -39,10 +39,10 @@ pub mod prelude {
 }
 
 mod api;
-mod client;
 mod paths;
 mod score;
 
+pub mod client;
 pub mod action;
 pub mod bot;
 pub mod constants;
@@ -96,24 +96,36 @@ impl PlayerSettings {
 	}
 }
 
+/// Events that happen in game.
+/// Passed to [`on_event`](Player::on_event).
 pub enum Event {
+	/// Unit died or structure destroyed (all units: your, enemy, neutral).
 	UnitDestroyed(u64),
+	/// Unit finished training (your only).
 	UnitCreated(u64),
+	/// Worker started to build a structure (your only).
 	ConstructionStarted(u64),
+	/// Construction of a structure finished (your only).
 	ConstructionComplete(u64),
 }
 
+/// Trait that bots must implement.
 pub trait Player {
+	/// Returns settings used to connect bot to the game.
 	fn get_player_settings(&self) -> PlayerSettings;
+	/// Called once on first step (i.e on game start).
 	fn on_start(&mut self) -> SC2Result<()> {
 		Ok(())
 	}
+	/// Called on every game step. (Main logic of the bot should be here)
 	fn on_step(&mut self, _iteration: usize) -> SC2Result<()> {
 		Ok(())
 	}
+	/// Called once on last step with a result for your bot.
 	fn on_end(&self, _result: GameResult) -> SC2Result<()> {
 		Ok(())
 	}
+	/// Called when different events happen.
 	fn on_event(&mut self, _event: Event) -> SC2Result<()> {
 		Ok(())
 	}
