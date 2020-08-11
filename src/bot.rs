@@ -1,5 +1,4 @@
 //! [`Bot`] struct and it's helpers.
-#![warn(missing_docs)]
 
 use crate::{
 	action::{Action, ActionResult, Commander, Target},
@@ -107,38 +106,8 @@ impl Default for PlacementOptions {
 	}
 }
 
-/**
-Options used to configure which units are counted.
-Constructed with [`counter`] method.
-
-# Examples
-Count all ready marines:
-```rust
-let count = self.counter().count(UnitTypeId::Marine);
-```
-
-Count all supplies in progress:
-```rust
-let count = self.counter().ordered().count(UnitTypeId::SupplyDepot);
-```
-
-Count all ready and ordered nexuses:
-```rust
-let count = self.counter().all().count(UnitTypeId::Nexus);
-```
-
-Count all ready zerglings, taking burrowed ones into accont:
-```rust
-let count = self.counter().alias().count(UnitTypeId::Zergling);
-```
-
-Count all terran bases and alias (orbital, planetary fortress), including ccs in progress:
-```rust
-let count = self.counter().all().tech().count(UnitTypeId::CommandCenter);
-```
-
-[`counter`]: Bot::counter
-*/
+/// Options used to configure which units are counted.
+/// Constructed with [`counter`](Bot::counter) method.
 #[derive(Clone, Copy)]
 pub struct CountOptions<'a> {
 	bot: &'a Bot,
@@ -335,6 +304,32 @@ impl Bot {
 		self.api.as_mut().expect("API is not initialized")
 	}
 	/// Constructs new [`CountOptions`], used to count units fast and easy.
+	///
+	/// # Examples
+	/// Count all ready marines:
+	/// ```rust
+	/// let count = self.counter().count(UnitTypeId::Marine);
+	/// ```
+	///
+	/// Count all supplies in progress:
+	/// ```rust
+	/// let count = self.counter().ordered().count(UnitTypeId::SupplyDepot);
+	/// ```
+	///
+	/// Count all ready and ordered nexuses:
+	/// ```rust
+	/// let count = self.counter().all().count(UnitTypeId::Nexus);
+	/// ```
+	///
+	/// Count all ready zerglings, taking burrowed ones into accont:
+	/// ```rust
+	/// let count = self.counter().alias().count(UnitTypeId::Zergling);
+	/// ```
+	///
+	/// Count all terran bases and alias (orbital, planetary fortress), including ccs in progress:
+	/// ```rust
+	/// let count = self.counter().all().tech().count(UnitTypeId::CommandCenter);
+	/// ```
 	pub fn counter(&self) -> CountOptions {
 		CountOptions::new(self)
 	}
