@@ -1,4 +1,5 @@
 // #![warn(missing_docs)]
+#![deny(intra_doc_link_resolution_failure)]
 
 #[macro_use]
 extern crate num_derive;
