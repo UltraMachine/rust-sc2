@@ -1,5 +1,4 @@
 //! Items for interacting with Debug API.
-#![warn(missing_docs)]
 
 use crate::{
 	geometry::{Point2, Point3},
