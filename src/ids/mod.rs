@@ -1,3 +1,6 @@
+//! Auto generated with `generate_ids.py` script from `stableid.json`
+//! ids of units, ablities, upgrades, buffs and effects.
+
 mod unit_typeid;
 mod ability_id;
 mod upgrade_id;

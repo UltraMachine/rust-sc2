@@ -82,8 +82,8 @@ def parse_data(data, version=None):
 
 	# fixes for wrong ids
 	# if version == "4.10":
-	# 	upgrades["EnhancedShockwaves"] = 296
-	# 	abilities["GhostAcademyResearchEnhancedShockwaves"] = 822
+	#   upgrades["EnhancedShockwaves"] = 296
+	#   abilities["GhostAcademyResearchEnhancedShockwaves"] = 822
 	# elif version is None:
 	if version is None:
 		abilities["TerranBuildRefinery"] = 320
@@ -98,7 +98,15 @@ def parse_data(data, version=None):
 
 
 def generate():
-	mod = [[], [], ["mod impls;"]]
+	mod = [
+		[
+			"//! Auto generated with `generate_ids.py` script from `stableid.json`",
+			"//! ids of units, ablities, upgrades, buffs and effects.",
+		],
+		[],
+		[],
+		["mod impls;"],
+	]
 	enums_latest = parse_data(
 		load((Path.home() / "Documents" / "StarCraft II" / "stableid.json").open())
 	)
@@ -142,8 +150,8 @@ def generate():
 			)
 
 		(Path.cwd() / "src" / "ids" / f"{file}.rs").write_text(generated)
-		mod[0].append(f"mod {file};")
-		mod[1].append(f"pub use {file}::{name};")
+		mod[1].append(f"mod {file};")
+		mod[2].append(f"pub use {file}::{name};")
 	(Path.cwd() / "src" / "ids" / "mod.rs").write_text(
 		"\n\n".join("\n".join(part) for part in mod) + "\n"
 	)
