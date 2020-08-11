@@ -1,3 +1,5 @@
+//! Constant information about map, populated on first step.
+
 use crate::{
 	bot::Rs,
 	geometry::{Point2, Rect, Size},
@@ -8,19 +10,33 @@ use crate::{
 use sc2_proto::sc2api::ResponseGameInfo;
 use std::{collections::HashMap, path::Path};
 
+/// Structure where all map information stored.
 #[derive(Default, Clone)]
 pub struct GameInfo {
-	pub map_name: String,      // Depends on sc2 localization language
-	pub map_name_path: String, // Depends on file name
+	/// Map name bot playing on, which depends on sc2 localization language.
+	pub map_name: String,
+	/// Map name bot playing on, which depends on file name.
+	pub map_name_path: String,
+	/// Mods used on that map.
 	pub mod_names: Vec<String>,
+	/// Path to the map on current computer.
 	pub local_map_path: String,
+	/// Players on this map, mapped by their ids.
 	pub players: HashMap<u32, PlayerInfo>,
+	/// Full size of the map.
 	pub map_size: Size,
+	/// Grid with information about pathable tiles on that map.
 	pub pathing_grid: PixelMap,
+	/// Grid with information about terrain height on that map.
 	pub terrain_height: Rs<ByteMap>,
+	/// Grid with information about buildable tiles on that map.
 	pub placement_grid: PixelMap,
+	/// Usually maps have some unplayable area around it, where units can't exist.
+	/// This rectangle is only playble area on that map.
 	pub playable_area: Rect,
+	/// All starting locations of opponents.
 	pub start_locations: Vec<Point2>,
+	/// Center of the map.
 	pub map_center: Point2,
 }
 impl FromProto<ResponseGameInfo> for GameInfo {
@@ -87,13 +103,21 @@ impl FromProto<ResponseGameInfo> for GameInfo {
 	}
 }
 
+/// Information about player.
 #[derive(Clone)]
 pub struct PlayerInfo {
+	/// Player id.
 	pub id: u32,
+	/// Player type, can be `Participant`, `Computer` or `Observer`.
 	pub player_type: PlayerType,
+	/// Requested race, can be random.
 	pub race_requested: Race,
+	/// Actual race, it's never random, `None` for opponents.
 	pub race_actual: Option<Race>,
+	/// Difficulty, populated only for computer opponents.
 	pub difficulty: Option<Difficulty>,
+	/// AI Build, populated only for computer opponents.
 	pub ai_build: Option<AIBuild>,
+	/// In-game name of player.
 	pub player_name: Option<String>,
 }
