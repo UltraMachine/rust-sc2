@@ -1,11 +1,17 @@
+//! Data structures, used to store map data.
+#![allow(missing_docs)]
+
 use crate::{geometry::Point2, FromProto};
 use ndarray::Array2;
 use num_traits::FromPrimitive;
 use sc2_proto::common::ImageData;
 use std::ops::{Index, IndexMut};
 
+/// 2-Dimensional Array of pixels, where each pixel is `Set` or is `Empty`.
 pub type PixelMap = Array2<Pixel>;
+/// 2-Dimensional Array of bytes.
 pub type ByteMap = Array2<u8>;
+/// 2-Dimensional Array that represents visibility.
 pub type VisibilityMap = Array2<Visibility>;
 
 impl<T> Index<Point2> for Array2<T> {
@@ -74,10 +80,14 @@ impl FromProto<&ImageData> for VisibilityMap {
 	}
 }
 
+/// Base for the most 2d maps.
 #[variant_checkers]
 #[derive(FromPrimitive, ToPrimitive, Copy, Clone, PartialEq, Eq)]
 pub enum Pixel {
+	/// When pixel is set, this tile is obstacle (e.g. not pathable | not placeable)
+	/// or has something on it (e.g. has creep).
 	Set,
+	/// When pixel is empty, this tile is free (e.g. pathable | placeable | no creep).
 	Empty,
 }
 impl Default for Pixel {
@@ -94,12 +104,17 @@ impl std::fmt::Debug for Pixel {
 	}
 }
 
+/// Base for visibility maps.
 #[variant_checkers]
 #[derive(Debug, FromPrimitive, ToPrimitive, Copy, Clone, PartialEq, Eq)]
 pub enum Visibility {
+	/// Position is hidden (i.e. weren't explored before)
 	Hidden,
+	/// Position is in fog of war (i.e. was explored before, but not visible now)
 	Fogged,
+	/// Position is visible now.
 	Visible,
+	/// Position is fully hidden (i.e. terrain isn't visible, only darkness; only in campain and custom maps).
 	FullHidden,
 }
 impl Visibility {
