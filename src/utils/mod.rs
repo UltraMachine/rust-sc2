@@ -1,9 +1,19 @@
+//! Different utilites useful (or useless) in bot develop.
+
 use indexmap::IndexSet;
 use rustc_hash::{FxHashSet, FxHasher};
 use std::hash::{BuildHasherDefault, Hash};
 
 type FxIndexSet<T> = IndexSet<T, BuildHasherDefault<FxHasher>>;
 
+/// DBSCAN implementation in Rust.
+///
+/// Inputs:
+/// - `data`: iterable collection of points.
+/// - `range_query`: function that should return neighbors of given point.
+/// - `min_points`: minimum neighbors required for point to not be marked as noise.
+///
+/// Returns: (Clusters, Noise).
 pub fn dbscan<'a, DT, P, F>(data: DT, range_query: F, min_points: usize) -> (Vec<Vec<P>>, FxHashSet<P>)
 where
 	DT: IntoIterator<Item = &'a P>,
@@ -48,6 +58,12 @@ where
 	(clusters, noise)
 }
 
+/// Generates `range_query` function for [`dbscan`].
+///
+/// Takes:
+/// - `data`: iterable collection of points (the same data should be passed in [`dbscan`]).
+/// - `distance`: function that should returns distance between 2 given points.
+/// - `epsilon`: maximum distance between neighbors.
 pub fn range_query<'a, DT, P, D, F>(data: DT, distance: F, epsilon: D) -> impl Fn(&P) -> FxIndexSet<P> + 'a
 where
 	DT: IntoIterator<Item = &'a P> + Clone + 'a,
