@@ -38,13 +38,12 @@ pub mod prelude {
 	};
 }
 
-mod api;
 mod paths;
-mod score;
 
-pub mod client;
 pub mod action;
+pub mod api;
 pub mod bot;
+pub mod client;
 pub mod constants;
 pub mod debug;
 pub mod distance;
@@ -56,6 +55,7 @@ pub mod ids;
 pub mod pixel_map;
 pub mod player;
 pub mod ramp;
+pub mod score;
 pub mod unit;
 pub mod units;
 pub mod utils;
@@ -63,9 +63,23 @@ pub mod utils;
 use player::{GameResult, Race};
 use unit::SharedUnitData;
 
-pub use client::{run_ladder_game, run_vs_computer, run_vs_human, SC2Result};
+#[doc(inline)]
+pub use client::SC2Result;
+/**
+Request to the SC2 API.
+
+# Usage
+```rust
+let mut request = Request::new();
+
+/* modify request through it's methods */
+
+let response = self.api().send(request)?;
+```
+*/
 pub use sc2_proto::sc2api::Request;
 
+/// Settings that must be provided by a player when joining a game.
 pub struct PlayerSettings {
 	race: Race,
 	name: Option<String>,
@@ -73,6 +87,8 @@ pub struct PlayerSettings {
 	raw_crop_to_playable_area: bool,
 }
 impl PlayerSettings {
+	/// Constructs new settings with given `Race` and name.
+	/// `raw_affects_selection` and `raw_crop_to_playable_area` are `false` by default.
 	pub fn new(race: Race, name: Option<&str>) -> Self {
 		Self {
 			race,
@@ -81,6 +97,13 @@ impl PlayerSettings {
 			raw_crop_to_playable_area: false,
 		}
 	}
+	/// Constructs new settings with more options given.
+	///
+	/// `raw_affects_selection`: Bot will select units to which it gives orders.
+	///
+	/// `raw_crop_to_playable_area`: Maps and all coordinates will be crooped to playable area.
+	/// That means map will start from (0, 0)
+	/// and finsh on (playable area length by `x`, playable area length by `y`).
 	pub fn configured(
 		race: Race,
 		name: Option<&str>,
