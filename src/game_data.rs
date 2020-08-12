@@ -1,9 +1,13 @@
+//! Information about units, ablities, upgrades, buffs and effects provided by API stored here.
+#![allow(missing_docs)]
+
 use crate::{
 	ids::{AbilityId, BuffId, EffectId, UnitTypeId, UpgradeId},
 	player::Race,
 	FromProto, TryFromProto,
 };
 use num_traits::FromPrimitive;
+use rustc_hash::FxHashMap;
 use sc2_proto::{
 	data::{
 		AbilityData as ProtoAbilityData, AbilityData_Target, Attribute as ProtoAttribute,
@@ -12,15 +16,21 @@ use sc2_proto::{
 	},
 	sc2api::ResponseData,
 };
-use std::collections::HashMap;
 
+/// All the data about different ids stored here.
+/// Can be accessed through [`game_data`](crate::bot::Bot::game_data) field.
 #[derive(Default, Clone)]
 pub struct GameData {
-	pub abilities: HashMap<AbilityId, AbilityData>,
-	pub units: HashMap<UnitTypeId, UnitTypeData>,
-	pub upgrades: HashMap<UpgradeId, UpgradeData>,
-	pub buffs: HashMap<BuffId, BuffData>,
-	pub effects: HashMap<EffectId, EffectData>,
+	/// Information about abilities mapped to `AbilityId`s.
+	pub abilities: FxHashMap<AbilityId, AbilityData>,
+	/// Information about units mapped to `UnitTypeId`s.
+	pub units: FxHashMap<UnitTypeId, UnitTypeData>,
+	/// Information about upgrades mapped to `UpgradeId`s.
+	pub upgrades: FxHashMap<UpgradeId, UpgradeData>,
+	/// Information about buffs mapped to `BuffId`s.
+	pub buffs: FxHashMap<BuffId, BuffData>,
+	/// Information about effects mapped to `EffectId`s.
+	pub effects: FxHashMap<EffectId, EffectData>,
 }
 impl FromProto<ResponseData> for GameData {
 	fn from_proto(data: ResponseData) -> Self {
@@ -54,6 +64,7 @@ impl FromProto<ResponseData> for GameData {
 	}
 }
 
+/// Cost of an item (`UnitTypeId` or `UpgradeId`) in resources, supply and time.
 #[derive(Debug, Default)]
 pub struct Cost {
 	pub minerals: u32,
@@ -62,7 +73,8 @@ pub struct Cost {
 	pub time: f32,
 }
 
-#[derive(Copy, Clone)]
+/// Possible target of ability, needed when giving commands to units.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum AbilityTarget {
 	None,
 	Point,
@@ -82,6 +94,7 @@ impl FromProto<AbilityData_Target> for AbilityTarget {
 	}
 }
 
+/// Differents attributes of units.
 #[variant_checkers]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Attribute {
@@ -115,6 +128,7 @@ impl FromProto<ProtoAttribute> for Attribute {
 	}
 }
 
+/// Possible target of unit's weapon.
 #[variant_checkers]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum TargetType {
@@ -132,13 +146,20 @@ impl FromProto<Weapon_TargetType> for TargetType {
 	}
 }
 
+/// Weapon's characteristic.
 #[derive(Clone)]
 pub struct Weapon {
+	/// Possible targets.
 	pub target: TargetType,
+	/// Usual damage.
 	pub damage: u32,
+	/// Addidional damage vs units with specific attribute.
 	pub damage_bonus: Vec<(Attribute, u32)>,
+	/// Number of attacks per use.
 	pub attacks: u32,
+	/// Maximum range.
 	pub range: f32,
+	/// Cooldown (in seconds * game speed).
 	pub speed: f32,
 }
 impl FromProto<&ProtoWeapon> for Weapon {
@@ -158,6 +179,7 @@ impl FromProto<&ProtoWeapon> for Weapon {
 	}
 }
 
+/// Information about specific ability.
 #[derive(Clone)]
 pub struct AbilityData {
 	pub id: AbilityId,
@@ -167,13 +189,20 @@ pub struct AbilityData {
 	pub friendly_name: Option<String>,
 	pub hotkey: Option<String>,
 	pub remaps_to_ability_id: Option<AbilityId>,
+	/// Ability is available in current game version.
 	pub available: bool,
+	/// Possible target of ability, needed when giving commands to units.
 	pub target: AbilityTarget,
+	/// Ability can be used on minimap.
 	pub allow_minimap: bool,
+	/// Ability can be autocasted.
 	pub allow_autocast: bool,
+	/// Ability is used to construct a building.
 	pub is_building: bool,
+	/// Half of the building size.
 	pub footprint_radius: Option<f32>,
 	pub is_instant_placement: bool,
+	/// Maximum range to target of the ability.
 	pub cast_range: Option<f32>,
 }
 impl TryFromProto<&ProtoAbilityData> for AbilityData {
@@ -198,20 +227,27 @@ impl TryFromProto<&ProtoAbilityData> for AbilityData {
 	}
 }
 
+/// Information about specific unit type.
 #[derive(Clone)]
 pub struct UnitTypeData {
 	pub id: UnitTypeId,
 	pub name: String,
+	/// Unit is available in current game version.
 	pub available: bool,
+	/// Space usage in transports and bunkers.
 	pub cargo_size: u32,
 	pub mineral_cost: u32,
 	pub vespene_cost: u32,
 	pub food_required: f32,
 	pub food_provided: f32,
+	/// Ability used to produce unit or `None` if unit can't be produced.
 	pub ability: Option<AbilityId>,
+	/// Race of unit.
 	pub race: Race,
 	pub build_time: f32,
+	/// Unit contains vespene (i.e. is vespene geyser).
 	pub has_vespene: bool,
+	/// Unit contains minerals (i.e. is mineral field).
 	pub has_minerals: bool,
 	pub sight_range: f32,
 	pub tech_alias: Vec<UnitTypeId>,
@@ -270,9 +306,11 @@ impl TryFromProto<&ProtoUnitTypeData> for UnitTypeData {
 	}
 }
 
+/// Information about specific upgrade.
 #[derive(Clone)]
 pub struct UpgradeData {
 	pub id: UpgradeId,
+	/// Ability used to research the upgrade.
 	pub ability: AbilityId,
 	pub name: String,
 	pub mineral_cost: u32,
@@ -302,6 +340,7 @@ impl TryFromProto<&ProtoUpgradeData> for UpgradeData {
 	}
 }
 
+/// Information about specific buff.
 #[derive(Clone)]
 pub struct BuffData {
 	pub id: BuffId,
@@ -316,13 +355,16 @@ impl TryFromProto<&ProtoBuffData> for BuffData {
 	}
 }
 
+/// Information about specific effect.
 #[derive(Clone)]
 pub struct EffectData {
 	pub id: EffectId,
 	pub name: String,
 	pub friendly_name: String,
 	pub radius: f32,
+	/// Targets affected by this effect.
 	pub target: TargetType,
+	/// `true` if effect affects allied units.
 	pub friendly_fire: bool,
 }
 impl TryFromProto<&ProtoEffectData> for EffectData {
