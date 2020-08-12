@@ -7,8 +7,9 @@ use crate::{
 	player::{AIBuild, Difficulty, PlayerType, Race},
 	FromProto,
 };
+use rustc_hash::FxHashMap;
 use sc2_proto::sc2api::ResponseGameInfo;
-use std::{collections::HashMap, path::Path};
+use std::path::Path;
 
 /// Structure where all map information stored.
 #[derive(Default, Clone)]
@@ -22,7 +23,7 @@ pub struct GameInfo {
 	/// Path to the map on current computer.
 	pub local_map_path: String,
 	/// Players on this map, mapped by their ids.
-	pub players: HashMap<u32, PlayerInfo>,
+	pub players: FxHashMap<u32, PlayerInfo>,
 	/// Full size of the map.
 	pub map_size: Size,
 	/// Grid with information about pathable tiles on that map.

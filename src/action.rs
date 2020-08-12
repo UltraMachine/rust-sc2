@@ -11,14 +11,14 @@ use sc2_proto::{
 	raw::{ActionRawUnitCommand_oneof_target as ProtoTarget, ActionRaw_oneof_action as ProtoRawAction},
 	sc2api::{Action as ProtoAction, ActionChat_Channel, ActionError as ProtoActionError},
 };
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 // pub(crate) type Command = (u64, (AbilityId, Target, bool));
 
 #[derive(Default, Clone)]
 pub(crate) struct Commander {
-	pub commands: HashMap<(AbilityId, Target, bool), Vec<u64>>,
-	pub autocast: HashMap<AbilityId, Vec<u64>>,
+	pub commands: FxHashMap<(AbilityId, Target, bool), Vec<u64>>,
+	pub autocast: FxHashMap<AbilityId, Vec<u64>>,
 }
 
 /// Target of ability used by unit.
