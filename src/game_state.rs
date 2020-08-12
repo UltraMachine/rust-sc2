@@ -1,3 +1,5 @@
+//! Information updated every step stored here.
+
 use crate::{
 	action::{Action, ActionError},
 	bot::{Rs, Rw},
@@ -26,12 +28,17 @@ pub(crate) type Rl<T> = RwLock<T>;
 #[cfg(not(feature = "rayon"))]
 pub(crate) type Rl<T> = RefCell<T>;
 
+/// Information about current state on current step.
+/// Can be accessed through [`state`](crate::bot::Bot::state) field.
 #[derive(Default, Clone)]
 pub struct GameState {
+	/// Actions executed on previous step.
 	pub actions: Vec<Action>,
+	/// Results on actions from previous step.
 	pub action_errors: Vec<ActionError>,
 	pub observation: Observation,
 	// player_result,
+	/// Messeges in game chat.
 	pub chat: Vec<ChatMessage>,
 }
 impl FromProtoData<&ResponseObservation> for GameState {
@@ -61,14 +68,18 @@ impl FromProtoData<&ResponseObservation> for GameState {
 	}
 }
 
+/// Messege in game chat.
 #[derive(Clone)]
 pub struct ChatMessage {
+	/// Id of player who sent that message.
 	pub player_id: u32,
+	/// Actual message.
 	pub message: String,
 }
 
 #[derive(Default, Clone)]
 pub struct Observation {
+	/// Current game tick (frame).
 	pub game_loop: u32,
 	pub common: Common,
 	pub alerts: Vec<Alert>,
