@@ -1,3 +1,8 @@
+//! Everything needed to easily run games in SC2.
+//!
+//! Contains Runner structures for verbose configuration and multiple games,
+//! and simple runner functions for playing once.
+
 use crate::{
 	api::API,
 	bot::{Bot, Rs},
@@ -80,6 +85,7 @@ const SC2_SUPPORT: &str = {
 	}
 };
 
+/// Runner for games vs built-in AI.
 pub struct RunnerSingle<'a, B>
 where
 	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
@@ -97,6 +103,7 @@ impl<'a, B> RunnerSingle<'a, B>
 where
 	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
 {
+	/// Constructs new single player runner.
 	pub fn new(bot: &'a mut B, computer: Computer, map: &str, sc2_version: Option<&'a str>) -> Self {
 		debug!("Starting game vs computer");
 		let sc2_path = get_path_to_sc2();
@@ -113,6 +120,7 @@ where
 		}
 	}
 
+	/// Launches SC2 client and connects bot to the API.
 	pub fn launch(&mut self) -> SC2Result<()> {
 		let port = get_unused_port();
 		debug!("Launching SC2 process");
@@ -122,6 +130,7 @@ where
 		Ok(())
 	}
 
+	/// Runs requested game.
 	pub fn run_game(&mut self) -> SC2Result<()> {
 		let settings = self.bot.get_player_settings();
 		let api = &mut self.bot.api.as_mut().unwrap();
@@ -169,15 +178,21 @@ where
 		Ok(())
 	}
 
+	/// Changes map to play on.
+	///
+	/// # Panics
+	/// Panics if the map doesn't exist in maps directory.
 	pub fn set_map(&mut self, map: &str) {
 		self.map_path = get_map_path(&self.sc2_path, map);
 	}
 
+	/// Manually closes SC2 client.
 	pub fn close(&mut self) {
 		self.bot.close_client();
 	}
 }
 
+/// Runner for games vs Human.
 pub struct RunnerMulti<'a, B>
 where
 	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
@@ -196,6 +211,7 @@ impl<'a, B> RunnerMulti<'a, B>
 where
 	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
 {
+	/// Constructs new multi player runner.
 	pub fn new(
 		bot: &'a mut B,
 		human_settings: PlayerSettings,
@@ -218,6 +234,7 @@ where
 		}
 	}
 
+	/// Launches SC2 clients and connects bot to the API.
 	pub fn launch(&mut self) -> SC2Result<()> {
 		// let (port_bot, port_human) = (PORT, PORT + 1);
 		let ports = get_unused_ports(2);
@@ -236,6 +253,7 @@ where
 		Ok(())
 	}
 
+	/// Runs requested game.
 	pub fn run_game(&mut self) -> SC2Result<()> {
 		let bot_settings = self.bot.get_player_settings();
 		let human_api = &mut self.human.api.as_mut().unwrap();
@@ -295,10 +313,14 @@ where
 		Ok(())
 	}
 
+	/// Changes map to play on.
+	/// # Panics
+	/// Panics if the map doesn't exist in maps directory.
 	pub fn set_map(&mut self, map: &str) {
 		self.map_path = get_map_path(&self.sc2_path, map);
 	}
 
+	/// Manually closes SC2 clients.
 	pub fn close(&mut self) {
 		self.bot.close_client();
 		self.human.close_client();
@@ -359,6 +381,7 @@ struct Ports {
 	client: Vec<(i32, i32)>,
 }
 
+/// Additional launch options for [`run_vs_computer`] and [`run_vs_human`].
 #[derive(Default)]
 pub struct LaunchOptions<'a> {
 	pub sc2_version: Option<&'a str>,
@@ -367,6 +390,8 @@ pub struct LaunchOptions<'a> {
 }
 
 // Runners
+
+/// Simple function to run game vs built-in AI.
 pub fn run_vs_computer<B>(
 	bot: &mut B,
 	computer: Computer,
@@ -384,6 +409,7 @@ where
 	Ok(())
 }
 
+/// Simple function to join ladder game.
 pub fn run_ladder_game<B>(
 	bot: &mut B,
 	host: &str,
@@ -429,6 +455,7 @@ where
 	Ok(())
 }
 
+/// Simple function to run game vs human.
 pub fn run_vs_human<B>(
 	bot: &mut B,
 	human_settings: PlayerSettings,
