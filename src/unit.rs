@@ -15,7 +15,7 @@ use crate::{
 	ids::{AbilityId, BuffId, UnitTypeId, UpgradeId},
 	pixel_map::{PixelMap, VisibilityMap},
 	player::Race,
-	FromProto, FromProtoData,
+	FromProto,
 };
 use num_traits::FromPrimitive;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -32,13 +32,12 @@ pub(crate) struct DataForUnit {
 	pub reactor_tags: Rw<FxHashSet<u64>>,
 	pub race_values: Rs<RaceValues>,
 	pub max_cooldowns: Rw<FxHashMap<UnitTypeId, f32>>,
-	pub last_units_health: Rs<FxHashMap<u64, u32>>,
-	pub abilities_units: Rs<FxHashMap<u64, FxHashSet<AbilityId>>>,
+	pub last_units_health: Rw<FxHashMap<u64, u32>>,
+	pub abilities_units: Rw<FxHashMap<u64, FxHashSet<AbilityId>>>,
 	pub upgrades: Rw<FxHashSet<UpgradeId>>,
 	pub enemy_upgrades: Rw<FxHashSet<UpgradeId>>,
-	pub creep: Rs<PixelMap>,
-	pub visibility: Rs<VisibilityMap>,
-	pub game_step: u32,
+	pub creep: Rw<PixelMap>,
+	pub game_step: Rw<u32>,
 }
 
 /// Weapon target used in [`calculate_weapon_stats`](Unit::calculate_weapon_stats).
@@ -290,7 +289,7 @@ impl Unit {
 	}
 	/// Unit was attacked on last step.
 	pub fn is_attacked(&self) -> bool {
-		self.hits() < self.data.last_units_health.get(&self.tag).copied()
+		self.hits() < self.data.last_units_health.lock_read().get(&self.tag).copied()
 	}
 	/// The damage was taken by unit if it was attacked, otherwise it's `0`.
 	pub fn damage_taken(&self) -> u32 {
@@ -298,7 +297,7 @@ impl Unit {
 			Some(hits) => hits,
 			None => return 0,
 		};
-		let last_hits = match self.data.last_units_health.get(&self.tag) {
+		let last_hits = match self.data.last_units_health.lock_read().get(&self.tag).copied() {
 			Some(hits) => hits,
 			None => return 0,
 		};
@@ -308,8 +307,8 @@ impl Unit {
 	///
 	/// Ability won't be avaliable if it's on cooldown, unit
 	/// is out of energy or bot hasn't got enough resources.
-	pub fn abilities(&self) -> Option<&FxHashSet<AbilityId>> {
-		self.data.abilities_units.get(&self.tag)
+	pub fn abilities(&self) -> Option<FxHashSet<AbilityId>> {
+		self.data.abilities_units.lock_read().get(&self.tag).cloned()
 	}
 	/// Checks if ability is available for unit.
 	///
@@ -318,6 +317,7 @@ impl Unit {
 	pub fn has_ability(&self, ability: AbilityId) -> bool {
 		self.data
 			.abilities_units
+			.lock_read()
 			.get(&self.tag)
 			.map_or(false, |abilities| abilities.contains(&ability))
 	}
@@ -371,17 +371,13 @@ impl Unit {
 		self.position
 			.offset(offset * self.facing.cos(), offset * self.facing.sin())
 	}
-	#[inline]
-	fn is_pos_visible(&self) -> bool {
-		self.data.visibility[self.position].is_visible()
-	}
 	/// Checks if unit is fully visible.
 	pub fn is_visible(&self) -> bool {
-		self.display_type.is_visible() && self.is_pos_visible()
+		self.display_type.is_visible()
 	}
 	/// Checks if unit is snapshot (i.e. hidden in fog of war or on high ground).
 	pub fn is_snapshot(&self) -> bool {
-		self.display_type.is_snapshot() && !self.is_pos_visible()
+		self.display_type.is_snapshot()
 	}
 	/// Checks if unit is fully hidden.
 	pub fn is_hidden(&self) -> bool {
@@ -527,7 +523,7 @@ impl Unit {
 
 		// ---- Creep ----
 		// On creep
-		if self.data.creep[self.position].is_set() {
+		if self.data.creep.lock_read()[self.position].is_set() {
 			if let Some(increase) = SPEED_ON_CREEP.get(&unit_type) {
 				speed *= increase;
 			}
@@ -545,7 +541,7 @@ impl Unit {
 	}
 	/// Distance unit can travel per one step.
 	pub fn distance_per_step(&self) -> f32 {
-		self.real_speed() / FRAMES_PER_SECOND * self.data.game_step as f32
+		self.real_speed() / FRAMES_PER_SECOND * *self.data.game_step.lock_read() as f32
 	}
 	/// Distance unit can travel until weapons be ready to fire.
 	pub fn distance_to_weapon_ready(&self) -> f32 {
@@ -1650,19 +1646,29 @@ impl From<&Unit> for Point2 {
 	}
 }
 
-impl FromProtoData<&ProtoUnit> for Unit {
-	fn from_proto_data(data: SharedUnitData, u: &ProtoUnit) -> Self {
+impl Unit {
+	pub(crate) fn from_proto(data: SharedUnitData, visibility: &VisibilityMap, u: &ProtoUnit) -> Self {
 		let pos = u.get_pos();
+		let position = Point2::from_proto(pos);
 		let type_id = UnitTypeId::from_u32(u.get_unit_type()).unwrap();
 		Self {
 			data,
 			allow_spam: false,
-			display_type: DisplayType::from_proto(u.get_display_type()),
+			display_type: match DisplayType::from_proto(u.get_display_type()) {
+				DisplayType::Visible => {
+					if visibility[position].is_visible() {
+						DisplayType::Visible
+					} else {
+						DisplayType::Snapshot
+					}
+				}
+				x => x,
+			},
 			alliance: Alliance::from_proto(u.get_alliance()),
 			tag: u.get_tag(),
 			type_id,
 			owner: u.get_owner() as u32,
-			position: Point2::from_proto(pos),
+			position,
 			position3d: Point3::from_proto(pos),
 			facing: u.get_facing(),
 			radius: u.get_radius(),

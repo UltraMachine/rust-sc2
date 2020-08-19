@@ -5,18 +5,13 @@
 
 use crate::{
 	api::API,
-	bot::{Bot, Rs},
-	game_state::GameState,
-	ids::{AbilityId, UnitTypeId},
+	bot::{Bot, Locked, Rs},
+	game_state::update_state,
 	paths::*,
 	player::Computer,
-	Event, FromProtoData, IntoProto, IntoSC2, Player, PlayerSettings,
+	IntoProto, IntoSC2, Player, PlayerSettings,
 };
-use num_traits::FromPrimitive;
-use sc2_proto::{
-	query::RequestQueryAvailableAbilities,
-	sc2api::{PlayerSetup, PlayerType, PortSet, Request, RequestCreateGame, Status},
-};
+use sc2_proto::sc2api::{PlayerSetup, PlayerType, PortSet, Request, RequestCreateGame, Status};
 use std::{
 	error::Error,
 	fmt,
@@ -603,8 +598,7 @@ where
 	req.mut_observation().set_disable_fog(bot.disable_fog);
 	let res = bot.api().send(req)?;
 
-	bot.update_data_for_unit();
-	bot.state = GameState::from_proto_data(bot.get_data_for_unit(), res.get_observation());
+	update_state(bot, res.get_observation())?;
 	bot.prepare_start();
 
 	bot.on_start()?;
@@ -619,7 +613,7 @@ where
 	}
 	if !realtime {
 		let mut req = Request::new();
-		req.mut_step().set_count(bot.game_step);
+		req.mut_step().set_count(*bot.game_step.lock_read());
 		bot.api().send_request(req)?;
 	}
 	Ok(())
@@ -642,64 +636,8 @@ where
 		return Ok(false);
 	}
 
-	let state = GameState::from_proto_data(bot.get_data_for_unit(), res.get_observation());
+	update_state(bot, res.get_observation())?;
 
-	let mut req = Request::new();
-	let req_query_abilities = req.mut_query().mut_abilities();
-	state.observation.raw.units.iter().for_each(|u| {
-		if u.is_mine() {
-			let mut req_unit = RequestQueryAvailableAbilities::new();
-			req_unit.set_unit_tag(u.tag);
-			req_query_abilities.push(req_unit);
-		}
-	});
-	for u in &state.observation.raw.dead_units {
-		bot.on_event(Event::UnitDestroyed(*u))?;
-	}
-
-	let res = bot.api().send(req)?;
-	bot.abilities_units = Rs::new(
-		res.get_query()
-			.get_abilities()
-			.iter()
-			.map(|a| {
-				(
-					a.get_unit_tag(),
-					a.get_abilities()
-						.iter()
-						.filter_map(|ab| AbilityId::from_i32(ab.get_ability_id()))
-						.collect(),
-				)
-			})
-			.collect(),
-	);
-	for u in state.observation.raw.units.iter() {
-		if !u.is_mine() {
-			continue;
-		}
-		let tag = u.tag;
-
-		if !bot.owned_tags.contains(&tag) {
-			bot.owned_tags.insert(tag);
-			if u.is_structure() {
-				if !u.is_placeholder() && u.type_id != UnitTypeId::KD8Charge {
-					if u.is_ready() {
-						bot.on_event(Event::ConstructionComplete(tag))?;
-					} else {
-						bot.on_event(Event::ConstructionStarted(tag))?;
-						bot.under_construction.insert(tag);
-					}
-				}
-			} else {
-				bot.on_event(Event::UnitCreated(tag))?;
-			}
-		} else if bot.under_construction.contains(&tag) && u.is_ready() {
-			bot.under_construction.remove(&tag);
-			bot.on_event(Event::ConstructionComplete(tag))?;
-		}
-	}
-
-	bot.state = state;
 	bot.prepare_step();
 
 	bot.on_step(iteration)?;
@@ -733,7 +671,7 @@ where
 	}
 	if !realtime {
 		let mut req = Request::new();
-		req.mut_step().set_count(bot.game_step);
+		req.mut_step().set_count(*bot.game_step.lock_read());
 		bot.api().send_request(req)?;
 	}
 	Ok(true)

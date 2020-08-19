@@ -42,6 +42,11 @@ pub(crate) type Rs<T> = Arc<T>;
 pub(crate) type Rs<T> = Rc<T>;
 
 #[cfg(feature = "rayon")]
+pub(crate) type Rl<T> = RwLock<T>;
+#[cfg(not(feature = "rayon"))]
+pub(crate) type Rl<T> = RefCell<T>;
+
+#[cfg(feature = "rayon")]
 pub(crate) type Rw<T> = Arc<RwLock<T>>;
 #[cfg(not(feature = "rayon"))]
 pub(crate) type Rw<T> = Rc<RefCell<T>>;
@@ -226,8 +231,7 @@ impl Default for Completion {
 pub struct Bot {
 	pub(crate) process: Option<Child>,
 	pub(crate) api: Option<API>,
-	/// Sets number of frames between every [`on_step`](crate::Player::on_step). Must be bigger than `0`.
-	pub game_step: u32,
+	pub(crate) game_step: Rw<u32>,
 	#[doc(hidden)]
 	pub disable_fog: bool,
 	/// Actual race of your bot.
@@ -252,10 +256,10 @@ pub struct Bot {
 	pub state: GameState,
 	/// Values, which depend on bot's race
 	pub race_values: Rs<RaceValues>,
-	data_for_unit: SharedUnitData,
+	pub(crate) data_for_unit: SharedUnitData,
 	/// Structured collection of units.
 	pub units: AllUnits,
-	pub(crate) abilities_units: Rs<FxHashMap<u64, FxHashSet<AbilityId>>>,
+	pub(crate) abilities_units: Rw<FxHashMap<u64, FxHashSet<AbilityId>>>,
 	orders: FxHashMap<AbilityId, usize>,
 	current_units: FxHashMap<UnitTypeId, usize>,
 	/// In-game time in seconds.
@@ -287,7 +291,7 @@ pub struct Bot {
 	/// All expansions stored in (location, resource center) pairs.
 	pub expansions: Vec<(Point2, Point2)>,
 	max_cooldowns: Rw<FxHashMap<UnitTypeId, f32>>,
-	last_units_health: Rs<FxHashMap<u64, u32>>,
+	last_units_health: Rw<FxHashMap<u64, u32>>,
 	/// Obstacles on map which block vision of ground units, but still pathable.
 	pub vision_blockers: Vec<Point2>,
 	/// Ramps on map.
@@ -302,6 +306,12 @@ impl Bot {
 	#[inline]
 	pub fn api(&mut self) -> &mut API {
 		self.api.as_mut().expect("API is not initialized")
+	}
+	pub fn set_game_step(&mut self, val: u32) {
+		*self.game_step.lock_write() = val;
+	}
+	pub fn game_step(&self) -> u32 {
+		*self.game_step.lock_read()
 	}
 	/// Constructs new [`CountOptions`], used to count units fast and easy.
 	///
@@ -333,8 +343,6 @@ impl Bot {
 	pub fn counter(&self) -> CountOptions {
 		CountOptions::new(self)
 	}
-	pub(crate) fn get_data_for_unit(&self) -> SharedUnitData {
-		Rs::clone(&self.data_for_unit)
 	}
 	pub(crate) fn get_actions(&mut self) -> &[Action] {
 		let actions = &mut self.actions;
@@ -546,9 +554,17 @@ impl Bot {
 	}
 	/// Checks if given position has zerg's creep.
 	pub fn has_creep<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
-		self.state.observation.raw.creep[pos.into()].is_empty()
+		self.state.observation.raw.creep.lock_read()[pos.into()].is_empty()
 	}
-	pub(crate) fn update_data_for_unit(&mut self) {
+	pub(crate) fn prepare_start(&mut self) {
+		self.race = self.game_info.players[&self.player_id].race_actual.unwrap();
+		if self.game_info.players.len() == 2 {
+			let enemy_player_id = 3 - self.player_id;
+			self.enemy_race = self.game_info.players[&enemy_player_id].race_requested;
+			self.enemy_player_id = enemy_player_id;
+		}
+		self.race_values = Rs::new(RACE_VALUES[&self.race].clone());
+
 		self.data_for_unit = Rs::new(DataForUnit {
 			commander: Rs::clone(&self.commander),
 			game_data: Rs::clone(&self.game_data),
@@ -561,21 +577,10 @@ impl Bot {
 			enemy_upgrades: Rs::clone(&self.enemy_upgrades),
 			upgrades: Rs::clone(&self.state.observation.raw.upgrades),
 			creep: Rs::clone(&self.state.observation.raw.creep),
-			visibility: Rs::clone(&self.state.observation.raw.visibility),
-			game_step: self.game_step,
+			game_step: Rs::clone(&self.game_step),
 		});
-	}
-	pub(crate) fn prepare_start(&mut self) {
-		self.race = self.game_info.players[&self.player_id].race_actual.unwrap();
-		if self.game_info.players.len() == 2 {
-			let enemy_player_id = 3 - self.player_id;
-			self.enemy_race = self.game_info.players[&enemy_player_id].race_requested;
-			self.enemy_player_id = enemy_player_id;
-		}
-		self.race_values = Rs::new(RACE_VALUES[&self.race].clone());
-		self.update_units();
 
-		self.update_data_for_unit();
+		self.update_units();
 
 		if let Some(townhall) = self.units.my.townhalls.first() {
 			self.start_location = townhall.position;
@@ -753,13 +758,12 @@ impl Bot {
 		self.ramps.all = ramps;
 	}
 	pub(crate) fn prepare_step(&mut self) {
-		self.last_units_health = Rs::new(
-			self.units
-				.all
-				.iter()
-				.filter_map(|u| Some((u.tag, u.hits()?)))
-				.collect(),
-		);
+		*self.last_units_health.lock_write() = self
+			.units
+			.all
+			.iter()
+			.filter_map(|u| Some((u.tag, u.hits()?)))
+			.collect();
 		self.update_units();
 		let observation = &self.state.observation;
 		self.time = (observation.game_loop as f32) / 22.4;
@@ -771,8 +775,6 @@ impl Bot {
 		self.supply_cap = common.food_cap;
 		self.supply_used = common.food_used;
 		self.supply_left = self.supply_cap - self.supply_used;
-
-		self.update_data_for_unit();
 
 		// Counting units and orders
 		let mut current_units = FxHashMap::default();
@@ -1264,7 +1266,7 @@ impl Bot {
 impl Default for Bot {
 	fn default() -> Self {
 		Self {
-			game_step: 1,
+			game_step: Rs::new(Rl::new(1)),
 			disable_fog: false,
 			race: Race::Random,
 			enemy_race: Race::Random,
