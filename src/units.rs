@@ -1,7 +1,7 @@
 use crate::{distance::Distance, geometry::Point2, ids::UnitTypeId, unit::Unit};
 use indexmap::{
 	map::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut},
-	IndexMap,
+	IndexMap, IndexSet,
 };
 use rustc_hash::FxHasher;
 use std::{
@@ -591,6 +591,16 @@ impl<T: Ord> Container<T> for BTreeSet<T> {
 	}
 }
 impl<T: Ord, V> Container<T> for BTreeMap<T, V> {
+	fn contains(&self, item: &T) -> bool {
+		self.contains_key(item)
+	}
+}
+impl<T> Container<T> for IndexSet<T> {
+	fn contains(&self, item: &T) -> bool {
+		self.contains(item)
+	}
+}
+impl<T, V> Container<T> for IndexMap<T, V> {
 	fn contains(&self, item: &T) -> bool {
 		self.contains_key(item)
 	}
