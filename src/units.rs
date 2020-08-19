@@ -250,6 +250,13 @@ impl FromIterator<Unit> for Units {
 		Self(iter.into_iter().map(|u| (u.tag, u)).collect())
 	}
 }
+impl FromIterator<(u64, Unit)> for Units {
+	#[inline]
+	fn from_iter<I: IntoIterator<Item = (u64, Unit)>>(iter: I) -> Self {
+		Self(iter.into_iter().collect())
+	}
+}
+
 impl IntoIterator for Units {
 	type Item = (u64, Unit);
 	type IntoIter = IntoIter<u64, Unit>;
@@ -259,6 +266,38 @@ impl IntoIterator for Units {
 		self.0.into_iter()
 	}
 }
+impl<'a> IntoIterator for &'a Units {
+	type Item = (&'a u64, &'a Unit);
+	type IntoIter = Iter<'a, u64, Unit>;
+
+	#[inline]
+	fn into_iter(self) -> Self::IntoIter {
+		self.0.iter()
+	}
+}
+impl<'a> IntoIterator for &'a mut Units {
+	type Item = (&'a u64, &'a mut Unit);
+	type IntoIter = IterMut<'a, u64, Unit>;
+
+	#[inline]
+	fn into_iter(self) -> Self::IntoIter {
+		self.0.iter_mut()
+	}
+}
+
+impl Extend<Unit> for Units {
+	#[inline]
+	fn extend<T: IntoIterator<Item = Unit>>(&mut self, iter: T) {
+		self.0.extend(iter.into_iter().map(|u| (u.tag, u)));
+	}
+}
+impl Extend<(u64, Unit)> for Units {
+	#[inline]
+	fn extend<T: IntoIterator<Item = (u64, Unit)>>(&mut self, iter: T) {
+		self.0.extend(iter);
+	}
+}
+
 impl Index<u64> for Units {
 	type Output = Unit;
 
@@ -270,13 +309,22 @@ impl Index<u64> for Units {
 impl IndexMut<u64> for Units {
 	#[inline]
 	fn index_mut(&mut self, tag: u64) -> &mut Self::Output {
-		self.0.get_mut(&tag).unwrap()
+		&mut self.0[&tag]
 	}
 }
-impl Extend<Unit> for Units {
+
+impl Index<usize> for Units {
+	type Output = Unit;
+
 	#[inline]
-	fn extend<T: IntoIterator<Item = Unit>>(&mut self, iter: T) {
-		self.0.extend(iter.into_iter().map(|u| (u.tag, u)));
+	fn index(&self, i: usize) -> &Self::Output {
+		&self.0[i]
+	}
+}
+impl IndexMut<usize> for Units {
+	#[inline]
+	fn index_mut(&mut self, i: usize) -> &mut Self::Output {
+		&mut self.0[i]
 	}
 }
 
@@ -544,6 +592,26 @@ impl IntoParallelIterator for Units {
 		self.0.into_par_iter()
 	}
 }
+#[cfg(feature = "rayon")]
+impl<'a> IntoParallelIterator for &'a Units {
+	type Item = (&'a u64, &'a Unit);
+	type Iter = ParIter<'a, u64, Unit>;
+
+	#[inline]
+	fn into_par_iter(self) -> Self::Iter {
+		self.0.par_iter()
+	}
+}
+#[cfg(feature = "rayon")]
+impl<'a> IntoParallelIterator for &'a mut Units {
+	type Item = (&'a u64, &'a mut Unit);
+	type Iter = ParIterMut<'a, u64, Unit>;
+
+	#[inline]
+	fn into_par_iter(self) -> Self::Iter {
+		self.0.par_iter_mut()
+	}
+}
 
 #[cfg(feature = "rayon")]
 impl ParallelExtend<Unit> for Units {
@@ -552,12 +620,26 @@ impl ParallelExtend<Unit> for Units {
 		self.0.par_extend(par_iter.into_par_iter().map(|u| (u.tag, u)));
 	}
 }
+#[cfg(feature = "rayon")]
+impl ParallelExtend<(u64, Unit)> for Units {
+	#[inline]
+	fn par_extend<T: IntoParallelIterator<Item = (u64, Unit)>>(&mut self, par_iter: T) {
+		self.0.par_extend(par_iter);
+	}
+}
 
 #[cfg(feature = "rayon")]
 impl FromParallelIterator<Unit> for Units {
 	#[inline]
 	fn from_par_iter<I: IntoParallelIterator<Item = Unit>>(par_iter: I) -> Self {
 		Self(par_iter.into_par_iter().map(|u| (u.tag, u)).collect())
+	}
+}
+#[cfg(feature = "rayon")]
+impl FromParallelIterator<(u64, Unit)> for Units {
+	#[inline]
+	fn from_par_iter<I: IntoParallelIterator<Item = (u64, Unit)>>(par_iter: I) -> Self {
+		Self(par_iter.into_par_iter().collect())
 	}
 }
 
