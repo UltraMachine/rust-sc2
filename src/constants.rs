@@ -7,7 +7,7 @@ use crate::{
 };
 use std::collections::HashMap;
 
-/// Default in-game speed modifier (on *Faster* game speed).
+/// Default in-game speed modifier (on **Faster** game speed).
 /// See [page on liquipedia](https://liquipedia.net/starcraft2/Game_Speed) for more info.
 pub const GAME_SPEED: f32 = 1.4;
 /// Frames per second, calculated by `16 (default frames per second) * 1.4 (game speed)`.

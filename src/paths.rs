@@ -78,6 +78,7 @@ pub fn get_latest_base_version(sc2_path: &str) -> u32 {
 // Returns (Base version, Data hash)
 pub fn get_version_info(version: &str) -> (u32, &str) {
 	match version {
+		"5.0.2" => (81102, "DC0A1182FB4ABBE8E29E3EC13CF46F68"),
 		"5.0.1" => (81009, "0D28678BC32E7F67A238F19CD3E0A2CE"),
 		"5.0.0" | "5.0" | "5" => (80949, "9AE39C332883B8BF6AA190286183ED72"),
 		"4.12.1" => (80188, "44DED5AED024D23177C742FC227C615A"),

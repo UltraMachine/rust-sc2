@@ -22,7 +22,7 @@ pub enum Race {
 	Terran,
 	/// Ruthless insects of incredibly big size. What a nightmare?
 	Zerg,
-	/// High-tech guys, who build cannons and batteries to scout and defend you.
+	/// Kinda high-tech guys, who build cannons and batteries near your base "just for scouting".
 	Protoss,
 	/// Use when you didn't decide your race yet or just want to play them all.
 	Random,

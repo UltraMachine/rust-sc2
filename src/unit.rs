@@ -67,10 +67,11 @@ pub struct Unit {
 	pub alliance: Alliance,
 
 	/// Unique and constant for each unit tag. Used to find exactly the same unit in bunch of [`Units`].
-	/// See also [`find_tag`] and [`find_tags`].
+	/// See also [`get`], [`get_mut`] and [`find_tags`].
 	///
 	/// [`Units`]: crate::units::Units
-	/// [`find_tag`]: crate::units::Units::find_tag
+	/// [`get`]: crate::units::Units::get
+	/// [`get_mut`]: crate::units::Units::get_mut
 	/// [`find_tags`]: crate::units::Units::find_tags
 	pub tag: u64,
 	/// The type of unit.

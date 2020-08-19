@@ -15,13 +15,13 @@ impl Player for EmptyBot {
 		match event {
 			Event::UnitDestroyed(tag) => { /* your code here */ }
 			Event::UnitCreated(tag) => {
-				if let Some(u) = self.units.my.units.find_tag(tag) { /* your code here */ }
+				if let Some(u) = self.units.my.units.get(tag) { /* your code here */ }
 			}
 			Event::ConstructionStarted(tag) => {
-				if let Some(u) = self.units.my.structures.find_tag(tag) { /* your code here */ }
+				if let Some(u) = self.units.my.structures.get(tag) { /* your code here */ }
 			}
 			Event::ConstructionComplete(tag) => {
-				if let Some(u) = self.units.my.structures.find_tag(tag) { /* your code here */ }
+				if let Some(u) = self.units.my.structures.get(tag) { /* your code here */ }
 			}
 		}
 		Ok(())

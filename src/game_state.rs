@@ -21,6 +21,7 @@ use sc2_proto::{
 use std::ops::{Deref, DerefMut};
 
 /// Information about current state on current step.
+///
 /// Can be accessed through [`state`](crate::bot::Bot::state) field.
 #[derive(Default, Clone)]
 pub struct GameState {
@@ -28,6 +29,7 @@ pub struct GameState {
 	pub actions: Vec<Action>,
 	/// Results on actions from previous step.
 	pub action_errors: Vec<ActionError>,
+	/// Bot's observation here.
 	pub observation: Observation,
 	// player_result,
 	/// Messeges in game chat.
@@ -240,34 +242,55 @@ pub struct ChatMessage {
 	pub message: String,
 }
 
+/// Bot's observation stored here.
+/// Can be accessed through [`state.observation`](GameState::observation).
 #[derive(Default, Clone)]
 pub struct Observation {
 	/// Current game tick (frame).
 	pub game_loop: u32,
+	/// Common information from the observation.
 	pub common: Common,
+	/// Alerts appearing when some kind of things happen.
 	pub alerts: Vec<Alert>,
 	pub abilities: Vec<AvailableAbility>,
+	/// SC2 Score data.
 	pub score: Score,
+	/// Data of raw interface.
 	pub raw: RawData,
 }
 
+/// Bot's observation stored here.
+/// Can be accessed through [`state.observation.raw`](Observation::raw).
 #[derive(Default, Clone)]
 pub struct RawData {
+	/// Protoss power from pylons.
 	pub psionic_matrix: Vec<PsionicMatrix>,
+	/// Current camera position
 	pub camera: Point2,
+	/// All current units.
 	pub units: Units,
+	/// Bot's ready upgrades.
 	pub upgrades: Rw<FxHashSet<UpgradeId>>,
+	/// Bot's visibility map.
 	pub visibility: VisibilityMap,
+	/// Creep on the map.
 	pub creep: Rw<PixelMap>,
+	/// Tags of units which died last step.
 	pub dead_units: Vec<u64>,
+	/// Current effects on the map.
 	pub effects: Vec<Effect>,
+	/// Terran radars on the map.
 	pub radars: Vec<Radar>,
 }
 
+/// Power matrix from the pylon or warp prism, used to give power to buildings and warp units on it.
 #[derive(Clone)]
 pub struct PsionicMatrix {
+	/// Position of psionic matrix source.
 	pub pos: Point2,
+	/// Radius of the matrix: shold be `6.5` for pylon and `3.75` for warp prism in phsing mode.
 	pub radius: f32,
+	/// Tag of unit that is source of power matrix.
 	pub tag: u64,
 }
 impl FromProto<&ProtoPowerSource> for PsionicMatrix {
@@ -280,20 +303,34 @@ impl FromProto<&ProtoPowerSource> for PsionicMatrix {
 	}
 }
 
+/// There are different effects in SC2, some of them can harm your units,
+/// so take them into account then microing.
+///
+/// All effects stored in [state.observation.raw.effects](RawData::effects).
 #[derive(Clone)]
 pub struct Effect {
+	/// Type of the effect.
 	pub id: EffectId,
+	/// Positions covered by this effect.
 	pub positions: Vec<Point2>,
+	/// Is this effect yours or opponent's.
 	pub alliance: Alliance,
+	/// Player id of effect's owner.
 	pub owner: u32,
+	/// Additional radius covered by effect around every it's position.
 	pub radius: f32,
 }
 
+/// The alliance of unit or effect to your bot.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Alliance {
+	/// Your own objects.
 	Own,
+	/// Owned by your allias (in 2v2, 3v3 an 4v4 games).
 	Ally,
+	/// Just neutral object.
 	Neutral,
+	/// Owned by your opponent.
 	Enemy,
 }
 impl Alliance {
@@ -321,27 +358,45 @@ impl FromProto<ProtoAlliance> for Alliance {
 	}
 }
 
+///	Radar point on the map.
 #[derive(Clone)]
 pub struct Radar {
+	/// Position where radar is.
 	pub pos: Point2,
+	/// Radius covered by radar (Pretty sure it's `12`).
 	pub radius: f32,
 }
 
+/// Common information of player.
 #[derive(Default, Clone)]
 pub struct Common {
+	/// In-game player id.
 	pub player_id: u32,
+	/// Amount of minerals bot currently has.
 	pub minerals: u32,
+	/// Amount of vespene gas bot currently has.
 	pub vespene: u32,
+	/// Supply capacity.
 	pub food_cap: u32,
+	/// Supply used in total.
 	pub food_used: u32,
+	/// Supply used by combat units.
 	pub food_army: u32,
+	/// Supply used by workers (workers count).
 	pub food_workers: u32,
+	/// The count of your idle workers.
 	pub idle_worker_count: u32,
+	/// The count of your combat units.
 	pub army_count: u32,
+	/// The count of your free warp gates.
 	pub warp_gate_count: u32,
+	/// The count of your larva.
 	pub larva_count: u32,
 }
 
+/// Different kinds of alert that can happen.
+/// All alerts stored in [`state.observation.alerts`](Observation::alerts).
+#[allow(missing_docs)]
 #[allow(clippy::enum_variant_names)]
 #[derive(Clone)]
 pub enum Alert {

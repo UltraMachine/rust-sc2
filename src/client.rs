@@ -25,7 +25,7 @@ use std::{
 use tungstenite::{client::AutoStream, connect, WebSocket};
 use url::Url;
 
-pub type WS = WebSocket<AutoStream>;
+pub(crate) type WS = WebSocket<AutoStream>;
 pub type SC2Result<T> = Result<T, Box<dyn Error>>;
 
 const HOST: &str = "127.0.0.1";
@@ -88,9 +88,12 @@ where
 	bot: &'a mut B,
 	sc2_path: String,
 	sc2_version: Option<&'a str>,
+	/// Computer opponent configuration.
 	pub computer: Computer,
 	map_path: String,
+	/// Play games in real time mode or not.
 	pub realtime: bool,
+	/// Save replay after the game in given path.
 	pub save_replay_as: Option<&'a str>,
 }
 
@@ -196,9 +199,12 @@ where
 	human: Human,
 	sc2_path: String,
 	sc2_version: Option<&'a str>,
+	/// Configuration of human opponent.
 	pub human_settings: PlayerSettings,
 	map_path: String,
+	/// Play games in real time mode or not.
 	pub realtime: bool,
+	/// Save replay after the game in given path.
 	pub save_replay_as: Option<&'a str>,
 }
 
@@ -379,8 +385,11 @@ struct Ports {
 /// Additional launch options for [`run_vs_computer`] and [`run_vs_human`].
 #[derive(Default)]
 pub struct LaunchOptions<'a> {
+	/// SC2 version to play on, otherwise latest available will be used.
 	pub sc2_version: Option<&'a str>,
+	/// Save replay after the game in given path.
 	pub save_replay_as: Option<&'a str>,
+	/// Play games in real time mode or not.
 	pub realtime: bool,
 }
 

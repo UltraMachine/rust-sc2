@@ -102,6 +102,7 @@ def generate():
 		[
 			"//! Auto generated with `generate_ids.py` script from `stableid.json`",
 			"//! ids of units, ablities, upgrades, buffs and effects.",
+			"#![allow(missing_docs)]",
 		],
 		[],
 		[],

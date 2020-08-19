@@ -112,7 +112,7 @@ impl Default for PlacementOptions {
 }
 
 /// Options used to configure which units are counted.
-/// Constructed with [`counter`](Bot::counter) method.
+/// Constructed with [`counter`](Bot::counter) and [`enemy_counter`](Bot::enemy_counter) methods.
 #[derive(Clone, Copy)]
 pub struct CountOptions<'a> {
 	bot: &'a Bot,
@@ -143,22 +143,22 @@ impl<'a> CountOptions<'a> {
 			alias: Default::default(),
 		}
 	}
-	/// Sets [`completion`](Self::completion) to `Ordered`.
+	/// Sets completion to `Ordered`.
 	pub fn ordered(&mut self) -> &mut Self {
 		self.completion = Completion::Ordered;
 		self
 	}
-	/// Sets [`completion`](Self::completion) to `All`.
+	/// Sets completion to `All`.
 	pub fn all(&mut self) -> &mut Self {
 		self.completion = Completion::All;
 		self
 	}
-	/// Sets [`alias`](Self::alias) to `Unit`.
+	/// Sets alias to `Unit`.
 	pub fn alias(&mut self) -> &mut Self {
 		self.alias = UnitAlias::Unit;
 		self
 	}
-	/// Sets [`alias`](Self::alias) to `Tech`.
+	/// Sets alias to `Tech`.
 	pub fn tech(&mut self) -> &mut Self {
 		self.alias = UnitAlias::Tech;
 		self
@@ -265,7 +265,7 @@ pub struct Bot {
 	pub player_id: u32,
 	/// Opponent in-game id.
 	pub enemy_player_id: u32,
-	/// Opponent id on ladder, filled by `--OpponentId`.
+	/// Opponent id on ladder, filled in `--OpponentId`.
 	pub opponent_id: String,
 	actions: Vec<Action>,
 	commander: Rw<Commander>,
@@ -333,9 +333,15 @@ impl Bot {
 	pub fn api(&mut self) -> &mut API {
 		self.api.as_mut().expect("API is not initialized")
 	}
+	/// Sets step between every [`on_step`] iteration
+	/// (e.g. on `1` [`on_step`] will be called every frame, on `2` every second frame, ...).
+	/// Must be bigger than `0`.
+	///
+	/// [`on_step`]: crate::Player::on_step
 	pub fn set_game_step(&mut self, val: u32) {
 		*self.game_step.lock_write() = val;
 	}
+	/// Returns current game step.
 	pub fn game_step(&self) -> u32 {
 		*self.game_step.lock_read()
 	}
@@ -369,6 +375,10 @@ impl Bot {
 	pub fn counter(&self) -> CountOptions {
 		CountOptions::new(self, false)
 	}
+	/// The same as [`counter`](Self::counter), but counts enemy units instead.
+	///
+	/// All information about enemy units count is based on scouting.
+	/// Also there's no way to see ordered enemy units, but bot sees enemy structures in-progress.
 	pub fn enemy_counter(&self) -> CountOptions {
 		CountOptions::new(self, true)
 	}

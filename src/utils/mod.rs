@@ -1,4 +1,4 @@
-//! Different utilites useful (or useless) in bot develop.
+//! Different utilites useful (or useless) in bot development.
 
 use indexmap::IndexSet;
 use rustc_hash::{FxHashSet, FxHasher};
