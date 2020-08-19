@@ -1,3 +1,285 @@
+/*!
+# Introduction
+
+## Installing
+
+Install Rust >= 1.42.0
+
+Add to dependencies in Cargo.toml:
+```toml
+[dependencies]
+rust-sc2 = "1"
+```
+Or if you want developer version directly from github:
+```toml
+[dependencies]
+rust-sc2 = { git = "https://github.com/UltraMachine/rust-sc2" }
+```
+
+## Making a bot
+
+Making bots with `rust-sc2` is pretty easy:
+```rust
+use::rust_sc2::prelude::*;
+
+#[bot]
+#[derive(Default)]
+struct MyBot;
+impl Player for MyBot {
+	fn get_player_settings(&self) -> PlayerSettings {
+		PlayerSettings::new(Race::Random, None)
+	}
+	fn on_step(&mut self, iteration: usize) -> SC2Result<()> {
+		/* Your code here */
+		Ok(())
+	}
+}
+
+fn main() -> SC2Result<()> {
+	run_vs_computer(
+		&mut MyBot::default(),
+		Computer::new(Race::Random, Difficulty::VeryEasy, None),
+		"EternalEmpireLE",
+		Default::default(),
+	)
+}
+```
+
+Add some cool stuff and watch how it destroys the opponent.
+
+## What bot can see?
+
+### Self information
+#### Common
+| Field                 | Type     | Description                                           |
+|-----------------------|----------|-------------------------------------------------------|
+| `self.race`           | `Race`   | The actual race your bot plays.                       |
+| `self.player_id`      | `u32`    | Bot's in-game id (usually `1` or `2` in 1v1 matches). |
+| `self.minerals`       | `u32`    | Amount of minerals bot has.                           |
+| `self.vespene`        | `u32`    | Amount of gas bot has.                                |
+| `self.supply_army`    | `u32`    | Amount of supply used by army.                        |
+| `self.supply_workers` | `u32`    | Amount of supply used by workers.                     |
+| `self.supply_cap`     | `u32`    | The supply limit.                                     |
+| `self.supply_used`    | `u32`    | Total supply used.                                    |
+| `self.supply_left`    | `u32`    | Amount of free supply.                                |
+| `self.start_location` | `Point2` | Bot's starting location.                              |
+| `self.start_center`   | `Point2` | Bot's resource center on start location.              |
+
+#### Race values
+| Field                             | Type              | Description                                             |
+|-----------------------------------|-------------------|---------------------------------------------------------|
+| `self.race_values.start_townhall` | `UnitTypeId`      | Default townhall which can be built by a worker.        |
+| `self.race_values.townhalls`      | `Vec<UnitTypeId>` | All possible forms of townhall for your race.           |
+| `self.race_values.gas`            | `UnitTypeId`      | Building used to extract gas from vespene geysers.      |
+| `self.race_values.rich_gas`       | `UnitTypeId`      | Building used to extract gas from rich vespene geysers. |
+| `self.race_values.supply`         | `UnitTypeId`      | Supply provider for your race.                          |
+| `self.race_values.worker`         | `UnitTypeId`      | Worker of your race.                                    |
+
+### Common opponent's information
+| Field                     | Type     | Description                                              |
+|---------------------------|----------|----------------------------------------------------------|
+| `self.enemy_race`         | `Race`   | Requested race of your opponent.                         |
+| `self.enemy_player_id`    | `u32`    | Opponent in-game id (usually `1` or `2` in 1v1 matches). |
+| `self.opponent_id`        | `String` | Opponent id on ladder, filled in `--OpponentId`.         |
+| `self.enemy_start`        | `Point2` | Opponent's starting location.                            |
+| `self.enemy_start_center` | `Point2` | Opponents's resource center on start location.           |
+
+### Ramps
+| Field             | Type        | Description                   |
+|-------------------|-------------|-------------------------------|
+| `self.ramp.my`    | `Ramp`      | Your main base ramp.          |
+| `self.ramp.enemy` | `Ramp`      | Opponent's main base ramp.    |
+| `self.ramp.all`   | `Vec<Ramp>` | All the ramps around the map. |
+
+### Units
+#### Common
+| Field                        | Type          | Description                                                                                     |
+|------------------------------|---------------|-------------------------------------------------------------------------------------------------|
+| `self.units.all`             | `Units`       | All the units including owned, enemies and neutral.                                             |
+| `self.units.my`              | `PlayerUnits` | Your's only units.                                                                              |
+| `self.units.enemy`           | `PlayerUnits` | Opponent's units, on current step.                                                              |
+| `self.units.cached`          | `PlayerUnits` | Opponent's units, but contains some units from previous steps, marked as snapshots or burrowed. |
+| `self.units.mineral_fields`  | `Units`       | All mineral fields on the map.                                                                  |
+| `self.units.vespene_geysers` | `Units`       | All vespene geysers on the map.                                                                 |
+| `self.units.resources`       | `Units`       | All resources (both minerals and geysers) on the map.                                           |
+| `self.units.destructables`   | `Units`       | Destructable rocks and other trash.                                                             |
+| `self.units.watchtowers`     | `Units`       | Watchtowers reveal area around them if there're any ground units near.                          |
+| `self.units.inhibitor_zones` | `Units`       | Inhubitor zones slow down movement speed of nearby units.                                       |
+
+#### What `PlayerUnits` consists of?
+All field are collections of `Units`:
+
+| Field            | Description                                                                                              |
+|------------------|----------------------------------------------------------------------------------------------------------|
+| `.all`           | All player units (includes both units and structures).                                                   |
+| `.units`         | Units only, without structures.                                                                          |
+| `.structures`    | Structures only.                                                                                         |
+| `.townhalls`     | From all structures only townhalls here.                                                                 |
+| `.workers`       | Workers only (doesn't include MULEs).                                                                    |
+| `.gas_buildings` | The gas buildings on geysers used to gather gas.                                                         |
+| `.larvas`        | Most of zerg units are morphed from it (Populated for zergs only).                                       |
+| `.placeholders`  | Kind of things that appear when you order worker to build something but construction didn't started yet. |
+
+### Other information
+| Field                  | Type                    | Description                                                                    |
+|------------------------|-------------------------|--------------------------------------------------------------------------------|
+| `self.time`            | `f32`                   | In-game time in seconds.                                                       |
+| `self.expansions`      | `Vec<(Point2, Point2)>` | All expansions stored in (location, resource center) pairs.                    |
+| `self.vision_blockers` | `Vec<Point2>`           | Obstacles on map which block vision of ground units, but still pathable.       |
+| `self.game_info`       | `GameInfo`              | Information about map: pathing grid, building placement, terrain height.       |
+| `self.game_data`       | `GameData`              | Constant information about abilities, unit types, upgrades, buffs and effects. |
+| `self.state`           | `GameState`             | Information about current state, updated each step.                            |
+
+## What bot can do?
+
+### Units training
+Training as much as possible marines may look like:
+```rust
+// Iterating bot's barracks which are completed (ready) and not already training (idle).
+for barrack in self.units.my.structures.iter().of_type(UnitTypeId::Barracks).ready().idle() {
+	// Checking if we have enough resources and supply.
+	if self.can_afford(UnitTypeId::Marine, true) {
+		// Ordering barracks to train marine.
+		barrack.train(UnitTypeId::Marine, false);
+		// Subtracting resources and suply used to train.
+		self.subtract_resources(UnitTypeId::Marine, true);
+	// Can't afford more marines. Stopping the iterator.
+	} else {
+		break;
+	}
+}
+```
+
+### Building structures
+Building up to 5 barracks might look like:
+```rust
+// Building near start location, but a bit closer to map center to not accidentally block mineral line.
+let main_base = self.start_location.towards(self.game_info.map_center, 8.0);
+
+// Checking if we have enough resources to afford a barrack.
+if self.can_afford(UnitTypeId::Barracks, false)
+	// Checking if total (current + ordered) number of barracks less than we want.
+	&& self.counter().all().count(UnitTypeId::Barracks) < 5
+{
+	// Finding a perfect location for a building.
+	if let Some(location) = self.find_placement(
+		UnitTypeId::Barracks,
+		main_base,
+		PlacementOptions {
+			// Step increased here to leave some space between barracks,
+			// so units won't stuck when coming out of them.
+			step: 4,
+			..Default::default()
+		},
+	) {
+		if let Some(builder) = self.units
+			// Finding workers which are not already building.
+			.my.workers.iter().filter(|w| !w.is_constructing())
+			// Selecting closest to our build location.
+			.closest(location)
+		{
+			// Ordering scv to build barracks finally.
+			builder.build(UnitTypeId::Barracks, location, false);
+			// Subtracting resources used to build it.
+			self.subtract_resources(UnitTypeId::Barracks, false);
+		}
+	}
+}
+```
+
+### Expanding
+Building new CCs might look like:
+```rust
+// Checking if we have enough minerals for new expand.
+if self.can_afford(UnitTypeId::CommandCenter, false)
+	// Checking if we not already building new base.
+	&& self.counter().ordered().count(UnitTypeId::CommandCenter) == 0
+{
+	// Getting next closest expansion
+	if let Some((location, _resource_center)) = self.get_expansion() {
+		if let Some(builder) = self.units
+			// Finding workers which are not already building.
+			.my.workers.iter().filter(|w| !w.is_constructing())
+			// Selecting closest to our build location.
+			.closest(location)
+		{
+			// Ordering scv to build new base.
+			builder.build(UnitTypeId::CommandCenter, location, false);
+			// Subtracting resources used to build CC.
+			self.subtract_resources(UnitTypeId::CommandCenter, false);
+		}
+	}
+}
+```
+
+### Units micro
+Attacking when marines >= 15, defending base before:
+```rust
+let main_base = self.start_location.towards(self.game_info.map_center, 8.0);
+let marines = self.units.my.units.iter().of_type(UnitTypeId::Marine).idle();
+
+if self.counter().count(UnitTypeId::Marine) >= 15 {
+	let targets = &self.units.enemy.all;
+	if targets.is_empty() {
+		for m in marines {
+			m.attack(Target::Pos(self.enemy_start), false);
+		}
+	} else {
+		for m in marines {
+			m.attack(Target::Tag(targets.closest(m)?.tag), false);
+		}
+	}
+} else {
+	let targets = self.units.enemy.all.closer(25.0, self.start_location);
+	if targets.is_empty() {
+		for m in marines {
+			m.move_to(Target::Pos(self.main_base), false);
+		}
+	} else {
+		for m in marines {
+			m.attack(Target::Tag(targets.closest(m)?.tag), false);
+		}
+	}
+}
+```
+
+## Prepearing for ladder
+
+There're community organized ladders for bots:
+- [SC2AI] - Runs games on windows and latest patch of SC2.
+- [AI Arena] - Runs games on linux and patch 4.10.
+
+Both use the same kind of system. In order to get your bot ready for ladder, make it parse following args:
+- `--LadderServer` - IP address.
+- `--OpponentId` - Id of the opponent on ladder.
+- `--GamePort` - Port.
+- `--StartPort` - Yet another port.
+
+If you're too lazy to add argparser yourself, see [`examples`] folder,
+some examples already have fully functional parser.
+
+Then call [`run_ladder_game`](client::run_ladder_game) this way:
+```rust
+run_ladder_game(
+	&mut bot,
+	ladder_server, // Should be 127.0.0.1 by default.
+	game_port,
+	start_port,
+	opponent_id, // Or `None`.
+)
+```
+
+The API will do the rest.
+
+Since [SC2AI] and [AI Arena] run the games on different platforms
+you'll need to provide suitable binaries for each ladder.
+
+Because of version differences ids are conditionally compiled for windows and linux.
+
+[SC2AI]: https://sc2ai.net
+[AI Arena]: https://ai-arena.net
+[`examples`]: https://github.com/UltraMachine/rust-sc2/tree/master/examples
+*/
 // #![warn(missing_docs)]
 #![deny(intra_doc_link_resolution_failure)]
 
