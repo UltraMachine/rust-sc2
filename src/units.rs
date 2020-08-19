@@ -159,8 +159,13 @@ impl Units {
 	}
 
 	#[inline]
-	pub fn find_tag(&self, tag: u64) -> Option<&Unit> {
+	pub fn get(&self, tag: u64) -> Option<&Unit> {
 		self.0.get(&tag)
+	}
+
+	#[inline]
+	pub fn get_mut(&mut self, tag: u64) -> Option<&mut Unit> {
+		self.0.get_mut(&tag)
 	}
 
 	// Units methods
