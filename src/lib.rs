@@ -61,7 +61,6 @@ pub mod units;
 pub mod utils;
 
 use player::{GameResult, Race};
-use unit::SharedUnitData;
 
 #[doc(inline)]
 pub use client::SC2Result;
@@ -175,13 +174,6 @@ where
 	Self: Sized,
 {
 	fn try_from_proto(p: T) -> Option<Self>;
-}
-
-trait FromProtoData<T>
-where
-	Self: Sized,
-{
-	fn from_proto_data(data: SharedUnitData, proto: T) -> Self;
 }
 
 trait IntoProto<T> {
