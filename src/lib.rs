@@ -26,22 +26,22 @@ use::rust_sc2::prelude::*;
 #[derive(Default)]
 struct MyBot;
 impl Player for MyBot {
-	fn get_player_settings(&self) -> PlayerSettings {
-		PlayerSettings::new(Race::Random, None)
-	}
-	fn on_step(&mut self, iteration: usize) -> SC2Result<()> {
-		/* Your code here */
-		Ok(())
-	}
+    fn get_player_settings(&self) -> PlayerSettings {
+        PlayerSettings::new(Race::Random, None)
+    }
+    fn on_step(&mut self, iteration: usize) -> SC2Result<()> {
+        /* Your code here */
+        Ok(())
+    }
 }
 
 fn main() -> SC2Result<()> {
-	run_vs_computer(
-		&mut MyBot::default(),
-		Computer::new(Race::Random, Difficulty::VeryEasy, None),
-		"EternalEmpireLE",
-		Default::default(),
-	)
+    run_vs_computer(
+        &mut MyBot::default(),
+        Computer::new(Race::Random, Difficulty::VeryEasy, None),
+        "EternalEmpireLE",
+        Default::default(),
+    )
 }
 ```
 
@@ -137,16 +137,16 @@ Training as much as possible marines may look like:
 ```rust
 // Iterating bot's barracks which are completed (ready) and not already training (idle).
 for barrack in self.units.my.structures.iter().of_type(UnitTypeId::Barracks).ready().idle() {
-	// Checking if we have enough resources and supply.
-	if self.can_afford(UnitTypeId::Marine, true) {
-		// Ordering barracks to train marine.
-		barrack.train(UnitTypeId::Marine, false);
-		// Subtracting resources and suply used to train.
-		self.subtract_resources(UnitTypeId::Marine, true);
-	// Can't afford more marines. Stopping the iterator.
-	} else {
-		break;
-	}
+    // Checking if we have enough resources and supply.
+    if self.can_afford(UnitTypeId::Marine, true) {
+        // Ordering barracks to train marine.
+        barrack.train(UnitTypeId::Marine, false);
+        // Subtracting resources and suply used to train.
+        self.subtract_resources(UnitTypeId::Marine, true);
+    // Can't afford more marines. Stopping the iterator.
+    } else {
+        break;
+    }
 }
 ```
 
@@ -158,32 +158,32 @@ let main_base = self.start_location.towards(self.game_info.map_center, 8.0);
 
 // Checking if we have enough resources to afford a barrack.
 if self.can_afford(UnitTypeId::Barracks, false)
-	// Checking if total (current + ordered) number of barracks less than we want.
-	&& self.counter().all().count(UnitTypeId::Barracks) < 5
+    // Checking if total (current + ordered) number of barracks less than we want.
+    && self.counter().all().count(UnitTypeId::Barracks) < 5
 {
-	// Finding a perfect location for a building.
-	if let Some(location) = self.find_placement(
-		UnitTypeId::Barracks,
-		main_base,
-		PlacementOptions {
-			// Step increased here to leave some space between barracks,
-			// so units won't stuck when coming out of them.
-			step: 4,
-			..Default::default()
-		},
-	) {
-		if let Some(builder) = self.units
-			// Finding workers which are not already building.
-			.my.workers.iter().filter(|w| !w.is_constructing())
-			// Selecting closest to our build location.
-			.closest(location)
-		{
-			// Ordering scv to build barracks finally.
-			builder.build(UnitTypeId::Barracks, location, false);
-			// Subtracting resources used to build it.
-			self.subtract_resources(UnitTypeId::Barracks, false);
-		}
-	}
+    // Finding a perfect location for a building.
+    if let Some(location) = self.find_placement(
+        UnitTypeId::Barracks,
+        main_base,
+        PlacementOptions {
+            // Step increased here to leave some space between barracks,
+            // so units won't stuck when coming out of them.
+            step: 4,
+            ..Default::default()
+        },
+    ) {
+        if let Some(builder) = self.units
+            // Finding workers which are not already building.
+            .my.workers.iter().filter(|w| !w.is_constructing())
+            // Selecting closest to our build location.
+            .closest(location)
+        {
+            // Ordering scv to build barracks finally.
+            builder.build(UnitTypeId::Barracks, location, false);
+            // Subtracting resources used to build it.
+            self.subtract_resources(UnitTypeId::Barracks, false);
+        }
+    }
 }
 ```
 
@@ -192,23 +192,23 @@ Building new CCs might look like:
 ```rust
 // Checking if we have enough minerals for new expand.
 if self.can_afford(UnitTypeId::CommandCenter, false)
-	// Checking if we not already building new base.
-	&& self.counter().ordered().count(UnitTypeId::CommandCenter) == 0
+    // Checking if we not already building new base.
+    && self.counter().ordered().count(UnitTypeId::CommandCenter) == 0
 {
-	// Getting next closest expansion
-	if let Some((location, _resource_center)) = self.get_expansion() {
-		if let Some(builder) = self.units
-			// Finding workers which are not already building.
-			.my.workers.iter().filter(|w| !w.is_constructing())
-			// Selecting closest to our build location.
-			.closest(location)
-		{
-			// Ordering scv to build new base.
-			builder.build(UnitTypeId::CommandCenter, location, false);
-			// Subtracting resources used to build CC.
-			self.subtract_resources(UnitTypeId::CommandCenter, false);
-		}
-	}
+    // Getting next closest expansion
+    if let Some((location, _resource_center)) = self.get_expansion() {
+        if let Some(builder) = self.units
+            // Finding workers which are not already building.
+            .my.workers.iter().filter(|w| !w.is_constructing())
+            // Selecting closest to our build location.
+            .closest(location)
+        {
+            // Ordering scv to build new base.
+            builder.build(UnitTypeId::CommandCenter, location, false);
+            // Subtracting resources used to build CC.
+            self.subtract_resources(UnitTypeId::CommandCenter, false);
+        }
+    }
 }
 ```
 
@@ -219,27 +219,27 @@ let main_base = self.start_location.towards(self.game_info.map_center, 8.0);
 let marines = self.units.my.units.iter().of_type(UnitTypeId::Marine).idle();
 
 if self.counter().count(UnitTypeId::Marine) >= 15 {
-	let targets = &self.units.enemy.all;
-	if targets.is_empty() {
-		for m in marines {
-			m.attack(Target::Pos(self.enemy_start), false);
-		}
-	} else {
-		for m in marines {
-			m.attack(Target::Tag(targets.closest(m)?.tag), false);
-		}
-	}
+    let targets = &self.units.enemy.all;
+    if targets.is_empty() {
+        for m in marines {
+            m.attack(Target::Pos(self.enemy_start), false);
+        }
+    } else {
+        for m in marines {
+            m.attack(Target::Tag(targets.closest(m)?.tag), false);
+        }
+    }
 } else {
-	let targets = self.units.enemy.all.closer(25.0, self.start_location);
-	if targets.is_empty() {
-		for m in marines {
-			m.move_to(Target::Pos(self.main_base), false);
-		}
-	} else {
-		for m in marines {
-			m.attack(Target::Tag(targets.closest(m)?.tag), false);
-		}
-	}
+    let targets = self.units.enemy.all.closer(25.0, self.start_location);
+    if targets.is_empty() {
+        for m in marines {
+            m.move_to(Target::Pos(self.main_base), false);
+        }
+    } else {
+        for m in marines {
+            m.attack(Target::Tag(targets.closest(m)?.tag), false);
+        }
+    }
 }
 ```
 
@@ -261,11 +261,11 @@ some examples already have fully functional parser.
 Then call [`run_ladder_game`](client::run_ladder_game) this way:
 ```rust
 run_ladder_game(
-	&mut bot,
-	ladder_server, // Should be 127.0.0.1 by default.
-	game_port,
-	start_port,
-	opponent_id, // Or `None`.
+    &mut bot,
+    ladder_server, // Should be 127.0.0.1 by default.
+    game_port,
+    start_port,
+    opponent_id, // Or `None`.
 )
 ```
 
