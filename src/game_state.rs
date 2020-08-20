@@ -367,7 +367,7 @@ impl FromProto<ProtoAlliance> for Alliance {
 	}
 }
 
-///	Radar point on the map.
+/// Radar point on the map.
 #[derive(Clone)]
 pub struct Radar {
 	/// Position where radar is.

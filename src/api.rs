@@ -6,7 +6,7 @@ use sc2_proto::sc2api::{Request, Response};
 use tungstenite::Message::Binary;
 
 /// SC2 API. Can be accessed through [`self.api()`](crate::bot::Bot::api).
-pub struct API(WS);
+pub struct API(pub(crate) WS);
 impl API {
 	/// Sends request and returns a response.
 	pub fn send(&mut self, req: Request) -> SC2Result<Response> {

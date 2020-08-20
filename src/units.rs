@@ -937,12 +937,12 @@ impl<T: Ord, V> Container<T> for BTreeMap<T, V> {
 		self.contains_key(item)
 	}
 }
-impl<T> Container<T> for IndexSet<T> {
+impl<T: Eq + Hash> Container<T> for IndexSet<T> {
 	fn contains(&self, item: &T) -> bool {
 		self.contains(item)
 	}
 }
-impl<T, V> Container<T> for IndexMap<T, V> {
+impl<T: Eq + Hash, V> Container<T> for IndexMap<T, V> {
 	fn contains(&self, item: &T) -> bool {
 		self.contains_key(item)
 	}

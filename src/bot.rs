@@ -14,7 +14,7 @@ use crate::{
 	ids::{AbilityId, UnitTypeId, UpgradeId},
 	player::Race,
 	ramp::{Ramp, Ramps},
-	unit::{DataForUnit, SharedUnitData, Unit},
+	unit::{DataForUnit, DisplayType, SharedUnitData, Unit},
 	units::{AllUnits, Units},
 	utils::{dbscan, range_query},
 	FromProto, IntoProto,
@@ -287,7 +287,7 @@ pub struct Bot {
 	current_units: FxHashMap<UnitTypeId, usize>,
 	enemies_ordered: FxHashMap<UnitTypeId, usize>,
 	enemies_current: FxHashMap<UnitTypeId, usize>,
-	saved_hallucinations: FxHashSet<u64>,
+	pub(crate) saved_hallucinations: FxHashSet<u64>,
 	/// In-game time in seconds.
 	pub time: f32,
 	/// Amount of minerals bot has.
@@ -1093,7 +1093,7 @@ impl Bot {
 
 		let mark_shapshot = |u: u64, us: &mut Units| {
 			if let Some(u) = us.get_mut(u) {
-				u.display_type = DisplayType::Shapshot;
+				u.display_type = DisplayType::Snapshot;
 			}
 		};
 		shapshot.into_iter().for_each(|u| {
