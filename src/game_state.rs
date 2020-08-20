@@ -201,26 +201,35 @@ where
 		.collect::<Units>();
 
 	// Events
-	for u in units.iter().filter(|u| u.is_mine()) {
-		let tag = u.tag;
+	let mut enemy_is_random = bot.enemy_race.is_random();
+	for u in units.iter() {
+		if u.is_mine() {
+			let tag = u.tag;
 
-		if !bot.owned_tags.contains(&tag) {
-			bot.owned_tags.insert(tag);
-			if u.is_structure() {
-				if !u.is_placeholder() && u.type_id != UnitTypeId::KD8Charge {
-					if u.is_ready() {
-						bot.on_event(Event::ConstructionComplete(tag))?;
-					} else {
-						bot.on_event(Event::ConstructionStarted(tag))?;
-						bot.under_construction.insert(tag);
+			if !bot.owned_tags.contains(&tag) {
+				bot.owned_tags.insert(tag);
+				if u.is_structure() {
+					if !u.is_placeholder() && u.type_id != UnitTypeId::KD8Charge {
+						if u.is_ready() {
+							bot.on_event(Event::ConstructionComplete(tag))?;
+						} else {
+							bot.on_event(Event::ConstructionStarted(tag))?;
+							bot.under_construction.insert(tag);
+						}
 					}
+				} else {
+					bot.on_event(Event::UnitCreated(tag))?;
 				}
-			} else {
-				bot.on_event(Event::UnitCreated(tag))?;
+			} else if bot.under_construction.contains(&tag) && u.is_ready() {
+				bot.under_construction.remove(&tag);
+				bot.on_event(Event::ConstructionComplete(tag))?;
 			}
-		} else if bot.under_construction.contains(&tag) && u.is_ready() {
-			bot.under_construction.remove(&tag);
-			bot.on_event(Event::ConstructionComplete(tag))?;
+		} else if enemy_is_random && u.is_enemy() {
+			let race = u.race();
+
+			bot.on_event(Event::RandomRaceDetected(race))?;
+			bot.enemy_race = race;
+			enemy_is_random = false;
 		}
 	}
 

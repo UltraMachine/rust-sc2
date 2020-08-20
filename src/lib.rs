@@ -421,6 +421,8 @@ pub enum Event {
 	ConstructionStarted(u64),
 	/// Construction of a structure finished (your only).
 	ConstructionComplete(u64),
+	/// Detected actual race of random opponent.
+	RandomRaceDetected(Race),
 }
 
 /// Trait that bots must implement.

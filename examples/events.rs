@@ -23,6 +23,7 @@ impl Player for EmptyBot {
 			Event::ConstructionComplete(tag) => {
 				if let Some(u) = self.units.my.structures.get(tag) { /* your code here */ }
 			}
+			Event::RandomRaceDetected(race) => { /* your code here */ }
 		}
 		Ok(())
 	}
