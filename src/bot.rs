@@ -824,7 +824,7 @@ impl Bot {
 				}
 			});
 
-			if u.is_ready() && !u.is_placeholder() {
+			if u.is_ready() && !(u.is_placeholder() || u.is_hallucination) {
 				*current_units.entry(u.type_id).or_default() += 1;
 			} else if let Some(data) = self.game_data.units.get(&u.type_id) {
 				if let Some(ability) = data.ability {
@@ -1116,7 +1116,7 @@ impl Bot {
 				} else {
 					*enemies_ordered.entry(u.type_id).or_default() += 1;
 				}
-			} else {
+			} else if !u.is_hallucination {
 				*enemies_current.entry(u.type_id).or_default() += 1;
 			}
 		});
