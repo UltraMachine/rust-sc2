@@ -51,63 +51,63 @@ Add some cool stuff and watch how it destroys the opponent.
 
 ### Self information
 #### Common
-| Field                 | Type     | Description                                           |
-|-----------------------|----------|-------------------------------------------------------|
-| `self.race`           | `Race`   | The actual race your bot plays.                       |
-| `self.player_id`      | `u32`    | Bot's in-game id (usually `1` or `2` in 1v1 matches). |
-| `self.minerals`       | `u32`    | Amount of minerals bot has.                           |
-| `self.vespene`        | `u32`    | Amount of gas bot has.                                |
-| `self.supply_army`    | `u32`    | Amount of supply used by army.                        |
-| `self.supply_workers` | `u32`    | Amount of supply used by workers.                     |
-| `self.supply_cap`     | `u32`    | The supply limit.                                     |
-| `self.supply_used`    | `u32`    | Total supply used.                                    |
-| `self.supply_left`    | `u32`    | Amount of free supply.                                |
-| `self.start_location` | `Point2` | Bot's starting location.                              |
-| `self.start_center`   | `Point2` | Bot's resource center on start location.              |
+| Field                 | Type       | Description                                           |
+|-----------------------|------------|-------------------------------------------------------|
+| `self.race`           | [`Race`]   | The actual race your bot plays.                       |
+| `self.player_id`      | `u32`      | Bot's in-game id (usually `1` or `2` in 1v1 matches). |
+| `self.minerals`       | `u32`      | Amount of minerals bot has.                           |
+| `self.vespene`        | `u32`      | Amount of gas bot has.                                |
+| `self.supply_army`    | `u32`      | Amount of supply used by army.                        |
+| `self.supply_workers` | `u32`      | Amount of supply used by workers.                     |
+| `self.supply_cap`     | `u32`      | The supply limit.                                     |
+| `self.supply_used`    | `u32`      | Total supply used.                                    |
+| `self.supply_left`    | `u32`      | Amount of free supply.                                |
+| `self.start_location` | [`Point2`] | Bot's starting location.                              |
+| `self.start_center`   | [`Point2`] | Bot's resource center on start location.              |
 
 #### Race values
-| Field                             | Type              | Description                                             |
-|-----------------------------------|-------------------|---------------------------------------------------------|
-| `self.race_values.start_townhall` | `UnitTypeId`      | Default townhall which can be built by a worker.        |
-| `self.race_values.townhalls`      | `Vec<UnitTypeId>` | All possible forms of townhall for your race.           |
-| `self.race_values.gas`            | `UnitTypeId`      | Building used to extract gas from vespene geysers.      |
-| `self.race_values.rich_gas`       | `UnitTypeId`      | Building used to extract gas from rich vespene geysers. |
-| `self.race_values.supply`         | `UnitTypeId`      | Supply provider for your race.                          |
-| `self.race_values.worker`         | `UnitTypeId`      | Worker of your race.                                    |
+| Field                             | Type                  | Description                                             |
+|-----------------------------------|-----------------------|---------------------------------------------------------|
+| `self.race_values.start_townhall` | [`UnitTypeId`]        | Default townhall which can be built by a worker.        |
+| `self.race_values.townhalls`      | `Vec`<[`UnitTypeId`]> | All possible forms of townhall for your race.           |
+| `self.race_values.gas`            | [`UnitTypeId`]        | Building used to extract gas from vespene geysers.      |
+| `self.race_values.rich_gas`       | [`UnitTypeId`]        | Building used to extract gas from rich vespene geysers. |
+| `self.race_values.supply`         | [`UnitTypeId`]        | Supply provider for your race.                          |
+| `self.race_values.worker`         | [`UnitTypeId`]        | Worker of your race.                                    |
 
 ### Common opponent's information
-| Field                     | Type     | Description                                              |
-|---------------------------|----------|----------------------------------------------------------|
-| `self.enemy_race`         | `Race`   | Requested race of your opponent.                         |
-| `self.enemy_player_id`    | `u32`    | Opponent in-game id (usually `1` or `2` in 1v1 matches). |
-| `self.opponent_id`        | `String` | Opponent id on ladder, filled in `--OpponentId`.         |
-| `self.enemy_start`        | `Point2` | Opponent's starting location.                            |
-| `self.enemy_start_center` | `Point2` | Opponents's resource center on start location.           |
+| Field                     | Type       | Description                                              |
+|---------------------------|------------|----------------------------------------------------------|
+| `self.enemy_race`         | [`Race`]   | Requested race of your opponent.                         |
+| `self.enemy_player_id`    | `u32`      | Opponent in-game id (usually `1` or `2` in 1v1 matches). |
+| `self.opponent_id`        | `String`   | Opponent id on ladder, filled in `--OpponentId`.         |
+| `self.enemy_start`        | [`Point2`] | Opponent's starting location.                            |
+| `self.enemy_start_center` | [`Point2`] | Opponents's resource center on start location.           |
 
 ### Ramps
-| Field             | Type        | Description                   |
-|-------------------|-------------|-------------------------------|
-| `self.ramp.my`    | `Ramp`      | Your main base ramp.          |
-| `self.ramp.enemy` | `Ramp`      | Opponent's main base ramp.    |
-| `self.ramp.all`   | `Vec<Ramp>` | All the ramps around the map. |
+| Field             | Type            | Description                   |
+|-------------------|-----------------|-------------------------------|
+| `self.ramp.my`    | [`Ramp`]        | Your main base ramp.          |
+| `self.ramp.enemy` | [`Ramp`]        | Opponent's main base ramp.    |
+| `self.ramp.all`   | `Vec`<[`Ramp`]> | All the ramps around the map. |
 
 ### Units
 #### Common
-| Field                        | Type          | Description                                                                                     |
-|------------------------------|---------------|-------------------------------------------------------------------------------------------------|
-| `self.units.all`             | `Units`       | All the units including owned, enemies and neutral.                                             |
-| `self.units.my`              | `PlayerUnits` | Your's only units.                                                                              |
-| `self.units.enemy`           | `PlayerUnits` | Opponent's units, on current step.                                                              |
-| `self.units.cached`          | `PlayerUnits` | Opponent's units, but contains some units from previous steps, marked as snapshots or burrowed. |
-| `self.units.mineral_fields`  | `Units`       | All mineral fields on the map.                                                                  |
-| `self.units.vespene_geysers` | `Units`       | All vespene geysers on the map.                                                                 |
-| `self.units.resources`       | `Units`       | All resources (both minerals and geysers) on the map.                                           |
-| `self.units.destructables`   | `Units`       | Destructable rocks and other trash.                                                             |
-| `self.units.watchtowers`     | `Units`       | Watchtowers reveal area around them if there're any ground units near.                          |
-| `self.units.inhibitor_zones` | `Units`       | Inhubitor zones slow down movement speed of nearby units.                                       |
+| Field                        | Type            | Description                                                                                     |
+|------------------------------|-----------------|-------------------------------------------------------------------------------------------------|
+| `self.units.all`             | [`Units`]       | All the units including owned, enemies and neutral.                                             |
+| `self.units.my`              | [`PlayerUnits`] | Your's only units.                                                                              |
+| `self.units.enemy`           | [`PlayerUnits`] | Opponent's units, on current step.                                                              |
+| `self.units.cached`          | [`PlayerUnits`] | Opponent's units, but contains some units from previous steps, marked as snapshots or burrowed. |
+| `self.units.mineral_fields`  | [`Units`]       | All mineral fields on the map.                                                                  |
+| `self.units.vespene_geysers` | [`Units`]       | All vespene geysers on the map.                                                                 |
+| `self.units.resources`       | [`Units`]       | All resources (both minerals and geysers) on the map.                                           |
+| `self.units.destructables`   | [`Units`]       | Destructable rocks and other trash.                                                             |
+| `self.units.watchtowers`     | [`Units`]       | Watchtowers reveal area around them if there're any ground units near.                          |
+| `self.units.inhibitor_zones` | [`Units`]       | Inhubitor zones slow down movement speed of nearby units.                                       |
 
 #### What `PlayerUnits` consists of?
-All field are collections of `Units`:
+All field are collections of [`Units`]:
 
 | Field            | Description                                                                                              |
 |------------------|----------------------------------------------------------------------------------------------------------|
@@ -121,14 +121,14 @@ All field are collections of `Units`:
 | `.placeholders`  | Kind of things that appear when you order worker to build something but construction didn't started yet. |
 
 ### Other information
-| Field                  | Type                    | Description                                                                    |
-|------------------------|-------------------------|--------------------------------------------------------------------------------|
-| `self.time`            | `f32`                   | In-game time in seconds.                                                       |
-| `self.expansions`      | `Vec<(Point2, Point2)>` | All expansions stored in (location, resource center) pairs.                    |
-| `self.vision_blockers` | `Vec<Point2>`           | Obstacles on map which block vision of ground units, but still pathable.       |
-| `self.game_info`       | `GameInfo`              | Information about map: pathing grid, building placement, terrain height.       |
-| `self.game_data`       | `GameData`              | Constant information about abilities, unit types, upgrades, buffs and effects. |
-| `self.state`           | `GameState`             | Information about current state, updated each step.                            |
+| Field                  | Type                            | Description                                                                    |
+|------------------------|---------------------------------|--------------------------------------------------------------------------------|
+| `self.time`            | `f32`                           | In-game time in seconds.                                                       |
+| `self.expansions`      | `Vec`<([`Point2`], [`Point2`])> | All expansions stored in (location, resource center) pairs.                    |
+| `self.vision_blockers` | `Vec`<[`Point2`]>               | Obstacles on map which block vision of ground units, but still pathable.       |
+| `self.game_info`       | [`GameInfo`]                    | Information about map: pathing grid, building placement, terrain height.       |
+| `self.game_data`       | [`GameData`]                    | Constant information about abilities, unit types, upgrades, buffs and effects. |
+| `self.state`           | [`GameState`]                   | Information about current state, updated each step.                            |
 
 ## What bot can do?
 
@@ -279,6 +279,16 @@ Because of version differences ids are conditionally compiled for windows and li
 [SC2AI]: https://sc2ai.net
 [AI Arena]: https://ai-arena.net
 [`examples`]: https://github.com/UltraMachine/rust-sc2/tree/master/examples
+
+[`Race`]: player::Race
+[`Point2`]: geometry::Point2
+[`UnitTypeId`]: ids::UnitTypeId
+[`Ramp`]: ramp::Ramp
+[`Units`]: units::Units
+[`PlayerUnits`]: units::PlayerUnits
+[`GameInfo`]: game_info::GameInfo
+[`GameData`]: game_data::GameData
+[`GameState`]: game_state::GameState
 */
 // #![warn(missing_docs)]
 #![deny(intra_doc_link_resolution_failure)]
