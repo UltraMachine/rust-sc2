@@ -9,9 +9,9 @@ use crate::{
 	distance::*,
 	game_data::{Cost, GameData},
 	game_info::GameInfo,
-	game_state::{Alliance, GameState},
+	game_state::{Alliance, Effect, GameState},
 	geometry::Point2,
-	ids::{AbilityId, UnitTypeId, UpgradeId},
+	ids::{AbilityId, EffectId, UnitTypeId, UpgradeId},
 	player::Race,
 	ramp::{Ramp, Ramps},
 	unit::{DataForUnit, DisplayType, SharedUnitData, Unit},
@@ -1031,12 +1031,40 @@ impl Bot {
 		let mut shapshot = Vec::<u64>::new();
 		let enemy_is_zerg = self.enemy_race.is_zerg();
 
+		fn is_invisible(u: &Unit, detectors: &Units, scans: &[Effect]) -> bool {
+			for d in detectors.iter() {
+				if u.is_closer(u.radius + d.radius + d.detect_range, d) {
+					return false;
+				}
+			}
+
+			for scan in scans {
+				for p in &scan.positions {
+					if u.is_closer(u.radius + scan.radius, *p) {
+						return false;
+					}
+				}
+			}
+
+			true
+		}
+		let detectors = self.units.my.all.filter(|u| u.is_detector());
+		let scans = self
+			.state
+			.observation
+			.raw
+			.effects
+			.iter()
+			.filter(|e| e.id == EffectId::ScannerSweep && e.alliance.is_mine())
+			.cloned()
+			.collect::<Vec<Effect>>();
+
 		let current = &self.units.enemy.all;
 		self.units.cached.all.iter().for_each(|u| {
 			if !current.contains_tag(u.tag) && (u.is_flying || !u.is_structure()) {
 				// unit position visible, but unit disappeared
 				if self.is_visible(u.position) {
-					// Was in vision visible previously
+					// Was visible previously
 					if u.is_visible() {
 						// Is zerg ground unit -> probably burrowed
 						let is_drone_close = |s: &Unit| {
@@ -1060,7 +1088,7 @@ impl Bot {
 							to_remove.push(u.tag);
 						}
 					// Was out of vision previously -> probably moved somewhere else
-					} else {
+					} else if !(u.is_burrowed && is_invisible(u, &detectors, &scans)) {
 						to_remove.push(u.tag);
 					}
 				} else {
@@ -1082,6 +1110,7 @@ impl Bot {
 
 		let mark_burrowed = |u: u64, us: &mut Units| {
 			if let Some(u) = us.get_mut(u) {
+				u.display_type = DisplayType::Snapshot;
 				u.is_burrowed = true;
 			}
 		};
