@@ -10,6 +10,13 @@ Feel free to ask questions in `#rust` channel of these Discord servers:
 # Getting started
 Install Rust >= 1.42.0
 
+Warning: Compilation is currently broken in latest stable releases, you'll get following error:
+```
+thread 'rustc' has overflowed its stack
+error: could not compile `rust-sc2`.
+```
+Use stable up to 1.44.1 or current nightly version of the compiler.
+
 Add to dependencies in Cargo.toml:
 ```toml
 [dependencies]
@@ -118,7 +125,7 @@ impl MyBot {
 If your bot implements `Default` you can simply call `MyBot::default()`, but if you want more control over initializer:
 ```rust
 impl MyBot {
-    // You don't need #[bot_new] here, because of "..Default::default()" 
+    // You don't need #[bot_new] here, because of "..Default::default()"
     fn new() -> Self {
         Self {
             /* initializing fields */
