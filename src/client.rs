@@ -607,6 +607,7 @@ where
 	req.mut_observation().set_disable_fog(bot.disable_fog);
 	let res = bot.api().send(req)?;
 
+	bot.init_data_for_unit();
 	update_state(bot, res.get_observation())?;
 	bot.prepare_start();
 

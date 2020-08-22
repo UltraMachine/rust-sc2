@@ -594,15 +594,7 @@ impl Bot {
 	pub fn has_creep<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
 		self.state.observation.raw.creep.lock_read()[pos.into()].is_empty()
 	}
-	pub(crate) fn prepare_start(&mut self) {
-		self.race = self.game_info.players[&self.player_id].race_actual.unwrap();
-		if self.game_info.players.len() == 2 {
-			let enemy_player_id = 3 - self.player_id;
-			self.enemy_race = self.game_info.players[&enemy_player_id].race_requested;
-			self.enemy_player_id = enemy_player_id;
-		}
-		self.race_values = Rs::new(RACE_VALUES[&self.race].clone());
-
+	pub(crate) fn init_data_for_unit(&mut self) {
 		self.data_for_unit = Rs::new(DataForUnit {
 			commander: Rs::clone(&self.commander),
 			game_data: Rs::clone(&self.game_data),
@@ -617,6 +609,15 @@ impl Bot {
 			creep: Rs::clone(&self.state.observation.raw.creep),
 			game_step: Rs::clone(&self.game_step),
 		});
+	}
+	pub(crate) fn prepare_start(&mut self) {
+		self.race = self.game_info.players[&self.player_id].race_actual.unwrap();
+		if self.game_info.players.len() == 2 {
+			let enemy_player_id = 3 - self.player_id;
+			self.enemy_race = self.game_info.players[&enemy_player_id].race_requested;
+			self.enemy_player_id = enemy_player_id;
+		}
+		self.race_values = Rs::new(RACE_VALUES[&self.race].clone());
 
 		self.update_units();
 
