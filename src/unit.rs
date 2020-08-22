@@ -752,6 +752,16 @@ impl Unit {
 	pub fn max_cooldown(&self) -> Option<f32> {
 		self.data.max_cooldowns.lock_read().get(&self.type_id).copied()
 	}
+	/// Returns weapon cooldown percentage (current cooldown divided by max cooldown).
+	/// Value in range from `0` to `1`.
+	pub fn cooldown_percentage(&self) -> Option<f32> {
+		let current = self.weapon_cooldown?;
+		let max = self.max_cooldown()?;
+		if max == 0.0 {
+			return None;
+		}
+		Some(current as f32 / max as f32)
+	}
 	/// Returns ground range of unit's weapon without considering upgrades.
 	/// Use [`real_ground_range`](Self::real_ground_range) to get range including upgrades.
 	pub fn ground_range(&self) -> f32 {
