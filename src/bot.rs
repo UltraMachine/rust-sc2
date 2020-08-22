@@ -1061,46 +1061,52 @@ impl Bot {
 			.collect::<Vec<Effect>>();
 
 		let current = &self.units.enemy.all;
-		self.units.cached.all.iter().for_each(|u| {
-			if !current.contains_tag(u.tag) && (u.is_flying || !u.is_structure()) {
-				// unit position visible, but unit disappeared
-				if self.is_visible(u.position) {
-					// Was visible previously
-					if u.is_visible() {
-						// Is zerg ground unit -> probably burrowed
-						let is_drone_close = |s: &Unit| {
-							(s.build_progress < 0.1 || (s.type_id == UnitTypeId::Extractor && s.is_ready()))
-								&& u.is_closer(u.radius + s.radius + 1.0, s)
-						};
-						if enemy_is_zerg
-							&& !u.is_flying && !(matches!(
-							u.type_id,
-							UnitTypeId::Changeling
-								| UnitTypeId::ChangelingZealot | UnitTypeId::ChangelingMarineShield
-								| UnitTypeId::ChangelingMarine | UnitTypeId::ChangelingZerglingWings
-								| UnitTypeId::ChangelingZergling | UnitTypeId::Broodling
-								| UnitTypeId::Larva | UnitTypeId::Egg
-						) || (u.type_id == UnitTypeId::Drone
-							&& self.units.enemy.structures.iter().any(is_drone_close)))
-						{
-							burrowed.push(u.tag);
-						// Whatever
-						} else {
+		self.units
+			.cached
+			.all
+			.iter()
+			.filter(|u| !current.contains_tag(u.tag))
+			.for_each(|u| {
+				if (u.is_flying || !u.is_structure()) {
+					// unit position visible, but unit disappeared
+					if self.is_visible(u.position) {
+						// Was visible previously
+						if u.is_visible() {
+							// Is zerg ground unit -> probably burrowed
+							let is_drone_close = |s: &Unit| {
+								(s.build_progress < 0.1
+									|| (s.type_id == UnitTypeId::Extractor && s.is_ready()))
+									&& u.is_closer(u.radius + s.radius + 1.0, s)
+							};
+							if enemy_is_zerg
+								&& !u.is_flying && !(matches!(
+								u.type_id,
+								UnitTypeId::Changeling
+									| UnitTypeId::ChangelingZealot | UnitTypeId::ChangelingMarineShield
+									| UnitTypeId::ChangelingMarine | UnitTypeId::ChangelingZerglingWings
+									| UnitTypeId::ChangelingZergling | UnitTypeId::Broodling
+									| UnitTypeId::Larva | UnitTypeId::Egg
+							) || (u.type_id == UnitTypeId::Drone
+								&& self.units.enemy.structures.iter().any(is_drone_close)))
+							{
+								burrowed.push(u.tag);
+							// Whatever
+							} else {
+								to_remove.push(u.tag);
+							}
+						// Was out of vision previously or burrowed but detected -> probably moved somewhere else
+						} else if !(u.is_burrowed && is_invisible(u, &detectors, &scans)) {
 							to_remove.push(u.tag);
 						}
-					// Was out of vision previously or burrowed but detected -> probably moved somewhere else
-					} else if !(u.is_burrowed && is_invisible(u, &detectors, &scans)) {
-						to_remove.push(u.tag);
+					// Unit is out of vision -> marking as snapshot
+					} else {
+						shapshot.push(u.tag);
 					}
-				// Unit is out of vision -> marking as snapshot
+				// Structure got destroyed
 				} else {
-					shapshot.push(u.tag);
+					to_remove.push(u.tag);
 				}
-			// Structure got destroyed
-			} else {
-				to_remove.push(u.tag);
-			}
-		});
+			});
 
 		let cache = &mut self.units.cached;
 		to_remove.into_iter().for_each(|u| {
