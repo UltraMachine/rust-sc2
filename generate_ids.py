@@ -22,7 +22,7 @@ def parse_simple(d, data):
 		if not key:
 			continue
 
-		key_to_insert = key.replace(" ", "").replace("_", "")
+		key_to_insert = key.replace(" ", "").replace("_", "").replace("@", "")
 		if key_to_insert[0].isdigit():
 			key_to_insert = "_" + key_to_insert
 		if key_to_insert in units:
@@ -59,12 +59,12 @@ def parse_data(data, version=None):
 			else:
 				exit(f"Not mapped: {v !r}")
 
-		key = key.replace(" ", "").replace("_", "")
+		key = key.replace(" ", "").replace("_", "").replace("@", "")
 		if "name" in v:
-			key = f'{v["name"].replace(" ", "").replace("_", "")}{key}'
+			key = f'{v["name"].replace(" ", "").replace("_", "").replace("@", "")}{key}'
 
 		if "friendlyname" in v:
-			key = v["friendlyname"].replace(" ", "").replace("_", "")
+			key = v["friendlyname"].replace(" ", "").replace("_", "").replace("@", "")
 
 		if key[0].isdigit():
 			key = "_" + key
