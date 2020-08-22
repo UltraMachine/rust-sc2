@@ -135,16 +135,20 @@ where
 
 	let enemy_is_terran = bot.enemy_race.is_terran();
 	for u in &dead_units {
-		let cache = &mut bot.units.cached;
-		cache.all.remove(*u);
-		cache.units.remove(*u);
-		cache.workers.remove(*u);
-		if enemy_is_terran {
-			cache.structures.remove(*u);
-			cache.townhalls.remove(*u);
-		}
+		if bot.owned_tags.remove(u) {
+			bot.under_construction.remove(u);
+		} else {
+			let cache = &mut bot.units.cached;
+			cache.all.remove(*u);
+			cache.units.remove(*u);
+			cache.workers.remove(*u);
+			if enemy_is_terran {
+				cache.structures.remove(*u);
+				cache.townhalls.remove(*u);
+			}
 
-		bot.saved_hallucinations.remove(u);
+			bot.saved_hallucinations.remove(u);
+		}
 
 		bot.on_event(Event::UnitDestroyed(*u))?;
 	}
@@ -209,7 +213,7 @@ where
 			if !bot.owned_tags.contains(&tag) {
 				bot.owned_tags.insert(tag);
 				if u.is_structure() {
-					if !u.is_placeholder() && u.type_id != UnitTypeId::KD8Charge {
+					if !(u.is_placeholder() || u.type_id == UnitTypeId::KD8Charge) {
 						if u.is_ready() {
 							bot.on_event(Event::ConstructionComplete(tag))?;
 						} else {
