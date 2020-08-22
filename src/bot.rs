@@ -1088,13 +1088,17 @@ impl Bot {
 						} else {
 							to_remove.push(u.tag);
 						}
-					// Was out of vision previously -> probably moved somewhere else
+					// Was out of vision previously or burrowed but detected -> probably moved somewhere else
 					} else if !(u.is_burrowed && is_invisible(u, &detectors, &scans)) {
 						to_remove.push(u.tag);
 					}
+				// Unit is out of vision -> marking as snapshot
 				} else {
 					shapshot.push(u.tag);
 				}
+			// Structure got destroyed
+			} else {
+				to_remove.push(u.tag);
 			}
 		});
 
