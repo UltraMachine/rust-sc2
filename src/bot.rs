@@ -1067,7 +1067,7 @@ impl Bot {
 			.iter()
 			.filter(|u| !current.contains_tag(u.tag))
 			.for_each(|u| {
-				if (u.is_flying || !u.is_structure()) {
+				if u.is_flying || !u.is_structure() {
 					// unit position visible, but unit disappeared
 					if self.is_visible(u.position) {
 						// Was visible previously
