@@ -204,6 +204,9 @@ where
 		.map(|u| Unit::from_proto(Rs::clone(&bot.data_for_unit), &visibility, u))
 		.collect::<Units>();
 
+	// Updating units
+	bot.update_units(&units);
+
 	// Events
 	let mut enemy_is_random = bot.enemy_race.is_random();
 	for u in units.iter() {

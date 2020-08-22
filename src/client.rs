@@ -647,7 +647,6 @@ where
 	}
 
 	update_state(bot, res.get_observation())?;
-
 	bot.prepare_step();
 
 	bot.on_step(iteration)?;

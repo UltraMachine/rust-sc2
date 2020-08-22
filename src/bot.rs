@@ -619,8 +619,6 @@ impl Bot {
 		}
 		self.race_values = Rs::new(RACE_VALUES[&self.race].clone());
 
-		self.update_units();
-
 		if let Some(townhall) = self.units.my.townhalls.first() {
 			self.start_location = townhall.position;
 		}
@@ -797,13 +795,6 @@ impl Bot {
 		self.ramps.all = ramps;
 	}
 	pub(crate) fn prepare_step(&mut self) {
-		*self.last_units_health.lock_write() = self
-			.units
-			.all
-			.iter()
-			.filter_map(|u| Some((u.tag, u.hits()?)))
-			.collect();
-		self.update_units();
 		let observation = &self.state.observation;
 		self.time = (observation.game_loop as f32) / 22.4;
 		let common = &observation.common;
@@ -836,7 +827,14 @@ impl Bot {
 		self.current_units = current_units;
 		self.orders = orders;
 	}
-	fn update_units(&mut self) {
+	pub(crate) fn update_units(&mut self, all_units: &Units) {
+		*self.last_units_health.lock_write() = self
+			.units
+			.all
+			.iter()
+			.filter_map(|u| Some((u.tag, u.hits()?)))
+			.collect();
+
 		self.units.clear();
 
 		let mut techlab_tags = self.techlab_tags.lock_write();
@@ -848,7 +846,7 @@ impl Bot {
 		reactor_tags.clear();
 
 		let units = &mut self.units;
-		self.state.observation.raw.units.iter().for_each(|u| {
+		all_units.iter().for_each(|u| {
 			macro_rules! add_to {
 				($group:expr) => {{
 					$group.push(u.clone());
@@ -996,7 +994,7 @@ impl Bot {
 				_ => {}
 			}
 		});
-		units.all = self.state.observation.raw.units.clone();
+		units.all = all_units.clone();
 
 		let enemies = &mut self.units.enemy;
 		let mark_hallucination = |u: u64, us: &mut Units| {
