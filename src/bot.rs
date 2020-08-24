@@ -809,21 +809,26 @@ impl Bot {
 		// Counting units and orders
 		let mut current_units = FxHashMap::default();
 		let mut orders = FxHashMap::default();
-		self.units.my.all.iter().for_each(|u| {
-			u.orders.iter().for_each(|order| {
-				if !order.ability.is_constructing() {
-					*orders.entry(order.ability).or_default() += 1
+		self.units
+			.my
+			.all
+			.iter()
+			.filter(|u| !u.is_hallucination)
+			.for_each(|u| {
+				u.orders.iter().for_each(|order| {
+					if !order.ability.is_constructing() {
+						*orders.entry(order.ability).or_default() += 1
+					}
+				});
+
+				if u.is_ready() && !u.is_placeholder() {
+					*current_units.entry(u.type_id).or_default() += 1;
+				} else if let Some(data) = self.game_data.units.get(&u.type_id) {
+					if let Some(ability) = data.ability {
+						*orders.entry(ability).or_default() += 1;
+					}
 				}
 			});
-
-			if u.is_ready() && !(u.is_placeholder() || u.is_hallucination) {
-				*current_units.entry(u.type_id).or_default() += 1;
-			} else if let Some(data) = self.game_data.units.get(&u.type_id) {
-				if let Some(ability) = data.ability {
-					*orders.entry(ability).or_default() += 1;
-				}
-			}
-		});
 		self.current_units = current_units;
 		self.orders = orders;
 	}
