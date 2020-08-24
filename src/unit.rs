@@ -15,6 +15,7 @@ use crate::{
 	ids::{AbilityId, BuffId, UnitTypeId, UpgradeId},
 	pixel_map::{PixelMap, VisibilityMap},
 	player::Race,
+	units::Container,
 	FromProto,
 };
 use num_traits::FromPrimitive;
@@ -1399,8 +1400,8 @@ impl Unit {
 	/// Checks if unit is using any of given abilities.
 	///
 	/// Doesn't work with enemies.
-	pub fn is_using_any<'a, A: IntoIterator<Item = &'a AbilityId>>(&self, abilities: A) -> bool {
-		!self.is_idle() && abilities.into_iter().any(|a| self.orders[0].ability == *a)
+	pub fn is_using_any<A: Container<AbilityId>>(&self, abilities: &A) -> bool {
+		!self.is_idle() && abilities.contains(&self.orders[0].ability)
 	}
 	/// Checks if unit is currently attacking.
 	///
