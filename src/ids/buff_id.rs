@@ -297,11 +297,12 @@ pub enum BuffId {
 	AccelerationZoneTemporalField = 289,
 	AccelerationZoneFlyingTemporalField = 290,
 	InhibitorZoneFlyingTemporalField = 291,
-	InhibitorZoneTemporalField = 292,
-	ResonatingGlaivesPhaseShift = 293,
-	AmorphousArmorcloud = 294,
-	RavenShredderMissileArmorReductionUISubtruct = 295,
-	BatteryOvercharge = 296,
+	LoadOutSprayTracker = 292,
+	InhibitorZoneTemporalField = 293,
+	ResonatingGlaivesPhaseShift = 294,
+	AmorphousArmorcloud = 295,
+	RavenShredderMissileArmorReductionUISubtruct = 296,
+	BatteryOvercharge = 297,
 }
 
 #[cfg(target_os = "linux")]
