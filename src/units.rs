@@ -257,7 +257,7 @@ impl Units {
 	/// on the iterator over units, since it's lazily evaluated and doesn't do any cloning operations.
 	///
 	/// [`exclude_type`]: UnitsIterator::exclude_type
-	pub fn exclude_type(&self, unit_type: UnitTypeId) -> Self{
+	pub fn exclude_type(&self, unit_type: UnitTypeId) -> Self {
 		self.filter(|u| u.type_id != unit_type)
 	}
 	/// Returns central position of all units in the collection or `None` if collection is empty.
@@ -571,7 +571,7 @@ impl Units {
 	/// on the iterator over units, since it's lazily evaluated and doesn't do any cloning operations.
 	///
 	/// [`exclude_types`]: UnitsIterator::exclude_types
-	pub fn exclude_types<T: Container<UnitTypeId>>(&self, types: &T) -> Self{
+	pub fn exclude_types<T: Container<UnitTypeId>>(&self, types: &T) -> Self {
 		self.filter(|u| !types.contains(&u.type_id))
 	}
 
@@ -999,9 +999,9 @@ pub trait UnitsIterator<'a>: Iterator<Item = &'a Unit> + Sized {
 	fn of_type(self, unit_type: UnitTypeId) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
 		self.filter(Box::new(move |u| u.type_id == unit_type))
 	}
-	fn exclude_type(self, unit_type: UnitTypeId) -> Filter<Self, Box<dyn FnMut(&&Unit)->bool + 'a>>{
 		self.filter(Box::new(move |u| u.type_id == unit_type))
 	/// Excludes units of given type.
+	fn exclude_type(self, unit_type: UnitTypeId) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
 	}
 	/// Leaves only units of given types.
 	fn of_types<T>(self, types: &'a T) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>>
@@ -1095,8 +1095,11 @@ pub trait ParUnitsIterator<'a>: ParallelIterator<Item = &'a Unit> {
 	fn of_type(self, type_id: UnitTypeId) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
 		self.filter(Box::new(move |u| u.type_id == type_id))
 	}
-	fn exclude_type(self, type_id: UnitTypeId) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
 	/// Excludes units of given type.
+	fn exclude_type(
+		self,
+		type_id: UnitTypeId,
+	) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
 		self.filter(Box::new(move |u| u.type_id != type_id))
 	}
 	/// Leaves only units of given types.
