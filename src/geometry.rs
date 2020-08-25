@@ -218,12 +218,12 @@ impl From<Point2> for (usize, usize) {
 		((p.x + 0.5) as usize, (p.y + 0.5) as usize)
 	}
 }
-impl From<(usize, usize)> for Point2{
+impl From<(usize, usize)> for Point2 {
 	#[inline]
-	fn from((x, y): (usize, usize)) -> Self{
-		Self{ 
+	fn from((x, y): (usize, usize)) -> Self {
+		Self {
 			x: x as f32 + 0.5,
-			y: y as f32 + 0.5
+			y: y as f32 + 0.5,
 		}
 	}
 }
