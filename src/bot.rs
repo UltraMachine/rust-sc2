@@ -804,7 +804,7 @@ impl Bot {
 		self.supply_workers = common.food_workers;
 		self.supply_cap = common.food_cap;
 		self.supply_used = common.food_used;
-		self.supply_left = self.supply_cap - self.supply_used;
+		self.supply_left = self.supply_cap.saturating_sub(self.supply_used);
 
 		// Counting units and orders
 		let mut current_units = FxHashMap::default();
