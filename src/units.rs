@@ -748,8 +748,8 @@ impl Units {
 	/// on the iterator over units, since it's lazily evaluated and doesn't do any cloning operations.
 	///
 	/// [`exclude_types`]: UnitsIterator::exclude_types
-	pub fn exclude_types<T: Container<UnitTypeId>>(&self, types: &T) -> Self{
-		self.filter(|U| !types.contains(&u.type_id))
+	pub fn exclude_types<T: Container<UnitTypeId> + Sync>(&self, types: &T) -> Self {
+		self.filter(|u| !types.contains(&u.type_id))
 	}
 
 	/// Leaves only units closer than given distance to target and makes new collection of them.
@@ -999,9 +999,9 @@ pub trait UnitsIterator<'a>: Iterator<Item = &'a Unit> + Sized {
 	fn of_type(self, unit_type: UnitTypeId) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
 		self.filter(Box::new(move |u| u.type_id == unit_type))
 	}
-		self.filter(Box::new(move |u| u.type_id == unit_type))
 	/// Excludes units of given type.
 	fn exclude_type(self, unit_type: UnitTypeId) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
+		self.filter(Box::new(move |u| u.type_id != unit_type))
 	}
 	/// Leaves only units of given types.
 	fn of_types<T>(self, types: &'a T) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>>
