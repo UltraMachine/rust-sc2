@@ -54,6 +54,10 @@ fn main() -> SC2Result<()> {
 
 Add some cool stuff and watch how it destroys the opponent.
 
+If you are careful guy who don't trust random macros that can destroy your PC,
+see [`#[bot]`] macro documentation to understand how it's implemented.
+You always can do the same thing by hands if needed.
+
 ## What bot can see?
 
 ### Self information
@@ -330,11 +334,12 @@ pub mod prelude {
 		geometry::Point2,
 		ids::*,
 		player::{AIBuild, Computer, Difficulty, GameResult, Race},
-		sc2_macro::{bot, bot_new},
 		unit::Unit,
 		units::{Units, UnitsIterator},
 		Event, Player, PlayerSettings,
 	};
+	#[doc(no_inline)]
+	pub use sc2_macro::{bot, bot_new};
 }
 
 mod paths;
@@ -360,6 +365,228 @@ pub mod units;
 pub mod utils;
 
 use player::{GameResult, Race};
+
+/**
+`#[bot]` macro implements [`Deref`]`<Target = `[`Bot`]`>` and [`DerefMut`]`<Target = `[`Bot`]`>` for your struct.
+Implementing this traits allows you to access [`Bot`] fields and methods on your struct through `self`.
+
+[`Bot`]: crate::bot::Bot
+[`Deref`]: std::ops::Deref
+[`DerefMut`]: std::ops::DerefMut
+
+Usage:
+```
+#[bot]
+struct MyBot;
+
+impl MyBot {
+    fn my_func(&self) {
+        println!("my race: {:?}", self.race);
+        println!("current \"game_step\": {}", self.game_step());
+    }
+    fn my_func_mut(&mut self) {
+        self.chat("It works!");
+        self.set_game_step(8);
+    }
+}
+```
+
+## What this macro does?
+It adds hidden field where data of [`Bot`] stored.
+
+Also this adds [`Deref`] and [`DerefMut`] implementations to access [`Bot`] data just through `self.whatever`
+instead of `self._bot.whatever`.
+
+## What compiler does?
+When you type this:
+```
+self.whatever_from_bot
+```
+Since [`Deref`] is implemented, compiler performs auto dereference to access [`Bot`]:
+```
+(*self).whatever_from_bot
+```
+The way how [`Deref`] implemented determines behavior of dereference operation, so actually it becomes:
+```
+self._bot.whatever_from_bot
+```
+
+# Macro Inside
+
+This:
+```
+#[bot]
+struct MyBot;
+```
+Expands to:
+```
+struct MyBot {
+    _bot: Bot,
+}
+impl Deref for MyBot {
+    type Target = Bot;
+
+    fn deref(&self) -> &Self::Target {
+        &self._bot
+    }
+}
+impl DerefMut for MyBot {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self._bot
+    }
+}
+```
+
+And this:
+```
+#[bot]
+struct MyBot {
+    field: Type,
+    field2: Type2,
+}
+```
+Expands to:
+```
+struct MyBot {
+    _bot: Bot,
+    field: Type,
+    field2: Type2,
+}
+impl Deref for MyBot {
+    type Target = Bot;
+
+    fn deref(&self) -> &Self::Target {
+        &self._bot
+    }
+}
+impl DerefMut for MyBot {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self._bot
+    }
+}
+```
+*/
+#[doc(inline)]
+pub use sc2_macro::bot;
+
+/**
+`#[bot_new]` macro adds initialization of field added by [`#[bot]`] macro.
+
+Usage:
+```
+#[bot]
+struct MyBot;
+
+impl MyBot {
+    #[bot_new]
+    fn new() -> MyBot {
+        MyBot
+    }
+}
+```
+If your bot implements `Default` then you don't need it, since [`Bot`](crate::bot::Bot)
+implements `Default` too and will be filled automatically:
+```
+#[bot]
+#[derive(Default)]
+struct MyBot;
+
+fn main() {
+    let bot = MyBot::default();
+}
+```
+```
+#[bot]
+#[derive(Default)]
+struct MyBot {
+    field: Type,
+    field2: Type2,
+    field_n: TypeN,
+}
+
+impl MyBot {
+    fn new() -> MyBot {
+        MyBot {
+            field: Type::init(),
+            field2: Type2::init(),
+            ..Default::default(),
+        }
+    }
+}
+
+fn main() {
+    let bot = MyBot::new();
+}
+```
+
+# Macro Inside
+
+This:
+```
+#[bot]
+struct MyBot;
+
+impl MyBot {
+    #[bot_new]
+    fn new() -> MyBot {
+        MyBot
+    }
+}
+```
+Expands to:
+```
+struct MyBot {
+    _bot: Bot,
+}
+
+impl MyBot {
+    fn new() -> MyBot {
+        MyBot {
+            _bot: Default::default(),
+        }
+    }
+}
+```
+
+And this:
+```
+#[bot]
+struct MyBot {
+    field: Type,
+    field2: Type2,
+}
+
+impl MyBot {
+    #[bot_new]
+    fn new() -> MyBot {
+        MyBot {
+            field: Type::init(),
+            field2: Type2::init(),
+        }
+    }
+}
+```
+Expands to:
+```
+struct MyBot {
+    _bot: Bot,
+    field: Type,
+    field2: Type2,
+}
+
+impl MyBot {
+    fn new() -> MyBot {
+        MyBot {
+            _bot: Default::default(),
+            field: Type::init(),
+            field2: Type2::init(),
+        }
+    }
+}
+```
+*/
+#[doc(inline)]
+pub use sc2_macro::bot_new;
 
 #[doc(inline)]
 pub use client::SC2Result;

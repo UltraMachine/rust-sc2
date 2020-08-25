@@ -23,7 +23,7 @@ pub fn bot(_attr: TokenStream, item: TokenStream) -> TokenStream {
 			quote! {#named}
 		}
 		Fields::Unnamed(_) => panic!("#[bot] is not allowed for tuple structs"),
-		unit @ Fields::Unit => quote! {#unit},
+		unit => quote! {#unit},
 	};
 
 	TokenStream::from(quote! {
