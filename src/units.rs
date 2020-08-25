@@ -240,7 +240,7 @@ impl Units {
 			.filter_map(|tag| self.0.get(tag).cloned())
 			.collect()
 	}
-	/// Leaves only units with given type and makes new collection of them.
+	/// Leaves only units of given type and makes a new collection of them.
 	///
 	/// Warning: This method will clone units in order to create a new collection
 	/// and will be evaluated initially. When applicable prefer using [`of_type`]
@@ -250,7 +250,7 @@ impl Units {
 	pub fn of_type(&self, unit_type: UnitTypeId) -> Self {
 		self.filter(|u| u.type_id == unit_type)
 	}
-	/// Excludes all units of given type and makes a new collection of them
+	/// Excludes all units of given type and makes a new collection of remaining units.
 	///
 	/// Warning: This method will clone units in order to create a new collection
 	/// and will be evaluated initially. When applicable prefer using [`exclude_type`]
@@ -553,7 +553,7 @@ impl Units {
 	{
 		Self(self.iter().filter(f).map(|u| (u.tag, u.clone())).collect())
 	}
-	/// Leaves only units of given types and makes new collection of them.
+	/// Leaves only units of given types and makes a new collection of them.
 	///
 	/// Warning: This method will clone units in order to create a new collection
 	/// and will be evaluated initially. When applicable prefer using [`of_types`]
@@ -564,7 +564,7 @@ impl Units {
 		self.filter(|u| types.contains(&u.type_id))
 	}
 
-	/// Excludes units of given types and makes a new collection of them.
+	/// Excludes units of given types and makes a new collection of remaining units.
 	///
 	/// Warning: This method will clone units in order to create a new collection
 	/// and will be evaluated initially. When applicable prefer using [`exclude_types`]
@@ -575,7 +575,7 @@ impl Units {
 		self.filter(|u| !types.contains(&u.type_id))
 	}
 
-	/// Leaves only closer than given distance to target and makes new collection of them.
+	/// Leaves only units closer than given distance to target and makes new collection of them.
 	///
 	/// Warning: This method will clone units in order to create a new collection
 	/// and will be evaluated initially. When applicable prefer using [`closer`]
@@ -585,7 +585,7 @@ impl Units {
 	pub fn closer<P: Into<Point2> + Copy>(&self, distance: f32, target: P) -> Self {
 		self.filter(|u| u.is_closer(distance, target))
 	}
-	/// Leaves only further than given distance to target and makes new collection of them.
+	/// Leaves only units further than given distance to target and makes new collection of them.
 	///
 	/// Warning: This method will clone units in order to create a new collection
 	/// and will be evaluated initially. When applicable prefer using [`further`]
@@ -730,7 +730,7 @@ impl Units {
 		Self(self.par_iter().filter(f).map(|u| (u.tag, u.clone())).collect())
 	}
 
-	/// Leaves only units of given types and makes new collection of them.
+	/// Leaves only units of given types and makes a new collection of them.
 	///
 	/// Warning: This method will clone units in order to create a new collection
 	/// and will be evaluated initially. When applicable prefer using [`of_types`]
@@ -741,7 +741,7 @@ impl Units {
 		self.filter(|u| types.contains(&u.type_id))
 	}
 
-	/// Excludes units of given types and makes a new collection of them.
+	/// Excludes units of given types and makes a new collection of remaining units.
 	///
 	/// Warning: This method will clone units in order to create a new collection
 	/// and will be evaluated initially. When applicable prefer using [`exclude_types`]
@@ -752,7 +752,7 @@ impl Units {
 		self.filter(|U| !types.contains(&u.type_id))
 	}
 
-	/// Leaves only closer than given distance to target and makes new collection of them.
+	/// Leaves only units closer than given distance to target and makes new collection of them.
 	///
 	/// Warning: This method will clone units in order to create a new collection
 	/// and will be evaluated initially. When applicable prefer using [`closer`]
@@ -762,7 +762,7 @@ impl Units {
 	pub fn closer<P: Into<Point2> + Copy + Sync>(&self, distance: f32, target: P) -> Self {
 		self.filter(|u| u.is_closer(distance, target))
 	}
-	/// Leaves only further than given distance to target and makes new collection of them.
+	/// Leaves only units further than given distance to target and makes new collection of them.
 	///
 	/// Warning: This method will clone units in order to create a new collection
 	/// and will be evaluated initially. When applicable prefer using [`further`]
@@ -995,13 +995,13 @@ pub trait UnitsIterator<'a>: Iterator<Item = &'a Unit> + Sized {
 	{
 		self.filter(Box::new(move |u| tags.contains(&u.tag)))
 	}
-	/// Leaves only units with given type.
+	/// Leaves only units of given type.
 	fn of_type(self, unit_type: UnitTypeId) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
 		self.filter(Box::new(move |u| u.type_id == unit_type))
 	}
-	/// Excludes units of given type
 	fn exclude_type(self, unit_type: UnitTypeId) -> Filter<Self, Box<dyn FnMut(&&Unit)->bool + 'a>>{
 		self.filter(Box::new(move |u| u.type_id == unit_type))
+	/// Excludes units of given type.
 	}
 	/// Leaves only units of given types.
 	fn of_types<T>(self, types: &'a T) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>>
@@ -1091,12 +1091,12 @@ pub trait ParUnitsIterator<'a>: ParallelIterator<Item = &'a Unit> {
 	{
 		self.filter(Box::new(move |u| tags.contains(&u.tag)))
 	}
-	/// Leaves only units with given type.
+	/// Leaves only units of given type.
 	fn of_type(self, type_id: UnitTypeId) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
 		self.filter(Box::new(move |u| u.type_id == type_id))
 	}
-	/// Exclude units of given type.
 	fn exclude_type(self, type_id: UnitTypeId) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
+	/// Excludes units of given type.
 		self.filter(Box::new(move |u| u.type_id != type_id))
 	}
 	/// Leaves only units of given types.
@@ -1106,7 +1106,7 @@ pub trait ParUnitsIterator<'a>: ParallelIterator<Item = &'a Unit> {
 	{
 		self.filter(Box::new(move |u| types.contains(&u.type_id)))
 	}
-	/// Exclude units of given types.
+	/// Excludes units of given types.
 	fn exclude_types<T>(self, types: &'a T) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>>
 	where
 		T: Container<UnitTypeId> + Sync,
