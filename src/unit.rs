@@ -1644,6 +1644,14 @@ impl Unit {
 			self.command(*ability, Target::Pos(target), false);
 		}
 	}
+	/// Orders terran building to lift in the air.
+	pub fn lift(&self, queue: bool) {
+		self.command(AbilityId::Lift, Target::None, queue);
+	}
+	/// Orders flying terran building to land on given position.
+	pub fn land(&self, target: Point2, queue: bool) {
+		self.command(AbilityId::Land, Target::Pos(target), queue);
+	}
 }
 impl From<Unit> for Point2 {
 	#[inline]

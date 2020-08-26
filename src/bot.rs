@@ -65,7 +65,7 @@ pub(crate) trait Locked<T> {
 	fn lock_read(&self) -> Reader<T>;
 	fn lock_write(&self) -> Writer<T>;
 }
-impl<T> Locked<T> for Rw<T> {
+impl<T> Locked<T> for Rl<T> {
 	fn lock_read(&self) -> Reader<T> {
 		#[cfg(feature = "rayon")]
 		{
