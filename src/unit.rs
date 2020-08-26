@@ -356,6 +356,10 @@ impl Unit {
 			self.footprint_radius().map(|radius| (radius * 2.0) as usize)
 		}
 	}
+	/// How long a unit takes to build.
+	pub fn build_time(&self) -> f32{
+		self.type_data().map_or(0_f32, |data| data.build_time)
+	}
 	/// Space that unit takes in transports and bunkers.
 	pub fn cargo_size(&self) -> u32 {
 		self.type_data().map_or(0, |data| data.cargo_size)
