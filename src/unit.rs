@@ -223,8 +223,7 @@ pub struct Unit {
 }
 
 impl Unit {
-	/// Contains the UnitTypeData for the unit.
-	pub fn type_data(&self) -> Option<&UnitTypeData> {
+	fn type_data(&self) -> Option<&UnitTypeData> {
 		self.data.game_data.units.get(&self.type_id)
 	}
 	fn upgrades(&self) -> Reader<FxHashSet<UpgradeId>> {
