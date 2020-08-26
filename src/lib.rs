@@ -52,7 +52,7 @@ fn main() -> SC2Result<()> {
         &mut MyBot::default(),
         // Opponent configuration.
         Computer::new(Race::Random, Difficulty::VeryEasy, None),
-        // Map name. Panics if map is doesn't exists in "StarCraft II/Maps" folder.
+        // Map name. Panics if map doesn't exists in "StarCraft II/Maps" folder.
         "EternalEmpireLE",
         // Additional settings:
         // LaunchOptions {
