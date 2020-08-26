@@ -33,7 +33,7 @@ use::rust_sc2::prelude::*;
 #[derive(Default)]
 struct MyBot;
 impl Player for MyBot {
-	// This settings are used to connect bot to the game.
+    // This settings are used to connect bot to the game.
     fn get_player_settings(&self) -> PlayerSettings {
         PlayerSettings::new(Race::Random, Some("BotName"))
     }
@@ -48,7 +48,7 @@ impl Player for MyBot {
 
 fn main() -> SC2Result<()> {
     run_vs_computer(
-    	// Pass mutable referece to your bot here.
+        // Pass mutable referece to your bot here.
         &mut MyBot::default(),
         // Opponent configuration.
         Computer::new(Race::Random, Difficulty::VeryEasy, None),
