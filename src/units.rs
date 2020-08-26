@@ -1,4 +1,4 @@
-//! Data structures for storing units and fast filtering and finding ones that needed.
+//! Data structures for storing units, fast filtering and finding ones that needed.
 #![warn(missing_docs)]
 
 use crate::{distance::Distance, geometry::Point2, ids::UnitTypeId, unit::Unit};

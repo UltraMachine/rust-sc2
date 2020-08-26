@@ -177,48 +177,48 @@ pub struct Unit {
 	///////////////////////////////
 	/// Current orders of unit.
 	///
-	/// Note: Not populated for enemies and snapshots.
+	/// Note: Not populated for enemies.
 	pub orders: Vec<UnitOrder>,
 	/// Tag of addon if any.
 	///
-	/// Note: Not populated for enemies and snapshots.
+	/// Note: Not populated for enemies.
 	pub addon_tag: Option<u64>,
 	/// Units inside transport or bunker.
 	///
-	/// Note: Not populated for enemies and snapshots.
+	/// Note: Not populated for enemies.
 	pub passengers: Vec<PassengerUnit>,
 	/// Used space of transport or bunker.
 	///
-	/// Note: Not populated for enemies and snapshots.
+	/// Note: Not populated for enemies.
 	pub cargo_space_taken: Option<u32>,
 	/// Maximum space of transport or bunker.
 	///
-	/// Note: Not populated for enemies and snapshots.
+	/// Note: Not populated for enemies.
 	pub cargo_space_max: Option<u32>,
 	/// Current number of workers on gas or base.
 	///
-	/// Note: Not populated for enemies and snapshots.
+	/// Note: Not populated for enemies.
 	pub assigned_harvesters: Option<u32>,
 	/// Ideal number of workers on gas or base.
 	///
-	/// Note: Not populated for enemies and snapshots.
+	/// Note: Not populated for enemies.
 	pub ideal_harvesters: Option<u32>,
 	/// Frames left until weapon will be ready to shot.
 	///
-	/// Note: Not populated for enemies and snapshots.
+	/// Note: Not populated for enemies.
 	pub weapon_cooldown: Option<f32>,
 	pub engaged_target_tag: Option<u64>,
 	/// How long a buff or unit is still around (e.g. mule, broodling, chronoboost).
 	///
-	/// Note: Not populated for enemies and snapshots.
+	/// Note: Not populated for enemies.
 	pub buff_duration_remain: Option<u32>,
 	/// How long the maximum duration of buff or unit (e.g. mule, broodling, chronoboost).
 	///
-	/// Note: Not populated for enemies and snapshots.
+	/// Note: Not populated for enemies.
 	pub buff_duration_max: Option<u32>,
 	/// All rally points of structure.
 	///
-	/// Note: Not populated for enemies and snapshots.
+	/// Note: Not populated for enemies.
 	pub rally_targets: Vec<RallyTarget>,
 }
 

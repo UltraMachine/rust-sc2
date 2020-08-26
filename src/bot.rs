@@ -249,8 +249,12 @@ impl Default for Completion {
 }
 
 /// Main bot struct.
-/// Structs with `#[bot]` attribute will get all it's fields and methods
-/// through `Deref` and `DerefMut` traits.
+/// Structs with [`#[bot]`] attribute will get all it's fields and methods
+/// through [`Deref`] and [`DerefMut`] traits.
+///
+/// [`Deref`]: std::ops::Deref
+/// [`DerefMut`]: std::ops::DerefMut
+/// [`#[bot]`]: macro@crate::bot
 pub struct Bot {
 	pub(crate) process: Option<Child>,
 	pub(crate) api: Option<API>,
@@ -263,7 +267,7 @@ pub struct Bot {
 	pub enemy_race: Race,
 	/// Your in-game id.
 	pub player_id: u32,
-	/// Opponent in-game id.
+	/// Opponent's in-game id.
 	pub enemy_player_id: u32,
 	/// Opponent id on ladder, filled in `--OpponentId`.
 	pub opponent_id: String,
@@ -349,27 +353,27 @@ impl Bot {
 	///
 	/// # Examples
 	/// Count all ready marines:
-	/// ```rust
+	/// ```
 	/// let count = self.counter().count(UnitTypeId::Marine);
 	/// ```
 	///
 	/// Count all supplies in progress:
-	/// ```rust
+	/// ```
 	/// let count = self.counter().ordered().count(UnitTypeId::SupplyDepot);
 	/// ```
 	///
 	/// Count all ready and ordered nexuses:
-	/// ```rust
+	/// ```
 	/// let count = self.counter().all().count(UnitTypeId::Nexus);
 	/// ```
 	///
 	/// Count all ready zerglings, taking burrowed ones into accont:
-	/// ```rust
+	/// ```
 	/// let count = self.counter().alias().count(UnitTypeId::Zergling);
 	/// ```
 	///
 	/// Count all terran bases and alias (orbital, planetary fortress), including ccs in progress:
-	/// ```rust
+	/// ```
 	/// let count = self.counter().all().tech().count(UnitTypeId::CommandCenter);
 	/// ```
 	pub fn counter(&self) -> CountOptions {
@@ -1362,7 +1366,7 @@ impl Bot {
 			.zip(paths.iter())
 			.filter_map(|(loc, path)| path.map(|path| (loc, path)))
 			.min_by(|(_, path1), (_, path2)| path1.partial_cmp(&path2).unwrap())
-			.map(|(loc, _path)| *loc)
+			.map(|(loc, _)| *loc)
 	}
 	/// Returns all [`expansions`](Self::expansions) taken by bot.
 	pub fn owned_expansions(&self) -> Vec<(Point2, Point2)> {

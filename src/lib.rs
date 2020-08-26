@@ -26,16 +26,20 @@ rust-sc2 = { git = "https://github.com/UltraMachine/rust-sc2" }
 ## Making a bot
 
 Making bots with `rust-sc2` is pretty easy:
-```rust
+```
 use::rust_sc2::prelude::*;
 
 #[bot]
 #[derive(Default)]
 struct MyBot;
 impl Player for MyBot {
+	// This settings are used to connect bot to the game.
     fn get_player_settings(&self) -> PlayerSettings {
-        PlayerSettings::new(Race::Random, None)
+        PlayerSettings::new(Race::Random, Some("BotName"))
     }
+    // This method will be called automatically each game step.
+    // Main bot's logic should be here.
+    // Bot's observation updates before each step.
     fn on_step(&mut self, iteration: usize) -> SC2Result<()> {
         /* Your code here */
         Ok(())
@@ -44,10 +48,19 @@ impl Player for MyBot {
 
 fn main() -> SC2Result<()> {
     run_vs_computer(
+    	// Pass mutable referece to your bot here.
         &mut MyBot::default(),
+        // Opponent configuration.
         Computer::new(Race::Random, Difficulty::VeryEasy, None),
+        // Map name. Panics if map is doesn't exists in "StarCraft II/Maps" folder.
         "EternalEmpireLE",
-        Default::default(),
+        // Additional settings:
+        // LaunchOptions {
+        //     sc2_version: Option<&str>, // Default: None - Latest available patch.
+        //     save_replay_as: Option<&str>, // Default: None - Doesn't save replay.
+        //     realtime: bool, // Default: false
+        // }
+        LaunchOptions::default(),
     )
 }
 ```
@@ -118,7 +131,7 @@ You always can do the same thing by hands if needed.
 | `self.units.inhibitor_zones` | [`Units`]       | Inhubitor zones slow down movement speed of nearby units.                                       |
 
 #### What `PlayerUnits` consists of?
-All field are collections of [`Units`]:
+All fields are collections of [`Units`]:
 
 | Field            | Description                                                                                              |
 |------------------|----------------------------------------------------------------------------------------------------------|
@@ -132,20 +145,20 @@ All field are collections of [`Units`]:
 | `.placeholders`  | Kind of things that appear when you order worker to build something but construction didn't started yet. |
 
 ### Other information
-| Field                  | Type                            | Description                                                                    |
-|------------------------|---------------------------------|--------------------------------------------------------------------------------|
-| `self.time`            | `f32`                           | In-game time in seconds.                                                       |
-| `self.expansions`      | `Vec`<([`Point2`], [`Point2`])> | All expansions stored in (location, resource center) pairs.                    |
-| `self.vision_blockers` | `Vec`<[`Point2`]>               | Obstacles on map which block vision of ground units, but still pathable.       |
-| `self.game_info`       | [`GameInfo`]                    | Information about map: pathing grid, building placement, terrain height.       |
-| `self.game_data`       | [`GameData`]                    | Constant information about abilities, unit types, upgrades, buffs and effects. |
-| `self.state`           | [`GameState`]                   | Information about current state, updated each step.                            |
+| Field                  | Type                           | Description                                                                    |
+|------------------------|--------------------------------|--------------------------------------------------------------------------------|
+| `self.time`            | `f32`                          | In-game time in seconds.                                                       |
+| `self.expansions`      | `Vec`<([`Point2`],[`Point2`])> | All expansions stored in (location, resource center) pairs.                    |
+| `self.vision_blockers` | `Vec`<[`Point2`]>              | Obstacles on map which block vision of ground units, but still pathable.       |
+| `self.game_info`       | [`GameInfo`]                   | Information about map: pathing grid, building placement, terrain height.       |
+| `self.game_data`       | [`GameData`]                   | Constant information about abilities, unit types, upgrades, buffs and effects. |
+| `self.state`           | [`GameState`]                  | Information about current state, updated each step.                            |
 
 ## What bot can do?
 
 ### Units training
 Training as much as possible marines may look like:
-```rust
+```
 // Iterating bot's barracks which are completed (ready) and not already training (idle).
 for barrack in self.units.my.structures.iter().of_type(UnitTypeId::Barracks).ready().idle() {
     // Checking if we have enough resources and supply.
@@ -163,7 +176,7 @@ for barrack in self.units.my.structures.iter().of_type(UnitTypeId::Barracks).rea
 
 ### Building structures
 Building up to 5 barracks might look like:
-```rust
+```
 // Building near start location, but a bit closer to map center to not accidentally block mineral line.
 let main_base = self.start_location.towards(self.game_info.map_center, 8.0);
 
@@ -200,7 +213,7 @@ if self.can_afford(UnitTypeId::Barracks, false)
 
 ### Expanding
 Building new CCs might look like:
-```rust
+```
 // Checking if we have enough minerals for new expand.
 if self.can_afford(UnitTypeId::CommandCenter, false)
     // Checking if we not already building new base.
@@ -225,7 +238,7 @@ if self.can_afford(UnitTypeId::CommandCenter, false)
 
 ### Units micro
 Attacking when marines >= 15, defending base before:
-```rust
+```
 let main_base = self.start_location.towards(self.game_info.map_center, 8.0);
 let marines = self.units.my.units.iter().of_type(UnitTypeId::Marine).idle();
 
@@ -270,7 +283,7 @@ If you're too lazy to add argparser yourself, see [`examples`] folder,
 some examples already have fully functional parser.
 
 Then call [`run_ladder_game`](client::run_ladder_game) this way:
-```rust
+```
 run_ladder_game(
     &mut bot,
     ladder_server, // Should be 127.0.0.1 by default.
@@ -300,6 +313,7 @@ Because of version differences ids are conditionally compiled for windows and li
 [`GameInfo`]: game_info::GameInfo
 [`GameData`]: game_data::GameData
 [`GameState`]: game_state::GameState
+[`#[bot]`]: macro@bot
 */
 // #![warn(missing_docs)]
 #![deny(intra_doc_link_resolution_failure)]
@@ -309,7 +323,7 @@ extern crate num_derive;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
-pub extern crate sc2_macro;
+extern crate sc2_macro;
 #[macro_use]
 extern crate itertools;
 #[macro_use]
@@ -470,7 +484,7 @@ impl DerefMut for MyBot {
 pub use sc2_macro::bot;
 
 /**
-`#[bot_new]` macro adds initialization of field added by [`#[bot]`] macro.
+`#[bot_new]` macro adds initialization of field added by [`#[bot]`](macro@bot) macro.
 
 Usage:
 ```
@@ -594,7 +608,7 @@ pub use client::SC2Result;
 Request to the SC2 API.
 
 # Usage
-```rust
+```
 let mut request = Request::new();
 
 /* modify request through it's methods */

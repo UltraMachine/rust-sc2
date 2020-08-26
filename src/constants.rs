@@ -272,7 +272,7 @@ lazy_static! {
 	/// Tech requirements mapped to different units.
 	///
 	/// Basic usage:
-	/// ```rust
+	/// ```
 	/// if let Some(requirment) = TECH_REQUIREMENTS.get(unit_type) {
 	///     /* do what you like */
 	/// }
