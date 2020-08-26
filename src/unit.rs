@@ -357,8 +357,8 @@ impl Unit {
 		}
 	}
 	/// How long a unit takes to build.
-	pub fn build_time(&self) -> f32{
-		self.type_data().map_or(0_f32, |data| data.build_time)
+	pub fn build_time(&self) -> f32 {
+		self.type_data().map_or(0.0, |data| data.build_time)
 	}
 	/// Space that unit takes in transports and bunkers.
 	pub fn cargo_size(&self) -> u32 {
