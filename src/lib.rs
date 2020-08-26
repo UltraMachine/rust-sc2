@@ -68,7 +68,7 @@ fn main() -> SC2Result<()> {
 Add some cool stuff and watch how it destroys the opponent.
 
 If you are careful guy who don't trust random macros that can destroy your PC,
-see [`#[bot]`] macro documentation to understand how it's implemented.
+see [`#[bot]`][b] macro documentation to understand how it's implemented.
 You always can do the same thing by hands if needed.
 
 ## What bot can see?
@@ -313,7 +313,7 @@ Because of version differences ids are conditionally compiled for windows and li
 [`GameInfo`]: game_info::GameInfo
 [`GameData`]: game_data::GameData
 [`GameState`]: game_state::GameState
-[`#[bot]`]: macro@bot
+[b]: bot!
 */
 // #![warn(missing_docs)]
 #![deny(intra_doc_link_resolution_failure)]
@@ -484,7 +484,7 @@ impl DerefMut for MyBot {
 pub use sc2_macro::bot;
 
 /**
-`#[bot_new]` macro adds initialization of field added by [`#[bot]`](macro@bot) macro.
+`#[bot_new]` macro adds initialization of field added by [`#[bot]`](bot!) macro.
 
 Usage:
 ```

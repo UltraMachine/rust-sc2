@@ -249,12 +249,12 @@ impl Default for Completion {
 }
 
 /// Main bot struct.
-/// Structs with [`#[bot]`] attribute will get all it's fields and methods
+/// Structs with [`#[bot]`][b] attribute will get all it's fields and methods
 /// through [`Deref`] and [`DerefMut`] traits.
 ///
 /// [`Deref`]: std::ops::Deref
 /// [`DerefMut`]: std::ops::DerefMut
-/// [`#[bot]`]: macro@crate::bot
+/// [b]: crate::bot!
 pub struct Bot {
 	pub(crate) process: Option<Child>,
 	pub(crate) api: Option<API>,
