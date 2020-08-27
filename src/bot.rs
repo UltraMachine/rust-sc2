@@ -1075,7 +1075,7 @@ impl Bot {
 					shapshot.push(u.tag);
 				}
 			} else if u.is_flying || !u.is_structure() {
-				// unit position visible, but unit disappeared
+				// unit position visible, but it disappeared
 				if self.is_visible(u.position) {
 					// Was visible previously
 					if u.is_visible() {
@@ -1085,15 +1085,17 @@ impl Bot {
 								&& u.is_closer(u.radius + s.radius + 1.0, s)
 						};
 						if enemy_is_zerg
-							&& !u.is_flying && !(matches!(
-							u.type_id,
-							UnitTypeId::Changeling
-								| UnitTypeId::ChangelingZealot | UnitTypeId::ChangelingMarineShield
-								| UnitTypeId::ChangelingMarine | UnitTypeId::ChangelingZerglingWings
-								| UnitTypeId::ChangelingZergling | UnitTypeId::Broodling
-								| UnitTypeId::Larva | UnitTypeId::Egg
-						) || (u.type_id == UnitTypeId::Drone
-							&& self.units.enemy.structures.iter().any(is_drone_close)))
+							&& !(u.is_flying
+								|| (matches!(
+									u.type_id,
+									UnitTypeId::Changeling
+										| UnitTypeId::ChangelingZealot | UnitTypeId::ChangelingMarineShield
+										| UnitTypeId::ChangelingMarine | UnitTypeId::ChangelingZerglingWings
+										| UnitTypeId::ChangelingZergling | UnitTypeId::Broodling
+										| UnitTypeId::Larva | UnitTypeId::Egg
+								) || (u.type_id == UnitTypeId::Drone
+									&& self.units.enemy.structures.iter().any(is_drone_close))))
+							&& is_invisible(u, &detectors, &scans)
 						{
 							burrowed.push(u.tag);
 						// Whatever
