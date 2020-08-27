@@ -1339,6 +1339,12 @@ impl Unit {
 			.find(|w| !w.damage_bonus.is_empty())
 			.map(|w| w.damage_bonus[0])
 	}
+	/// Returns (ability, target, progress) of the current unit order or `None` if it's idle.
+	pub fn order(&self) -> Option<(AbilityId, Target, f32)> {
+		self.orders
+			.first()
+			.map(|order| (order.ability, order.target, order.progress))
+	}
 	/// Returns target of first unit's order.
 	pub fn target(&self) -> Target {
 		if self.is_idle() {
