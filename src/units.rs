@@ -939,7 +939,7 @@ use std::{
 	hash::{BuildHasher, Hash},
 };
 
-impl<T: PartialEq> Container<T> for [T] {
+impl<T: PartialEq> Container<T> for &[T] {
 	fn contains(&self, other: &T) -> bool {
 		self.iter().any(|item| item == other)
 	}
