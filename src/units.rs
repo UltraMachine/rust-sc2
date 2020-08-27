@@ -980,98 +980,98 @@ impl<T: Eq + Hash, V> Container<T> for IndexMap<T, V> {
 	}
 }
 
-use std::iter::Filter;
+use std::{borrow::Borrow, iter::Filter};
 
 /// Helper trait for iterators over units.
-pub trait UnitsIterator<'a>: Iterator<Item = &'a Unit> + Sized {
+pub trait UnitsIterator<'a, U: Borrow<Unit> + 'a>: Iterator<Item = U> + Sized {
 	/// Searches for unit with given tag and returns it if found.
-	fn find_tag(mut self, tag: u64) -> Option<&'a Unit> {
-		self.find(|u| u.tag == tag)
+	fn find_tag(mut self, tag: u64) -> Option<U> {
+		self.find(|u| u.borrow().tag == tag)
 	}
 	/// Leaves only units with given tags.
-	fn find_tags<T>(self, tags: &'a T) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>>
+	fn find_tags<T>(self, tags: &'a T) -> Filter<Self, Box<dyn FnMut(&U) -> bool + 'a>>
 	where
 		T: Container<u64>,
 	{
-		self.filter(Box::new(move |u| tags.contains(&u.tag)))
+		self.filter(Box::new(move |u| tags.contains(&u.borrow().tag)))
 	}
 	/// Leaves only units of given type.
-	fn of_type(self, unit_type: UnitTypeId) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
-		self.filter(Box::new(move |u| u.type_id == unit_type))
+	fn of_type(self, unit_type: UnitTypeId) -> Filter<Self, Box<dyn FnMut(&U) -> bool>> {
+		self.filter(Box::new(move |u| u.borrow().type_id == unit_type))
 	}
 	/// Excludes units of given type.
-	fn exclude_type(self, unit_type: UnitTypeId) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
-		self.filter(Box::new(move |u| u.type_id != unit_type))
+	fn exclude_type(self, unit_type: UnitTypeId) -> Filter<Self, Box<dyn FnMut(&U) -> bool>> {
+		self.filter(Box::new(move |u| u.borrow().type_id != unit_type))
 	}
 	/// Leaves only units of given types.
-	fn of_types<T>(self, types: &'a T) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>>
+	fn of_types<T>(self, types: &'a T) -> Filter<Self, Box<dyn FnMut(&U) -> bool + 'a>>
 	where
 		T: Container<UnitTypeId>,
 	{
-		self.filter(Box::new(move |u| types.contains(&u.type_id)))
+		self.filter(Box::new(move |u| types.contains(&u.borrow().type_id)))
 	}
 	/// Excludes units of given types.
-	fn exclude_types<T>(self, types: &'a T) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>>
+	fn exclude_types<T>(self, types: &'a T) -> Filter<Self, Box<dyn FnMut(&U) -> bool + 'a>>
 	where
 		T: Container<UnitTypeId>,
 	{
-		self.filter(Box::new(move |u| !types.contains(&u.type_id)))
+		self.filter(Box::new(move |u| !types.contains(&u.borrow().type_id)))
 	}
 	/// Leaves only non-flying units.
-	fn ground(self) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
-		self.filter(Box::new(|u| !u.is_flying))
+	fn ground(self) -> Filter<Self, Box<dyn FnMut(&U) -> bool>> {
+		self.filter(Box::new(|u| !u.borrow().is_flying))
 	}
 	/// Leaves only flying units.
-	fn flying(self) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
-		self.filter(Box::new(|u| u.is_flying))
+	fn flying(self) -> Filter<Self, Box<dyn FnMut(&U) -> bool>> {
+		self.filter(Box::new(|u| u.borrow().is_flying))
 	}
 	/// Leaves only ready structures.
-	fn ready(self) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
-		self.filter(Box::new(|u| u.is_ready()))
+	fn ready(self) -> Filter<Self, Box<dyn FnMut(&U) -> bool>> {
+		self.filter(Box::new(|u| u.borrow().is_ready()))
 	}
 	/// Leaves only structures in-progress.
-	fn not_ready(self) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
-		self.filter(Box::new(|u| !u.is_ready()))
+	fn not_ready(self) -> Filter<Self, Box<dyn FnMut(&U) -> bool>> {
+		self.filter(Box::new(|u| !u.borrow().is_ready()))
 	}
 	/// Leaves only units with no orders.
-	fn idle(self) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
-		self.filter(Box::new(|u| u.is_idle()))
+	fn idle(self) -> Filter<Self, Box<dyn FnMut(&U) -> bool>> {
+		self.filter(Box::new(|u| u.borrow().is_idle()))
 	}
 	/// Leaves only units with no orders or that almost finished their orders.
-	fn almost_idle(self) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
-		self.filter(Box::new(|u| u.is_almost_idle()))
+	fn almost_idle(self) -> Filter<Self, Box<dyn FnMut(&U) -> bool>> {
+		self.filter(Box::new(|u| u.borrow().is_almost_idle()))
 	}
 	/// Leaves only units with no orders.
 	/// Unlike [`idle`](Self::idle) this takes reactor on terran buildings into account.
-	fn unused(self) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
-		self.filter(Box::new(|u| u.is_unused()))
+	fn unused(self) -> Filter<Self, Box<dyn FnMut(&U) -> bool>> {
+		self.filter(Box::new(|u| u.borrow().is_unused()))
 	}
 	/// Leaves only units with no orders or that almost finished their orders.
 	/// Unlike [`almost_idle`](Self::almost_idle) this takes reactor on terran buildings into account.
-	fn almost_unused(self) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
-		self.filter(Box::new(|u| u.is_almost_unused()))
+	fn almost_unused(self) -> Filter<Self, Box<dyn FnMut(&U) -> bool>> {
+		self.filter(Box::new(|u| u.borrow().is_almost_unused()))
 	}
 	/// Leaves only units in attack range of given unit.
-	fn in_range_of(self, unit: &'a Unit, gap: f32) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
-		self.filter(Box::new(move |u| unit.in_range(u, gap)))
+	fn in_range_of(self, unit: U, gap: f32) -> Filter<Self, Box<dyn FnMut(&U) -> bool + 'a>> {
+		self.filter(Box::new(move |u| unit.borrow().in_range(u.borrow(), gap)))
 	}
 	/// Leaves only units that are close enough to attack given unit.
-	fn in_range(self, unit: &'a Unit, gap: f32) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
-		self.filter(Box::new(move |u| u.in_range(unit, gap)))
+	fn in_range(self, unit: U, gap: f32) -> Filter<Self, Box<dyn FnMut(&U) -> bool + 'a>> {
+		self.filter(Box::new(move |u| u.borrow().in_range(unit.borrow(), gap)))
 	}
 	/// Leaves only units in attack range of given unit.
 	/// Unlike [`in_range_of`](Self::in_range_of) this takes range upgrades into account.
-	fn in_real_range_of(self, unit: &'a Unit, gap: f32) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
-		self.filter(Box::new(move |u| unit.in_real_range(u, gap)))
+	fn in_real_range_of(self, unit: U, gap: f32) -> Filter<Self, Box<dyn FnMut(&U) -> bool + 'a>> {
+		self.filter(Box::new(move |u| unit.borrow().in_real_range(u.borrow(), gap)))
 	}
 	/// Leaves only units that are close enough to attack given unit.
 	/// Unlike [`in_range`](Self::in_range) this takes range upgrades into account.
-	fn in_real_range(self, unit: &'a Unit, gap: f32) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
-		self.filter(Box::new(move |u| u.in_real_range(unit, gap)))
+	fn in_real_range(self, unit: U, gap: f32) -> Filter<Self, Box<dyn FnMut(&U) -> bool + 'a>> {
+		self.filter(Box::new(move |u| u.borrow().in_real_range(unit.borrow(), gap)))
 	}
 	/// Leaves only units visible on current step.
-	fn visible(self) -> Filter<Self, Box<dyn FnMut(&&Unit) -> bool + 'a>> {
-		self.filter(Box::new(|u| u.is_visible()))
+	fn visible(self) -> Filter<Self, Box<dyn FnMut(&U) -> bool>> {
+		self.filter(Box::new(|u| u.borrow().is_visible()))
 	}
 }
 #[cfg(feature = "rayon")]
@@ -1079,118 +1079,113 @@ use rayon::iter::Filter as ParFilter;
 
 /// Helper trait for parallel iterators over units.
 #[cfg(feature = "rayon")]
-pub trait ParUnitsIterator<'a>: ParallelIterator<Item = &'a Unit> {
+pub trait ParUnitsIterator<'a, U: Borrow<Unit> + Send + Sync + 'a>: ParallelIterator<Item = U> {
 	/// Searches for unit with given tag and returns it if found.
-	fn find_tag(self, tag: u64) -> Option<&'a Unit> {
-		self.find_any(|u| u.tag == tag)
+	fn find_tag(self, tag: u64) -> Option<U> {
+		self.find_any(|u| u.borrow().tag == tag)
 	}
 	/// Leaves only units with given tags.
-	fn find_tags<T>(self, tags: &'a T) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>>
+	fn find_tags<T>(self, tags: &'a T) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync + 'a>>
 	where
 		T: Container<u64> + Sync,
 	{
-		self.filter(Box::new(move |u| tags.contains(&u.tag)))
+		self.filter(Box::new(move |u| tags.contains(&u.borrow().tag)))
 	}
 	/// Leaves only units of given type.
-	fn of_type(self, type_id: UnitTypeId) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
-		self.filter(Box::new(move |u| u.type_id == type_id))
+	fn of_type(self, type_id: UnitTypeId) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync>> {
+		self.filter(Box::new(move |u| u.borrow().type_id == type_id))
 	}
 	/// Excludes units of given type.
-	fn exclude_type(
-		self,
-		type_id: UnitTypeId,
-	) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
-		self.filter(Box::new(move |u| u.type_id != type_id))
+	fn exclude_type(self, type_id: UnitTypeId) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync>> {
+		self.filter(Box::new(move |u| u.borrow().type_id != type_id))
 	}
 	/// Leaves only units of given types.
-	fn of_types<T>(self, types: &'a T) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>>
+	fn of_types<T>(self, types: &'a T) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync + 'a>>
 	where
 		T: Container<UnitTypeId> + Sync,
 	{
-		self.filter(Box::new(move |u| types.contains(&u.type_id)))
+		self.filter(Box::new(move |u| types.contains(&u.borrow().type_id)))
 	}
 	/// Excludes units of given types.
-	fn exclude_types<T>(self, types: &'a T) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>>
+	fn exclude_types<T>(self, types: &'a T) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync + 'a>>
 	where
 		T: Container<UnitTypeId> + Sync,
 	{
-		self.filter(Box::new(move |u| !types.contains(&u.type_id)))
+		self.filter(Box::new(move |u| !types.contains(&u.borrow().type_id)))
 	}
 	/// Leaves only non-flying units.
-	fn ground(self) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
-		self.filter(Box::new(|u| !u.is_flying))
+	fn ground(self) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync>> {
+		self.filter(Box::new(|u| !u.borrow().is_flying))
 	}
 	/// Leaves only flying units.
-	fn flying(self) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
-		self.filter(Box::new(|u| u.is_flying))
+	fn flying(self) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync>> {
+		self.filter(Box::new(|u| u.borrow().is_flying))
 	}
 	/// Leaves only ready structures.
-	fn ready(self) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
-		self.filter(Box::new(|u| u.is_ready()))
+	fn ready(self) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync>> {
+		self.filter(Box::new(|u| u.borrow().is_ready()))
 	}
 	/// Leaves only structures in-progress.
-	fn not_ready(self) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
-		self.filter(Box::new(|u| !u.is_ready()))
+	fn not_ready(self) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync>> {
+		self.filter(Box::new(|u| !u.borrow().is_ready()))
 	}
 	/// Leaves only units with no orders.
-	fn idle(self) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
-		self.filter(Box::new(|u| u.is_idle()))
+	fn idle(self) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync>> {
+		self.filter(Box::new(|u| u.borrow().is_idle()))
 	}
 	/// Leaves only units with no orders or that almost finished their orders.
-	fn almost_idle(self) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
-		self.filter(Box::new(|u| u.is_almost_idle()))
+	fn almost_idle(self) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync>> {
+		self.filter(Box::new(|u| u.borrow().is_almost_idle()))
 	}
 	/// Leaves only units with no orders.
 	/// Unlike [`idle`](Self::idle) this takes reactor on terran buildings into account.
-	fn unused(self) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
-		self.filter(Box::new(|u| u.is_unused()))
+	fn unused(self) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync>> {
+		self.filter(Box::new(|u| u.borrow().is_unused()))
 	}
 	/// Leaves only units with no orders or that almost finished their orders.
 	/// Unlike [`almost_idle`](Self::almost_idle) this takes reactor on terran buildings into account.
-	fn almost_unused(self) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
-		self.filter(Box::new(|u| u.is_almost_unused()))
+	fn almost_unused(self) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync>> {
+		self.filter(Box::new(|u| u.borrow().is_almost_unused()))
 	}
 	/// Leaves only units in attack range of given unit.
-	fn in_range_of(
-		self,
-		unit: &'a Unit,
-		gap: f32,
-	) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
-		self.filter(Box::new(move |u| unit.in_range(u, gap)))
+	fn in_range_of(self, unit: U, gap: f32) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync + 'a>> {
+		self.filter(Box::new(move |u| unit.borrow().in_range(u.borrow(), gap)))
 	}
 	/// Leaves only units that are close enough to attack given unit.
-	fn in_range(
-		self,
-		unit: &'a Unit,
-		gap: f32,
-	) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
-		self.filter(Box::new(move |u| u.in_range(unit, gap)))
+	fn in_range(self, unit: U, gap: f32) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync + 'a>> {
+		self.filter(Box::new(move |u| u.borrow().in_range(unit.borrow(), gap)))
 	}
 	/// Leaves only units in attack range of given unit.
 	/// Unlike [`in_range_of`](Self::in_range_of) this takes range upgrades into account.
 	fn in_real_range_of(
 		self,
-		unit: &'a Unit,
+		unit: U,
 		gap: f32,
-	) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
-		self.filter(Box::new(move |u| unit.in_real_range(u, gap)))
+	) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync + 'a>> {
+		self.filter(Box::new(move |u| unit.borrow().in_real_range(u.borrow(), gap)))
 	}
 	/// Leaves only units that are close enough to attack given unit.
 	/// Unlike [`in_range`](Self::in_range) this takes range upgrades into account.
-	fn in_real_range(
-		self,
-		unit: &'a Unit,
-		gap: f32,
-	) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
-		self.filter(Box::new(move |u| u.in_real_range(unit, gap)))
+	fn in_real_range(self, unit: U, gap: f32) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync + 'a>> {
+		self.filter(Box::new(move |u| u.borrow().in_real_range(unit.borrow(), gap)))
 	}
 	/// Leaves only units visible on current step.
-	fn visible(self) -> ParFilter<Self, Box<dyn Fn(&&Unit) -> bool + Send + Sync + 'a>> {
-		self.filter(Box::new(|u| u.is_visible()))
+	fn visible(self) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync>> {
+		self.filter(Box::new(|u| u.borrow().is_visible()))
 	}
 }
 
-impl<'a, I> UnitsIterator<'a> for I where I: Iterator<Item = &'a Unit> + Sized {}
+impl<'a, I, U> UnitsIterator<'a, U> for I
+where
+	I: Iterator<Item = U> + Sized,
+	U: Borrow<Unit> + 'a,
+{
+}
 
 #[cfg(feature = "rayon")]
-impl<'a, I> ParUnitsIterator<'a> for I where I: ParallelIterator<Item = &'a Unit> {}
+impl<'a, I, U> ParUnitsIterator<'a, U> for I
+where
+	I: ParallelIterator<Item = U>,
+	U: Borrow<Unit> + Send + Sync + 'a,
+{
+}
