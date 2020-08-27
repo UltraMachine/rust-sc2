@@ -57,7 +57,7 @@ fn cmp<T: PartialOrd>(a: &T, b: &T) -> Ordering {
 }
 
 #[inline]
-fn cmp_by<T, P>(target: P) -> impl Fn(&T, &T) -> Ordering
+fn dist_to<T, P>(target: P) -> impl Fn(&T, &T) -> Ordering
 where
 	T: Distance + Copy,
 	P: Into<Point2> + Copy,
@@ -89,11 +89,11 @@ where
 
 	/// Returns closest to `target` item in iterator.
 	fn closest<P: Into<Point2> + Copy>(self, target: P) -> Option<T> {
-		self.min_by(cmp_by(target))
+		self.min_by(dist_to(target))
 	}
 	/// Returns furthest to `target` item in iterator.
 	fn furthest<P: Into<Point2> + Copy>(self, target: P) -> Option<T> {
-		self.max_by(cmp_by(target))
+		self.max_by(dist_to(target))
 	}
 
 	/// Returns distance to closest to `target` item in iterator.
@@ -122,7 +122,7 @@ where
 	/// and it doesn't allocate auxiliary memory. See [`sort_unstable_by_distance`](Self::sort_unstable_by_distance).
 	fn sort_by_distance<P: Into<Point2> + Copy>(self, target: P) -> IntoIter<T> {
 		let mut v = Vec::from_iter(self);
-		v.sort_by(cmp_by(target));
+		v.sort_by(dist_to(target));
 		v.into_iter()
 	}
 	/// Returns iterator of items sorted by distance to `target`.
@@ -131,7 +131,7 @@ where
 	/// in-place (i.e., does not allocate), and `O(n * log(n))` worst-case.
 	fn sort_unstable_by_distance<P: Into<Point2> + Copy>(self, target: P) -> IntoIter<T> {
 		let mut v = Vec::from_iter(self);
-		v.sort_unstable_by(cmp_by(target));
+		v.sort_unstable_by(dist_to(target));
 		v.into_iter()
 	}
 }
@@ -171,11 +171,11 @@ where
 
 	/// Returns closest to `target` item in iterator.
 	fn closest<P: Into<Point2> + Copy + Sync + Send>(self, target: P) -> Option<T> {
-		self.min_by(cmp_by(target))
+		self.min_by(dist_to(target))
 	}
 	/// Returns furthest to `target` item in iterator.
 	fn furthest<P: Into<Point2> + Copy + Sync + Send>(self, target: P) -> Option<T> {
-		self.max_by(cmp_by(target))
+		self.max_by(dist_to(target))
 	}
 
 	/// Returns distance to closest to `target` item in iterator.
@@ -204,7 +204,7 @@ where
 	/// and it doesn't allocate auxiliary memory. See [`sort_unstable_by_distance`](Self::sort_unstable_by_distance).
 	fn sort_by_distance<P: Into<Point2> + Copy + Sync>(self, target: P) -> IntoParIter<T> {
 		let mut v = Vec::from_par_iter(self);
-		v.par_sort_by(cmp_by(target));
+		v.par_sort_by(dist_to(target));
 		v.into_par_iter()
 	}
 	/// Returns iterator of items sorted by distance to target.
@@ -213,7 +213,7 @@ where
 	/// in-place (i.e. does not allocate), and `O(n log n)` worst-case.
 	fn sort_unstable_by_distance<P: Into<Point2> + Copy + Sync>(self, target: P) -> IntoParIter<T> {
 		let mut v = Vec::from_par_iter(self);
-		v.par_sort_unstable_by(cmp_by(target));
+		v.par_sort_unstable_by(dist_to(target));
 		v.into_par_iter()
 	}
 }
@@ -249,14 +249,14 @@ where
 	/// and it doesn't allocate auxiliary memory.
 	/// See [`par_sort_unstable_by_distance`](Self::par_sort_unstable_by_distance).
 	fn par_sort_by_distance<P: Into<Point2> + Copy + Sync>(&mut self, target: P) {
-		self.par_sort_by(cmp_by(target))
+		self.par_sort_by(dist_to(target))
 	}
 	/// Sorts slice in parallel by distance to target.
 	///
 	/// This sort is unstable (i.e. may reorder equal elements),
 	/// in-place (i.e. does not allocate), and `O(n log n)` worst-case.
 	fn par_sort_unstable_by_distance<P: Into<Point2> + Copy + Sync>(&mut self, target: P) {
-		self.par_sort_unstable_by(cmp_by(target))
+		self.par_sort_unstable_by(dist_to(target))
 	}
 }
 
@@ -331,10 +331,10 @@ where
 
 impl<T: Distance + Copy> DistanceSlice<T> for [T] {
 	fn sort_by_distance<P: Into<Point2> + Copy>(&mut self, target: P) {
-		self.sort_by(cmp_by(target))
+		self.sort_by(dist_to(target))
 	}
 	fn sort_unstable_by_distance<P: Into<Point2> + Copy>(&mut self, target: P) {
-		self.sort_unstable_by(cmp_by(target))
+		self.sort_unstable_by(dist_to(target))
 	}
 }
 
