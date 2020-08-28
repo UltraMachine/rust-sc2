@@ -51,6 +51,16 @@ pub enum CalcTarget<'a> {
 
 pub(crate) type SharedUnitData = Rs<DataForUnit>;
 
+/// Trait used for either a Unit or a Point2
+pub trait AbilityTarget {
+	/// Position of target
+	fn pos(&self) -> Point2;
+	/// Radius of target. Defaults to 0.0 since Point2 does not have a radius
+	fn radius(&self) -> f32 {
+		0.0
+	}
+}
+
 /// Unit structure contains some raw data, helper methods for it's analysis
 /// and some methods for actions execution.
 #[derive(Clone)]
@@ -1309,6 +1319,22 @@ impl Unit {
 	pub fn in_range_of(&self, threat: &Unit, gap: f32) -> bool {
 		threat.in_range(self, gap)
 	}
+	/// Checks if unit is close enough to use given ability on unit/position.
+	pub fn in_ability_cast_range<A: AbilityTarget>(
+		&self,
+		ability_id: AbilityId,
+		target: A,
+		gap: f32,
+	) -> bool {
+		self.data
+			.game_data
+			.abilities
+			.get(&ability_id)
+			.map_or(false, |data| {
+				self.distance_squared(target.pos())
+					<= (data.cast_range.unwrap_or(0.0) + self.radius + target.radius() + gap).powi(2)
+			})
+	}
 	/// Checks if unit is close enough to attack given target.
 	///
 	/// Uses actual range from [`real_range_vs`](Self::real_range_vs) in it's calculations.
@@ -1868,4 +1894,13 @@ pub struct RallyTarget {
 	pub point: Point2,
 	/// Filled if building is rallied on unit.
 	pub tag: Option<u64>,
+}
+
+impl AbilityTarget for Unit {
+	fn pos(&self) -> Point2 {
+		self.position
+	}
+	fn radius(&self) -> f32 {
+		self.radius
+	}
 }
