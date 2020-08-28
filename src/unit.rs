@@ -1337,15 +1337,13 @@ impl Unit {
 	where
 		A: Into<Point2> + Radius,
 	{
-		self.data
-			.game_data
-			.abilities
-			.get(&ability_id)
-			.map_or(false, |data| {
-				let target_radius = target.radius();
-				(data.cast_range.unwrap_or(0.0) + self.radius + target_radius + gap).powi(2)
-					>= self.distance_squared(target)
-			})
+		if let Some(data) = self.data.game_data.abilities.get(&ability_id) {
+			if let Some(cast_range) = data.cast_range {
+				return (cast_range + self.radius + target.radius() + gap).powi(2)
+					>= self.distance_squared(target);
+			}
+		}
+		false
 	}
 	/// Returns (attribute, bonus damage) for first unit's weapon if any.
 	pub fn damage_bonus(&self) -> Option<(Attribute, u32)> {
