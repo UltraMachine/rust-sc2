@@ -2,7 +2,7 @@
 //!
 //! Countains various geometric primitives with useful helper methods.
 
-use crate::{distance::Distance, unit::AbilityTarget, FromProto, IntoProto};
+use crate::{distance::Distance, FromProto, IntoProto};
 use sc2_proto::common::{Point, Point2D};
 use std::{
 	hash::{Hash, Hasher},
@@ -577,11 +577,5 @@ impl IntoProto<Point> for Point3 {
 		pos.set_y(self.y);
 		pos.set_z(self.z);
 		pos
-	}
-}
-
-impl AbilityTarget for Point2 {
-	fn pos(&self) -> Point2 {
-		*self
 	}
 }
