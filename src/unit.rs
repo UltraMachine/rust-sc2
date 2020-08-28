@@ -273,7 +273,7 @@ impl Unit {
 	}
 	/// Building construction complete.
 	pub fn is_ready(&self) -> bool {
-		(self.build_progress - 1.0).abs() < std::f32::EPSILON
+		(self.build_progress - 1.0).abs() < f32::EPSILON
 	}
 	/// Terran building has addon.
 	pub fn has_addon(&self) -> bool {

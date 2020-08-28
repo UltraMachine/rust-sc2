@@ -5,7 +5,10 @@ use crate::{geometry::Point2, FromProto};
 use ndarray::Array2;
 use num_traits::FromPrimitive;
 use sc2_proto::common::ImageData;
-use std::ops::{Index, IndexMut};
+use std::{
+	fmt,
+	ops::{Index, IndexMut},
+};
 
 /// 2-Dimensional Array of pixels, where each pixel is `Set` or is `Empty`.
 pub type PixelMap = Array2<Pixel>;
@@ -95,8 +98,8 @@ impl Default for Pixel {
 		Pixel::Empty
 	}
 }
-impl std::fmt::Debug for Pixel {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for Pixel {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {
 			Pixel::Empty => 0.fmt(f),
 			Pixel::Set => 1.fmt(f),
