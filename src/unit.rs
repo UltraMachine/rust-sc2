@@ -1676,12 +1676,7 @@ impl Unit {
 		self.command(AbilityId::Land, Target::Pos(target), queue);
 	}
 }
-impl From<Unit> for Point2 {
-	#[inline]
-	fn from(u: Unit) -> Self {
-		u.position
-	}
-}
+
 impl From<&Unit> for Point2 {
 	#[inline]
 	fn from(u: &Unit) -> Self {
@@ -1891,11 +1886,6 @@ pub trait Radius {
 	}
 }
 
-impl Radius for Unit {
-	fn radius(&self) -> f32 {
-		self.radius
-	}
-}
 impl Radius for &Unit {
 	fn radius(&self) -> f32 {
 		self.radius

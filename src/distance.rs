@@ -1,6 +1,6 @@
 //! Traits for comparing distance between points and units.
 
-use crate::{geometry::Point2, unit::Unit};
+use crate::geometry::Point2;
 use std::{
 	cmp::Ordering,
 	iter::{Filter, FromIterator},
@@ -8,9 +8,17 @@ use std::{
 };
 
 /// Basic trait for comparing distance.
-pub trait Distance: Sized {
+pub trait Distance: Into<Point2> {
 	/// Calculates squared euclidean distance from `self` to `other`.
-	fn distance_squared<P: Into<Point2>>(self, other: P) -> f32;
+	fn distance_squared<P: Into<Point2>>(self, other: P) -> f32 {
+		let a = self.into();
+		let b = other.into();
+
+		let dx = a.x - b.x;
+		let dy = a.y - b.y;
+
+		dx * dx + dy * dy
+	}
 
 	/// Calculates euclidean distance from `self` to `other`.
 	#[inline]
@@ -29,27 +37,7 @@ pub trait Distance: Sized {
 	}
 }
 
-impl Distance for Point2 {
-	#[inline]
-	fn distance_squared<P: Into<Point2>>(self, other: P) -> f32 {
-		let other = other.into();
-		let dx = self.x - other.x;
-		let dy = self.y - other.y;
-		dx * dx + dy * dy
-	}
-}
-impl Distance for &Point2 {
-	#[inline]
-	fn distance_squared<P: Into<Point2>>(self, other: P) -> f32 {
-		(*self).distance_squared(other)
-	}
-}
-impl Distance for &Unit {
-	#[inline]
-	fn distance_squared<P: Into<Point2>>(self, other: P) -> f32 {
-		self.position.distance_squared(other)
-	}
-}
+impl<T: Into<Point2>> Distance for T {}
 
 #[inline]
 fn cmp<T: PartialOrd>(a: &T, b: &T) -> Ordering {
