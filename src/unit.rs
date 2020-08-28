@@ -1332,6 +1332,21 @@ impl Unit {
 	pub fn in_real_range_of(&self, threat: &Unit, gap: f32) -> bool {
 		threat.in_real_range(self, gap)
 	}
+	/// Checks if unit is close enough to use given ability on target.
+	pub fn in_ability_cast_range<A>(&self, ability_id: AbilityId, target: A, gap: f32) -> bool
+	where
+		A: Into<Point2> + Radius,
+	{
+		self.data
+			.game_data
+			.abilities
+			.get(&ability_id)
+			.map_or(false, |data| {
+				let target_radius = target.radius();
+				(data.cast_range.unwrap_or(0.0) + self.radius + target_radius + gap).powi(2)
+					>= self.distance_squared(target)
+			})
+	}
 	/// Returns (attribute, bonus damage) for first unit's weapon if any.
 	pub fn damage_bonus(&self) -> Option<(Attribute, u32)> {
 		self.weapons()
