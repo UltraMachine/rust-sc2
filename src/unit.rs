@@ -1869,3 +1869,22 @@ pub struct RallyTarget {
 	/// Filled if building is rallied on unit.
 	pub tag: Option<u64>,
 }
+
+/// Trait for radius
+pub trait Radius {
+	/// Radius for struct
+	fn radius(&self) -> f32 {
+		0.0
+	}
+}
+
+impl Radius for Unit {
+	fn radius(&self) -> f32 {
+		self.radius
+	}
+}
+impl Radius for &Unit {
+	fn radius(&self) -> f32 {
+		self.radius
+	}
+}

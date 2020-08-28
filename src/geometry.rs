@@ -2,7 +2,7 @@
 //!
 //! Countains various geometric primitives with useful helper methods.
 
-use crate::{distance::Distance, FromProto, IntoProto};
+use crate::{distance::Distance, unit::Radius, FromProto, IntoProto};
 use sc2_proto::common::{Point, Point2D};
 use std::{
 	hash::{Hash, Hasher},
@@ -579,3 +579,8 @@ impl IntoProto<Point> for Point3 {
 		pos
 	}
 }
+
+impl Radius for Point2 {}
+impl Radius for &Point2 {}
+impl Radius for Point3 {}
+impl Radius for &Point3 {}
