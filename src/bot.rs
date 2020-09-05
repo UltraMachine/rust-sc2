@@ -1036,7 +1036,7 @@ impl Bot {
 
 		let mut to_remove = Vec::<u64>::new();
 		let mut burrowed = Vec::<u64>::new();
-		let mut shapshot = Vec::<u64>::new();
+		let mut hidden = Vec::<u64>::new();
 		let enemy_is_zerg = self.enemy_race.is_zerg();
 
 		fn is_invisible(u: &Unit, detectors: &Units, scans: &[Effect]) -> bool {
@@ -1070,9 +1070,9 @@ impl Bot {
 		let current = &self.units.enemy.all;
 		self.units.cached.all.iter().for_each(|u| {
 			if current.contains_tag(u.tag) {
-				// Mark as snapshots undetected burrowed units - it's not possible to attack them.
+				// Mark as hidden undetected burrowed units - it's not possible to attack them.
 				if u.is_burrowed && u.is_visible() && is_invisible(u, &detectors, &scans) {
-					shapshot.push(u.tag);
+					hidden.push(u.tag);
 				}
 			} else if u.is_flying || !u.is_structure() {
 				// unit position visible, but it disappeared
@@ -1106,9 +1106,9 @@ impl Bot {
 					} else if !(u.is_burrowed && is_invisible(u, &detectors, &scans)) {
 						to_remove.push(u.tag);
 					}
-				// Unit is out of vision -> marking as snapshot
+				// Unit is out of vision -> marking as hidden
 				} else {
-					shapshot.push(u.tag);
+					hidden.push(u.tag);
 				}
 			// Structure got destroyed
 			} else {
@@ -1129,7 +1129,7 @@ impl Bot {
 
 		let mark_burrowed = |u: u64, us: &mut Units| {
 			if let Some(u) = us.get_mut(u) {
-				u.display_type = DisplayType::Snapshot;
+				u.display_type = DisplayType::Hidden;
 				u.is_burrowed = true;
 			}
 		};
@@ -1139,18 +1139,18 @@ impl Bot {
 			mark_burrowed(u, &mut cache.workers);
 		});
 
-		let mark_shapshot = |u: u64, us: &mut Units| {
+		let mark_hidden = |u: u64, us: &mut Units| {
 			if let Some(u) = us.get_mut(u) {
-				u.display_type = DisplayType::Snapshot;
+				u.display_type = DisplayType::Hidden;
 			}
 		};
-		shapshot.into_iter().for_each(|u| {
-			mark_shapshot(u, &mut cache.all);
-			mark_shapshot(u, &mut cache.units);
-			mark_shapshot(u, &mut cache.workers);
+		hidden.into_iter().for_each(|u| {
+			mark_hidden(u, &mut cache.all);
+			mark_hidden(u, &mut cache.units);
+			mark_hidden(u, &mut cache.workers);
 			if enemy_is_terran {
-				mark_shapshot(u, &mut cache.structures);
-				mark_shapshot(u, &mut cache.townhalls);
+				mark_hidden(u, &mut cache.structures);
+				mark_hidden(u, &mut cache.townhalls);
 			}
 		});
 
