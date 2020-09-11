@@ -39,6 +39,7 @@ pub enum AbilityId {
 	ResearchPhoenixAnionPulseCrystals = 46,
 	FleetBeaconResearchTempestRangeUpgrade = 47,
 	FleetBeaconResearchVoidRaySpeedUpgrade = 48,
+	FleetBeaconResearchTempestResearchGroundAttackUpgrade = 49,
 	FungalGrowthFungalGrowth = 74,
 	GuardianShieldGuardianShield = 76,
 	EffectRepairMule = 78,

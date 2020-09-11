@@ -301,12 +301,13 @@ pub enum UpgradeId {
 	DiggingClaws = 293,
 	CarrierCarrierCapacity = 294,
 	CarrierLeashRangeUpgrade = 295,
-	EnhancedShockwaves = 296,
-	MicrobialShroud = 297,
-	SunderingImpact = 298,
-	AmplifiedShielding = 299,
-	PsionicAmplifiers = 300,
-	SecretedCoating = 301,
+	TempestGroundAttackUpgrade = 296,
+	EnhancedShockwaves = 297,
+	MicrobialShroud = 298,
+	SunderingImpact = 299,
+	AmplifiedShielding = 300,
+	PsionicAmplifiers = 301,
+	SecretedCoating = 302,
 }
 
 #[cfg(target_os = "linux")]

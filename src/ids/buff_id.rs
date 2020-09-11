@@ -300,9 +300,10 @@ pub enum BuffId {
 	LoadOutSprayTracker = 292,
 	InhibitorZoneTemporalField = 293,
 	ResonatingGlaivesPhaseShift = 294,
-	AmorphousArmorcloud = 295,
-	RavenShredderMissileArmorReductionUISubtruct = 296,
-	BatteryOvercharge = 297,
+	NeuralParasiteChildren = 295,
+	AmorphousArmorcloud = 296,
+	RavenShredderMissileArmorReductionUISubtruct = 297,
+	BatteryOvercharge = 298,
 }
 
 #[cfg(target_os = "linux")]
