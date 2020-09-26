@@ -1271,15 +1271,10 @@ impl Bot {
 							)
 							.unwrap();
 						valid_positions = valid_positions
-							.iter()
-							.zip(results.iter())
-							.filter_map(|(pos, res)| {
-								if *res == ActionResult::Success {
-									Some(*pos)
-								} else {
-									None
-								}
-							})
+							.into_iter()
+							.zip(results.into_iter())
+							.filter(|(_, res)| *res == ActionResult::Success)
+							.map(|(pos, _)| pos)
 							.collect::<Vec<Point2>>();
 					}
 
@@ -1311,10 +1306,10 @@ impl Bot {
 			.unwrap();
 
 		geysers
-			.iter()
-			.zip(results.iter())
-			.find(|(_, res)| **res == ActionResult::Success)
-			.map(|(geyser, _)| geyser.clone())
+			.into_iter()
+			.zip(results.into_iter())
+			.find(|(_, res)| *res == ActionResult::Success)
+			.map(|(geyser, _)| geyser.1)
 	}
 
 	/// Returns next possible location from [`expansions`](Self::expansions) closest to bot's start location
@@ -1339,11 +1334,11 @@ impl Bot {
 			.unwrap();
 
 		expansions
-			.iter()
-			.zip(paths.iter())
-			.filter_map(|(loc, path)| path.map(|path| (loc, path)))
+			.into_iter()
+			.zip(paths.into_iter())
+			.filter_map(|(loc, path)| Some((loc, path?)))
 			.min_by(|(_, path1), (_, path2)| path1.partial_cmp(&path2).unwrap())
-			.map(|(loc, _path)| *loc)
+			.map(|(loc, _)| loc)
 	}
 	/// Returns next possible location from [`expansions`](Self::expansions) closest to opponent's start location
 	/// or `None` if there aren't any free locations.
@@ -1364,11 +1359,11 @@ impl Bot {
 			.unwrap();
 
 		expansions
-			.iter()
-			.zip(paths.iter())
-			.filter_map(|(loc, path)| path.map(|path| (loc, path)))
+			.into_iter()
+			.zip(paths.into_iter())
+			.filter_map(|(loc, path)| Some((loc, path?)))
 			.min_by(|(_, path1), (_, path2)| path1.partial_cmp(&path2).unwrap())
-			.map(|(loc, _)| *loc)
+			.map(|(loc, _)| loc)
 	}
 	/// Returns all [`expansions`](Self::expansions) taken by bot.
 	pub fn owned_expansions(&self) -> Vec<(Point2, Point2)> {
