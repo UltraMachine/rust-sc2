@@ -10,28 +10,20 @@ struct WorkerRushAI {
 	mineral_forward: u64,
 	mineral_back: u64,
 }
-impl WorkerRushAI {
-	fn new() -> Self {
-		Default::default()
-	}
-}
 
 impl Player for WorkerRushAI {
 	fn on_start(&mut self) -> SC2Result<()> {
-		self.units
-			.my
-			.townhalls
-			.first()
-			.unwrap()
-			.train(UnitTypeId::Probe, false);
+		if let Some(townhall) = self.units.my.townhalls.first() {
+			townhall.train(UnitTypeId::Probe, false);
+		}
 
-		self.mineral_forward = self.units.mineral_fields.closest(self.enemy_start).unwrap().tag;
-		self.mineral_back = self
-			.units
-			.mineral_fields
-			.closest(self.start_location)
-			.unwrap()
-			.tag;
+		if let Some(closest) = self.units.mineral_fields.closest(self.enemy_start) {
+			self.mineral_forward = closest.tag;
+		}
+		if let Some(closest) = self.units.mineral_fields.closest(self.start_location) {
+			self.mineral_back = closest.tag;
+		}
+
 		Ok(())
 	}
 
@@ -42,20 +34,18 @@ impl Player for WorkerRushAI {
 			.units
 			.filter(|u| !u.is_flying && u.can_attack_ground() && u.is_closer(45.0, self.enemy_start));
 		if !ground_attackers.is_empty() {
-			let mineral_back = self.mineral_back;
-			let mineral_forward = self.mineral_forward;
 			self.units.my.workers.iter().for_each(|u| {
 				let closest = ground_attackers.closest(u).unwrap();
 				if u.shield > Some(5) {
 					if !u.on_cooldown() {
 						u.attack(Target::Tag(closest.tag), false);
 					} else {
-						u.gather(mineral_back, false);
+						u.gather(self.mineral_back, false);
 					}
 				} else if u.in_range_of(&closest, 2.0) {
-					u.gather(mineral_back, false);
+					u.gather(self.mineral_back, false);
 				} else {
-					u.gather(mineral_forward, false);
+					u.gather(self.mineral_forward, false);
 				}
 			})
 		} else {
@@ -69,9 +59,8 @@ impl Player for WorkerRushAI {
 					u.attack(Target::Tag(ground_structures.closest(u).unwrap().tag), false);
 				})
 			} else {
-				let mineral_forward = self.mineral_forward;
 				self.units.my.workers.iter().for_each(|u| {
-					u.gather(mineral_forward, false);
+					u.gather(self.mineral_forward, false);
 				})
 			}
 		}
@@ -154,8 +143,8 @@ fn main() -> SC2Result<()> {
 		None => unreachable!(),
 	};
 
-	let mut bot = WorkerRushAI::new();
-	bot.game_step = game_step;
+	let mut bot = WorkerRushAI::default();
+	bot.set_game_step(game_step);
 
 	if app.is_present("ladder_server") {
 		run_ladder_game(

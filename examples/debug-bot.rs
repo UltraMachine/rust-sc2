@@ -1,26 +1,20 @@
 #[macro_use]
 extern crate clap;
 
-use rand::prelude::{thread_rng, SliceRandom};
-use rust_sc2::geometry::Point3;
-use rust_sc2::prelude::*;
+use rand::prelude::*;
+use rust_sc2::{geometry::Point3, prelude::*};
 
 #[bot]
 #[derive(Default)]
 struct DebugAI;
-impl DebugAI {
-	fn new() -> Self {
-		Default::default()
-	}
-}
 
 impl Player for DebugAI {
 	fn on_step(&mut self, _iteration: usize) -> SC2Result<()> {
 		// Debug expansion locations
-		self.expansions.clone().iter().for_each(|(loc, center)| {
-			let z = self.get_z_height(*loc) + 1.5;
+		self.expansions.clone().into_iter().for_each(|(loc, center)| {
+			let z = self.get_z_height(loc) + 1.5;
 			self.debug.draw_sphere(loc.to3(z), 0.6, Some((255, 128, 255)));
-			let z = self.get_z_height(*center) + 1.5;
+			let z = self.get_z_height(center) + 1.5;
 			self.debug.draw_sphere(center.to3(z), 0.5, Some((255, 128, 64)));
 		});
 
@@ -115,8 +109,8 @@ fn main() -> SC2Result<()> {
 		None => unreachable!(),
 	};
 
-	let mut bot = DebugAI::new();
-	bot.game_step = game_step;
+	let mut bot = DebugAI::default();
+	bot.set_game_step(game_step);
 	if let Some(race) = app
 		.value_of("race")
 		.map(|race| race.parse().expect("Can't parse bot race"))
