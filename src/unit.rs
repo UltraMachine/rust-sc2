@@ -9,7 +9,7 @@ use crate::{
 		SPEED_BUFFS, SPEED_ON_CREEP, SPEED_UPGRADES, WARPGATE_ABILITIES,
 	},
 	distance::Distance,
-	game_data::{Attribute, GameData, TargetType, UnitTypeData, Weapon},
+	game_data::{Attribute, Cost, GameData, TargetType, UnitTypeData, Weapon},
 	game_state::Alliance,
 	geometry::{Point2, Point3},
 	ids::{AbilityId, BuffId, UnitTypeId, UpgradeId},
@@ -427,6 +427,10 @@ impl Unit {
 	/// Returns how much supply this unit uses.
 	pub fn supply_cost(&self) -> f32 {
 		self.type_data().map_or(0.0, |data| data.food_required)
+	}
+	/// Returns cost of unit
+	pub fn cost(&self) -> Cost {
+		self.type_data().map_or(Cost::default(), |data| data.cost())
 	}
 	/// Returns health percentage (current health divided by max health).
 	/// Value in range from `0` to `1`.
