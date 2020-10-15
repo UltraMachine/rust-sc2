@@ -5,12 +5,11 @@
 
 Install Rust >= 1.42.0
 
-Warning: Compilation is currently broken in latest stable releases, you'll get following error:
+Warning: Compilation is broken in rustc 1.45.0 - 1.46.0, you'll get following error:
 ```text
 thread 'rustc' has overflowed its stack
 error: could not compile `rust-sc2`.
 ```
-Use stable up to 1.44.1 or current nightly version of the compiler.
 
 Add to dependencies in Cargo.toml:
 ```toml
