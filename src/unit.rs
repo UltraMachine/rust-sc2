@@ -643,7 +643,7 @@ impl Unit {
 	}
 
 	#[inline]
-	fn weapons(&self) -> &[Weapon] {
+	pub fn weapons(&self) -> &[Weapon] {
 		match self.type_id {
 			UnitTypeId::Changeling
 			| UnitTypeId::ChangelingZealot
