@@ -660,6 +660,7 @@ lazy_static! {
 		];
 		#[cfg(windows)]
 		{
+			map.reserve(1);
 			map.insert(UpgradeId::EnhancedShockwaves, UnitTypeId::GhostAcademy);
 		}
 		map
@@ -735,6 +736,7 @@ lazy_static! {
 			UnitTypeId::LurkerMP => (UpgradeId::DiggingClaws, 1.1),
 		];
 		if cfg!(windows) {
+			map.reserve(2);
 			map.insert(UnitTypeId::Medivac, (UpgradeId::MedivacRapidDeployment, 1.18));
 			map.insert(UnitTypeId::VoidRay, (UpgradeId::VoidRaySpeedUpgrade, 1.328));
 		}
@@ -855,6 +857,7 @@ lazy_static! {
 		];
 		#[cfg(windows)]
 		{
+			map.reserve(3);
 			map.insert(UnitTypeId::InhibitorZoneFlyingSmall, 4.0);
 			map.insert(UnitTypeId::InhibitorZoneFlyingMedium, 5.0);
 			map.insert(UnitTypeId::InhibitorZoneFlyingLarge, 6.0);
@@ -873,6 +876,7 @@ lazy_static! {
 		];
 		#[cfg(windows)]
 		{
+			map.reserve(3);
 			map.insert(BuffId::InhibitorZoneFlyingTemporalField, 0.65);
 			map.insert(BuffId::AccelerationZoneTemporalField, 1.35);
 			map.insert(BuffId::AccelerationZoneFlyingTemporalField, 1.35);
