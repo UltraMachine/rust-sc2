@@ -382,12 +382,10 @@ impl TryFromProto<&ProtoEffectData> for EffectData {
 				| EffectId::RavagerCorrosiveBileCP => TargetType::Any,
 				_ => TargetType::Ground,
 			},
-			friendly_fire: match id {
-				EffectId::PsiStormPersistent
-				| EffectId::NukePersistent
-				| EffectId::RavagerCorrosiveBileCP => true,
-				_ => false,
-			},
+			friendly_fire: matches!(
+				id,
+				EffectId::PsiStormPersistent | EffectId::NukePersistent | EffectId::RavagerCorrosiveBileCP
+			),
 		})
 	}
 }

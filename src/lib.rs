@@ -316,7 +316,7 @@ Because of version differences ids are conditionally compiled for windows and li
 [b]: bot!
 */
 // #![warn(missing_docs)]
-#![deny(intra_doc_link_resolution_failure)]
+#![deny(broken_intra_doc_links)]
 
 #[macro_use]
 extern crate num_derive;
