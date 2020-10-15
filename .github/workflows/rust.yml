@@ -1,0 +1,75 @@
+name: Rust
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+          toolchain: stable
+          override: true
+    - name: Cache cargo registry
+      uses: actions/cache@v2
+      with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-dev-registry-${{ hashFiles('**/Cargo.lock') }}
+    - name: Cache cargo index
+      uses: actions/cache@v2
+      with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-dev-index-${{ hashFiles('**/Cargo.lock') }}
+    - name: Cache cargo build
+      uses: actions/cache@v2
+      with:
+          path: |
+            target
+          key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-dev-target-${{ hashFiles('**/Cargo.lock') }}
+    - name: Build library
+      run: cargo build --lib --verbose
+#     - name: Run tests
+#       run: cargo test --verbose
+  
+  fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - run: rustup component add rustfmt
+      - uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - run: rustup component add clippy
+      - uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -- -D warnings
