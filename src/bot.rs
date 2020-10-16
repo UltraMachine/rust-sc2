@@ -561,6 +561,10 @@ impl Bot {
 	pub fn chat(&mut self, message: &str) {
 		self.actions.push(Action::Chat(message.to_string(), false));
 	}
+	/// Sends message for allies only to in-game chat (can be used for debug).
+	pub fn chat_ally(&mut self, message: &str) {
+		self.actions.push(Action::Chat(message.to_string(), true));
+	}
 	/// Returns actual terrain height on given position in 3D space.
 	pub fn get_z_height<P: Into<(usize, usize)>>(&self, pos: P) -> f32 {
 		self.game_info.terrain_height[pos.into()] as f32 * 32.0 / 255.0 - 16.0
