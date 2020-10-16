@@ -1,6 +1,6 @@
 use dirs::home_dir;
 use regex::Regex;
-use std::{env::var_os, fs, path::Path};
+use std::{env, fs, path::Path};
 
 const DEFAULT_SC2_PATH: &str = {
 	#[cfg(target_os = "windows")]
@@ -18,7 +18,7 @@ const DEFAULT_SC2_PATH: &str = {
 };
 
 pub fn get_path_to_sc2() -> String {
-	match var_os("SC2PATH") {
+	match env::var_os("SC2PATH") {
 		Some(path) => path.to_str().unwrap().to_string(),
 		None => {
 			if cfg!(target_os = "windows") {

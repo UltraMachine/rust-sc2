@@ -312,7 +312,7 @@ Because of version differences ids are conditionally compiled for windows and li
 [`GameInfo`]: game_info::GameInfo
 [`GameData`]: game_data::GameData
 [`GameState`]: game_state::GameState
-[b]: bot!
+[b]: macro@bot
 */
 // #![warn(missing_docs)]
 #![deny(broken_intra_doc_links)]
@@ -383,7 +383,7 @@ use player::{GameResult, Race};
 `#[bot]` macro implements [`Deref`]`<Target = `[`Bot`]`>` and [`DerefMut`]`<Target = `[`Bot`]`>` for your struct.
 Implementing this traits allows you to access [`Bot`] fields and methods on your struct through `self`.
 
-[`Bot`]: crate::bot::Bot
+[`Bot`]: bot::Bot
 [`Deref`]: std::ops::Deref
 [`DerefMut`]: std::ops::DerefMut
 
@@ -483,7 +483,7 @@ impl DerefMut for MyBot {
 pub use sc2_macro::bot;
 
 /**
-`#[bot_new]` macro adds initialization of field added by [`#[bot]`](bot!) macro.
+`#[bot_new]` macro adds initialization of field added by [`#[bot]`](macro@bot) macro.
 
 Usage:
 ```
@@ -497,7 +497,7 @@ impl MyBot {
     }
 }
 ```
-If your bot implements `Default` then you don't need it, since [`Bot`](crate::bot::Bot)
+If your bot implements `Default` then you don't need it, since [`Bot`](bot::Bot)
 implements `Default` too and will be filled automatically:
 ```
 #[bot]

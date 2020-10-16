@@ -257,7 +257,7 @@ impl Default for Completion {
 ///
 /// [`Deref`]: std::ops::Deref
 /// [`DerefMut`]: std::ops::DerefMut
-/// [b]: crate::bot!
+/// [b]: macro@crate::bot
 pub struct Bot {
 	pub(crate) process: Option<Child>,
 	pub(crate) api: Option<API>,
@@ -485,7 +485,8 @@ impl Bot {
 		unimplemented!()
 	}
 	*/
-	/// Subtracts cost of given unit type from [`minerals`], [`vespene`], [`supply_left`] and adds to [`supply_used`].
+	/// Subtracts cost of given unit type from [`minerals`],
+	/// [`vespene`], [`supply_left`] and adds to [`supply_used`].
 	///
 	/// [`minerals`]: Self::minerals
 	/// [`vespene`]: Self::vespene
@@ -1092,7 +1093,7 @@ impl Bot {
 							};
 							if enemy_is_zerg
 								&& !(u.is_flying
-									|| (matches!(
+									|| matches!(
 										u.type_id,
 										UnitTypeId::Changeling
 											| UnitTypeId::ChangelingZealot | UnitTypeId::ChangelingMarineShield
@@ -1100,7 +1101,7 @@ impl Bot {
 											| UnitTypeId::ChangelingZergling | UnitTypeId::Broodling
 											| UnitTypeId::Larva | UnitTypeId::Egg
 									) || (u.type_id == UnitTypeId::Drone
-										&& self.units.enemy.structures.iter().any(is_drone_close))))
+									&& self.units.enemy.structures.iter().any(is_drone_close)))
 								&& is_invisible(u, &detectors, &scans)
 							{
 								burrowed.push(u.tag);
@@ -1358,8 +1359,8 @@ impl Bot {
 			.min_by(|(_, path1), (_, path2)| path1.partial_cmp(&path2).unwrap())
 			.map(|(loc, _)| loc)
 	}
-	/// Returns next possible location from [`expansions`](Self::expansions) closest to opponent's start location
-	/// or `None` if there aren't any free locations.
+	/// Returns next possible location from [`expansions`](Self::expansions) closest to
+	/// opponent's start location or `None` if there aren't any free locations.
 	pub fn get_enemy_expansion(&mut self) -> Option<(Point2, Point2)> {
 		let expansions = self
 			.expansions
