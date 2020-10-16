@@ -424,6 +424,11 @@ impl Unit {
 	pub fn can_be_attacked(&self) -> bool {
 		matches!(self.cloak, CloakState::NotCloaked | CloakState::CloakedDetected)
 	}
+	/// Checks if unit is burrowed or cloaked, and not detected (i.e. must be detected to be attacked).
+	pub fn is_invisible(&self) -> bool {
+		matches!(self.cloak, CloakState::Cloaked | CloakState::CloakedAllied)
+			|| (self.is_burrowed && self.is_hidden())
+	}
 	/// Returns how much supply this unit uses.
 	pub fn supply_cost(&self) -> f32 {
 		self.type_data().map_or(0.0, |data| data.food_required)
