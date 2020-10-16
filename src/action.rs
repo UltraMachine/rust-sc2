@@ -6,12 +6,12 @@ use crate::{
 	FromProto, IntoProto,
 };
 use num_traits::{FromPrimitive, ToPrimitive};
+use rustc_hash::FxHashMap;
 use sc2_proto::{
 	error::ActionResult as ProtoActionResult,
 	raw::{ActionRawUnitCommand_oneof_target as ProtoTarget, ActionRaw_oneof_action as ProtoRawAction},
 	sc2api::{Action as ProtoAction, ActionChat_Channel, ActionError as ProtoActionError},
 };
-use rustc_hash::FxHashMap;
 
 // pub(crate) type Command = (u64, (AbilityId, Target, bool));
 
