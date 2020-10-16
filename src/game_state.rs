@@ -133,20 +133,34 @@ where
 	// Dead units
 	let dead_units = res_raw.get_event().get_dead_units().to_vec();
 
-	let enemy_is_terran = bot.enemy_race.is_terran();
+	#[cfg(feature = "enemies_cache")]
+	{
+		let enemy_is_terran = bot.enemy_race.is_terran();
+
+		for u in &dead_units {
+			if bot.owned_tags.remove(u) {
+				bot.under_construction.remove(u);
+			} else {
+				let cache = &mut bot.units.cached;
+				cache.all.remove(*u);
+				cache.units.remove(*u);
+				cache.workers.remove(*u);
+				if enemy_is_terran {
+					cache.structures.remove(*u);
+					cache.townhalls.remove(*u);
+				}
+
+				bot.saved_hallucinations.remove(u);
+			}
+
+			bot.on_event(Event::UnitDestroyed(*u))?;
+		}
+	}
+	#[cfg(not(feature = "enemies_cache"))]
 	for u in &dead_units {
 		if bot.owned_tags.remove(u) {
 			bot.under_construction.remove(u);
 		} else {
-			let cache = &mut bot.units.cached;
-			cache.all.remove(*u);
-			cache.units.remove(*u);
-			cache.workers.remove(*u);
-			if enemy_is_terran {
-				cache.structures.remove(*u);
-				cache.townhalls.remove(*u);
-			}
-
 			bot.saved_hallucinations.remove(u);
 		}
 

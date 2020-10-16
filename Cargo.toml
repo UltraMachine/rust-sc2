@@ -35,6 +35,7 @@ clap = "^2.33.2"
 
 [features]
 protoc = ["sc2-proto/protoc-rust"]
+enemies_cache = []
 
 # hack: change when will be found better solution
 [target.'cfg(feature = "rayon")'.dependencies]

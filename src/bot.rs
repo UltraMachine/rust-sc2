@@ -9,12 +9,12 @@ use crate::{
 	distance::*,
 	game_data::{Cost, GameData},
 	game_info::GameInfo,
-	game_state::{Alliance, Effect, GameState},
+	game_state::{Alliance, GameState},
 	geometry::Point2,
-	ids::{AbilityId, EffectId, UnitTypeId, UpgradeId},
+	ids::{AbilityId, UnitTypeId, UpgradeId},
 	player::Race,
 	ramp::{Ramp, Ramps},
-	unit::{DataForUnit, DisplayType, SharedUnitData, Unit},
+	unit::{DataForUnit, SharedUnitData, Unit},
 	units::{AllUnits, Units},
 	utils::{dbscan, range_query},
 	FromProto, IntoProto,
@@ -27,6 +27,9 @@ use sc2_proto::{
 	sc2api::Request,
 };
 use std::{panic, process::Child};
+
+#[cfg(feature = "enemies_cache")]
+use crate::{game_state::Effect, ids::EffectId, unit::DisplayType};
 
 #[cfg(feature = "rayon")]
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -1018,146 +1021,161 @@ impl Bot {
 		});
 		self.saved_hallucinations = saved_hallucinations;
 
-		let cache = &mut self.units.cached;
-		let enemy_is_terran = self.enemy_race.is_terran();
+		#[cfg(feature = "enemies_cache")]
+		{
+			let cache = &mut self.units.cached;
+			let enemy_is_terran = self.enemy_race.is_terran();
 
-		cache.all.extend(enemies.all.clone());
-		cache.units.extend(enemies.units.clone());
-		cache.workers.extend(enemies.workers.clone());
-		if enemy_is_terran {
-			cache.structures.extend(enemies.structures.clone());
-			cache.townhalls.extend(enemies.townhalls.clone());
-		} else {
-			cache.structures = enemies.structures.clone();
-			cache.townhalls = enemies.townhalls.clone();
-		}
-		cache.gas_buildings = enemies.gas_buildings.clone();
-		cache.larvas = enemies.larvas.clone();
-
-		let mut to_remove = Vec::<u64>::new();
-		let mut burrowed = Vec::<u64>::new();
-		let mut hidden = Vec::<u64>::new();
-		let enemy_is_zerg = self.enemy_race.is_zerg();
-
-		fn is_invisible(u: &Unit, detectors: &Units, scans: &[Effect]) -> bool {
-			for d in detectors.iter() {
-				if u.is_closer(u.radius + d.radius + d.detect_range, d) {
-					return false;
-				}
+			cache.all.extend(enemies.all.clone());
+			cache.units.extend(enemies.units.clone());
+			cache.workers.extend(enemies.workers.clone());
+			if enemy_is_terran {
+				cache.structures.extend(enemies.structures.clone());
+				cache.townhalls.extend(enemies.townhalls.clone());
+			} else {
+				cache.structures = enemies.structures.clone();
+				cache.townhalls = enemies.townhalls.clone();
 			}
+			cache.gas_buildings = enemies.gas_buildings.clone();
+			cache.larvas = enemies.larvas.clone();
 
-			for scan in scans {
-				for p in &scan.positions {
-					if u.is_closer(u.radius + scan.radius, *p) {
+			let mut to_remove = Vec::<u64>::new();
+			let mut burrowed = Vec::<u64>::new();
+			let mut hidden = Vec::<u64>::new();
+			let enemy_is_zerg = self.enemy_race.is_zerg();
+
+			fn is_invisible(u: &Unit, detectors: &Units, scans: &[Effect]) -> bool {
+				for d in detectors.iter() {
+					if u.is_closer(u.radius + d.radius + d.detect_range, d) {
 						return false;
 					}
 				}
-			}
 
-			true
-		}
-		let detectors = self.units.my.all.filter(|u| u.is_detector());
-		let scans = self
-			.state
-			.observation
-			.raw
-			.effects
-			.iter()
-			.filter(|e| e.id == EffectId::ScannerSweep && e.alliance.is_mine())
-			.cloned()
-			.collect::<Vec<Effect>>();
-
-		let current = &self.units.enemy.all;
-		self.units.cached.all.iter().for_each(|u| {
-			if current.contains_tag(u.tag) {
-				// Mark as hidden undetected burrowed units - it's not possible to attack them.
-				if u.is_burrowed && u.is_visible() && is_invisible(u, &detectors, &scans) {
-					hidden.push(u.tag);
+				for scan in scans {
+					for p in &scan.positions {
+						if u.is_closer(u.radius + scan.radius, *p) {
+							return false;
+						}
+					}
 				}
-			} else if u.is_flying || !u.is_structure() {
-				// unit position visible, but it disappeared
-				if self.is_visible(u.position) {
-					// Was visible previously
-					if u.is_visible() {
-						// Is zerg ground unit -> probably burrowed
-						let is_drone_close = |s: &Unit| {
-							(s.build_progress < 0.1 || (s.type_id == UnitTypeId::Extractor && s.is_ready()))
-								&& u.is_closer(u.radius + s.radius + 1.0, s)
-						};
-						if enemy_is_zerg
-							&& !(u.is_flying
-								|| (matches!(
-									u.type_id,
-									UnitTypeId::Changeling
-										| UnitTypeId::ChangelingZealot | UnitTypeId::ChangelingMarineShield
-										| UnitTypeId::ChangelingMarine | UnitTypeId::ChangelingZerglingWings
-										| UnitTypeId::ChangelingZergling | UnitTypeId::Broodling
-										| UnitTypeId::Larva | UnitTypeId::Egg
-								) || (u.type_id == UnitTypeId::Drone
-									&& self.units.enemy.structures.iter().any(is_drone_close))))
-							&& is_invisible(u, &detectors, &scans)
-						{
-							burrowed.push(u.tag);
-						// Whatever
-						} else {
+
+				true
+			}
+			let detectors = self.units.my.all.filter(|u| u.is_detector());
+			let scans = self
+				.state
+				.observation
+				.raw
+				.effects
+				.iter()
+				.filter(|e| e.id == EffectId::ScannerSweep && e.alliance.is_mine())
+				.cloned()
+				.collect::<Vec<Effect>>();
+
+			let current = &self.units.enemy.all;
+			self.units.cached.all.iter().for_each(|u| {
+				if current.contains_tag(u.tag) {
+					// Mark as hidden undetected burrowed units - it's not possible to attack them.
+					if u.is_burrowed && u.is_visible() && is_invisible(u, &detectors, &scans) {
+						hidden.push(u.tag);
+					}
+				} else if u.is_flying || !u.is_structure() {
+					// unit position visible, but it disappeared
+					if self.is_visible(u.position) {
+						// Was visible previously
+						if u.is_visible() {
+							// Is zerg ground unit -> probably burrowed
+							let is_drone_close = |s: &Unit| {
+								(s.build_progress < 0.1
+									|| (s.type_id == UnitTypeId::Extractor && s.is_ready()))
+									&& u.is_closer(u.radius + s.radius + 1.0, s)
+							};
+							if enemy_is_zerg
+								&& !(u.is_flying
+									|| (matches!(
+										u.type_id,
+										UnitTypeId::Changeling
+											| UnitTypeId::ChangelingZealot | UnitTypeId::ChangelingMarineShield
+											| UnitTypeId::ChangelingMarine | UnitTypeId::ChangelingZerglingWings
+											| UnitTypeId::ChangelingZergling | UnitTypeId::Broodling
+											| UnitTypeId::Larva | UnitTypeId::Egg
+									) || (u.type_id == UnitTypeId::Drone
+										&& self.units.enemy.structures.iter().any(is_drone_close))))
+								&& is_invisible(u, &detectors, &scans)
+							{
+								burrowed.push(u.tag);
+							// Whatever
+							} else {
+								to_remove.push(u.tag);
+							}
+						// Was out of vision previously or burrowed but detected -> probably moved somewhere else
+						} else if !(u.is_burrowed && is_invisible(u, &detectors, &scans)) {
 							to_remove.push(u.tag);
 						}
-					// Was out of vision previously or burrowed but detected -> probably moved somewhere else
-					} else if !(u.is_burrowed && is_invisible(u, &detectors, &scans)) {
-						to_remove.push(u.tag);
+					// Unit is out of vision -> marking as hidden
+					} else {
+						hidden.push(u.tag);
 					}
-				// Unit is out of vision -> marking as hidden
+				// Structure got destroyed
 				} else {
-					hidden.push(u.tag);
+					to_remove.push(u.tag);
 				}
-			// Structure got destroyed
-			} else {
-				to_remove.push(u.tag);
-			}
-		});
+			});
 
-		let cache = &mut self.units.cached;
-		to_remove.into_iter().for_each(|u| {
-			cache.all.remove(u);
-			cache.units.remove(u);
-			cache.workers.remove(u);
-			if enemy_is_terran {
-				cache.structures.remove(u);
-				cache.townhalls.remove(u);
-			}
-		});
+			let cache = &mut self.units.cached;
+			to_remove.into_iter().for_each(|u| {
+				cache.all.remove(u);
+				cache.units.remove(u);
+				cache.workers.remove(u);
+				if enemy_is_terran {
+					cache.structures.remove(u);
+					cache.townhalls.remove(u);
+				}
+			});
 
-		let mark_burrowed = |u: u64, us: &mut Units| {
-			if let Some(u) = us.get_mut(u) {
-				u.display_type = DisplayType::Hidden;
-				u.is_burrowed = true;
-			}
-		};
-		burrowed.into_iter().for_each(|u| {
-			mark_burrowed(u, &mut cache.all);
-			mark_burrowed(u, &mut cache.units);
-			mark_burrowed(u, &mut cache.workers);
-		});
+			let mark_burrowed = |u: u64, us: &mut Units| {
+				if let Some(u) = us.get_mut(u) {
+					u.display_type = DisplayType::Hidden;
+					u.is_burrowed = true;
+				}
+			};
+			burrowed.into_iter().for_each(|u| {
+				mark_burrowed(u, &mut cache.all);
+				mark_burrowed(u, &mut cache.units);
+				mark_burrowed(u, &mut cache.workers);
+			});
 
-		let mark_hidden = |u: u64, us: &mut Units| {
-			if let Some(u) = us.get_mut(u) {
-				u.display_type = DisplayType::Hidden;
-			}
-		};
-		hidden.into_iter().for_each(|u| {
-			mark_hidden(u, &mut cache.all);
-			mark_hidden(u, &mut cache.units);
-			mark_hidden(u, &mut cache.workers);
-			if enemy_is_terran {
-				mark_hidden(u, &mut cache.structures);
-				mark_hidden(u, &mut cache.townhalls);
-			}
-		});
+			let mark_hidden = |u: u64, us: &mut Units| {
+				if let Some(u) = us.get_mut(u) {
+					u.display_type = DisplayType::Hidden;
+				}
+			};
+			hidden.into_iter().for_each(|u| {
+				mark_hidden(u, &mut cache.all);
+				mark_hidden(u, &mut cache.units);
+				mark_hidden(u, &mut cache.workers);
+				if enemy_is_terran {
+					mark_hidden(u, &mut cache.structures);
+					mark_hidden(u, &mut cache.townhalls);
+				}
+			});
+		}
 
 		let mut enemies_ordered = FxHashMap::default();
 		let mut enemies_current = FxHashMap::default();
 
-		self.units.cached.all.iter().for_each(|u| {
+		{
+			#[cfg(not(feature = "enemies_cache"))]
+			{
+				&self.units.enemy.all
+			}
+			#[cfg(feature = "enemies_cache")]
+			{
+				&self.units.cached.all
+			}
+		}
+		.iter()
+		.for_each(|u| {
 			if u.is_structure() {
 				if u.is_ready() {
 					*enemies_current.entry(u.type_id).or_default() += 1;

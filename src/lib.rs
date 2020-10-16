@@ -116,18 +116,18 @@ You always can do the same thing by hands if needed.
 
 ### Units
 #### Common
-| Field                        | Type            | Description                                                                                     |
-|------------------------------|-----------------|-------------------------------------------------------------------------------------------------|
-| `self.units.all`             | [`Units`]       | All the units including owned, enemies and neutral.                                             |
-| `self.units.my`              | [`PlayerUnits`] | Your's only units.                                                                              |
-| `self.units.enemy`           | [`PlayerUnits`] | Opponent's units, on current step.                                                              |
-| `self.units.cached`          | [`PlayerUnits`] | Opponent's units, but contains some units from previous steps, marked as snapshots or burrowed. |
-| `self.units.mineral_fields`  | [`Units`]       | All mineral fields on the map.                                                                  |
-| `self.units.vespene_geysers` | [`Units`]       | All vespene geysers on the map.                                                                 |
-| `self.units.resources`       | [`Units`]       | All resources (both minerals and geysers) on the map.                                           |
-| `self.units.destructables`   | [`Units`]       | Destructable rocks and other trash.                                                             |
-| `self.units.watchtowers`     | [`Units`]       | Watchtowers reveal area around them if there're any ground units near.                          |
-| `self.units.inhibitor_zones` | [`Units`]       | Inhubitor zones slow down movement speed of nearby units.                                       |
+| Field                        | Type            | Description                                                                |
+|------------------------------|-----------------|----------------------------------------------------------------------------|
+| `self.units.all`             | [`Units`]       | All the units including owned, enemies and neutral.                        |
+| `self.units.my`              | [`PlayerUnits`] | Your's only units.                                                         |
+| `self.units.enemy`           | [`PlayerUnits`] | Opponent's units, on current step.                                         |
+| `self.units.cached`          | [`PlayerUnits`] | Opponent's units, but also contains some hidden units from previous steps. |
+| `self.units.mineral_fields`  | [`Units`]       | All mineral fields on the map.                                             |
+| `self.units.vespene_geysers` | [`Units`]       | All vespene geysers on the map.                                            |
+| `self.units.resources`       | [`Units`]       | All resources (both minerals and geysers) on the map.                      |
+| `self.units.destructables`   | [`Units`]       | Destructable rocks and other trash.                                        |
+| `self.units.watchtowers`     | [`Units`]       | Watchtowers reveal area around them if there're any ground units near.     |
+| `self.units.inhibitor_zones` | [`Units`]       | Inhubitor zones slow down movement speed of nearby units.                  |
 
 #### What `PlayerUnits` consists of?
 All fields are collections of [`Units`]:

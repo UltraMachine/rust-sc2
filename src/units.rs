@@ -26,7 +26,8 @@ pub struct AllUnits {
 	pub my: PlayerUnits,
 	/// Opponent's units, on current step.
 	pub enemy: PlayerUnits,
-	/// Opponent's units, but contains some units from previous steps, marked as snapshots or burrowed.
+	#[cfg(feature = "enemies_cache")]
+	/// Opponent's units, but also contains some hidden units from previous steps.
 	pub cached: PlayerUnits,
 	/// All mineral fields on the map.
 	pub mineral_fields: Units,
