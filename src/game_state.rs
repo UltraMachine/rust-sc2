@@ -428,7 +428,7 @@ pub struct Common {
 /// All alerts stored in [`state.observation.alerts`](Observation::alerts).
 #[allow(missing_docs)]
 #[allow(clippy::enum_variant_names)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum Alert {
 	AlertError,
 	AddOnComplete,

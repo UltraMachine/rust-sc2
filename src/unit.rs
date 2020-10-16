@@ -1800,7 +1800,7 @@ impl Unit {
 
 /// The display type of [`Unit`]. Can be accessed through [`display_type`](Unit::display_type) field.
 #[variant_checkers]
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum DisplayType {
 	/// Fully visible.
 	Visible,
@@ -1824,7 +1824,7 @@ impl FromProto<ProtoDisplayType> for DisplayType {
 }
 
 /// Cloak state of [`Unit`]. Can be accessed through [`cloak`](Unit::cloak) field.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CloakState {
 	/// Under the fog, so unknown whether it's cloaked or not.
 	CloakedUnknown,
