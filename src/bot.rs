@@ -1024,7 +1024,7 @@ impl Bot {
 			mark_hallucination(u, &mut enemies.units);
 			mark_hallucination(u, &mut enemies.workers);
 		});
-		self.saved_hallucinations = saved_hallucinations;
+		self.saved_hallucinations.extend(saved_hallucinations);
 
 		#[cfg(feature = "enemies_cache")]
 		{
