@@ -6,7 +6,7 @@ use indexmap::{
 	map::{Iter, IterMut, Keys, Values, ValuesMut},
 	IndexMap, IndexSet,
 };
-use iter::*;
+use iter::IntoUnits;
 use rustc_hash::FxHasher;
 use std::{
 	hash::BuildHasherDefault,
@@ -543,6 +543,11 @@ where
 {
 	move |_, a, _, b| f(a).partial_cmp(&f(b)).unwrap()
 }
+
+#[cfg(not(feature = "rayon"))]
+use crate::distance::Distance;
+#[cfg(not(feature = "rayon"))]
+use std::iter::Sum;
 
 #[cfg(not(feature = "rayon"))]
 impl Units {
