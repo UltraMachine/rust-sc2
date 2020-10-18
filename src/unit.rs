@@ -233,6 +233,10 @@ impl Unit {
 			self.data.enemy_upgrades.lock_read()
 		}
 	}
+	/// Name of the unit
+	pub fn name(&self) -> &str {
+		self.type_data().map_or("", |data| &data.name)
+	}
 	/// Checks if unit is worker.
 	pub fn is_worker(&self) -> bool {
 		self.type_id.is_worker()
