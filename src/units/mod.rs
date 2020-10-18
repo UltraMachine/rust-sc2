@@ -1,17 +1,22 @@
 //! Data structures for storing units, fast filtering and finding ones that needed.
 #![warn(missing_docs)]
 
-use crate::{distance::Distance, geometry::Point2, ids::UnitTypeId, unit::Unit};
+use crate::{geometry::Point2, ids::UnitTypeId, unit::Unit};
 use indexmap::{
-	map::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut},
+	map::{Iter, IterMut, Keys, Values, ValuesMut},
 	IndexMap, IndexSet,
 };
+use iter::*;
 use rustc_hash::FxHasher;
 use std::{
 	hash::BuildHasherDefault,
-	iter::{FromIterator, Sum},
+	iter::FromIterator,
 	ops::{Index, IndexMut},
 };
+
+pub mod iter;
+#[cfg(feature = "rayon")]
+pub mod rayon;
 
 type FxIndexMap<K, V> = IndexMap<K, V, BuildHasherDefault<FxHasher>>;
 
@@ -443,30 +448,30 @@ impl FromIterator<(u64, Unit)> for Units {
 }
 
 impl IntoIterator for Units {
-	type Item = (u64, Unit);
-	type IntoIter = IntoIter<u64, Unit>;
+	type Item = Unit;
+	type IntoIter = IntoUnits;
 
 	#[inline]
 	fn into_iter(self) -> Self::IntoIter {
-		self.0.into_iter()
+		IntoUnits(self.0.into_iter())
 	}
 }
 impl<'a> IntoIterator for &'a Units {
-	type Item = (&'a u64, &'a Unit);
-	type IntoIter = Iter<'a, u64, Unit>;
+	type Item = &'a Unit;
+	type IntoIter = Values<'a, u64, Unit>;
 
 	#[inline]
 	fn into_iter(self) -> Self::IntoIter {
-		self.0.iter()
+		self.0.values()
 	}
 }
 impl<'a> IntoIterator for &'a mut Units {
-	type Item = (&'a u64, &'a mut Unit);
-	type IntoIter = IterMut<'a, u64, Unit>;
+	type Item = &'a mut Unit;
+	type IntoIter = ValuesMut<'a, u64, Unit>;
 
 	#[inline]
 	fn into_iter(self) -> Self::IntoIter {
-		self.0.iter_mut()
+		self.0.values_mut()
 	}
 }
 
@@ -670,264 +675,6 @@ impl Units {
 	}
 }
 
-#[cfg(feature = "rayon")]
-use indexmap::map::rayon::{IntoParIter, ParIter, ParIterMut, ParKeys, ParValues, ParValuesMut};
-#[cfg(feature = "rayon")]
-use rayon::prelude::*;
-
-#[cfg(feature = "rayon")]
-#[inline]
-fn cmp_by<U, T, F>(f: F) -> impl Fn(&&U, &&U) -> Ordering
-where
-	T: PartialOrd,
-	F: Fn(&U) -> T + Send + Sync,
-{
-	move |a, b| f(a).partial_cmp(&f(b)).unwrap()
-}
-
-#[cfg(feature = "rayon")]
-impl Units {
-	/// Returns parallel iterator over the units of the collection.
-	#[inline]
-	pub fn par_iter(&self) -> ParValues<u64, Unit> {
-		self.0.par_values()
-	}
-
-	/// Returns mutable parallel iterator over the units of the collection.
-	#[inline]
-	pub fn par_iter_mut(&mut self) -> ParValuesMut<u64, Unit> {
-		self.0.par_values_mut()
-	}
-
-	/// Returns parallel iterator over (tag, unit) pairs of the collection.
-	#[inline]
-	pub fn par_pairs(&self) -> ParIter<u64, Unit> {
-		self.0.par_iter()
-	}
-
-	/// Returns mutable parallel iterator over (tag, unit) pairs of the collection.
-	#[inline]
-	pub fn par_pairs_mut(&mut self) -> ParIterMut<u64, Unit> {
-		self.0.par_iter_mut()
-	}
-
-	/// Returns parallel iterator over unit tags of the collection.
-	#[inline]
-	pub fn par_tags(&self) -> ParKeys<u64, Unit> {
-		self.0.par_keys()
-	}
-
-	/// Leaves only units that match given predicate and makes new collection of them.
-	///
-	/// Warning: This method will clone units in order to create a new collection
-	/// and will be evaluated initially. When applicable prefer using [`filter`]
-	/// on the iterator over units, since it's lazily evaluated and doesn't do any cloning operations.
-	///
-	/// [`filter`]: Iterator::filter
-	pub fn filter<F>(&self, f: F) -> Self
-	where
-		F: Fn(&&Unit) -> bool + Sync + Send,
-	{
-		Self(self.par_iter().filter(f).map(|u| (u.tag, u.clone())).collect())
-	}
-
-	/// Leaves only units of given types and makes a new collection of them.
-	///
-	/// Warning: This method will clone units in order to create a new collection
-	/// and will be evaluated initially. When applicable prefer using [`of_types`]
-	/// on the iterator over units, since it's lazily evaluated and doesn't do any cloning operations.
-	///
-	/// [`of_types`]: UnitsIterator::of_types
-	pub fn of_types<T: Container<UnitTypeId> + Sync>(&self, types: &T) -> Self {
-		self.filter(|u| types.contains(&u.type_id))
-	}
-
-	/// Excludes units of given types and makes a new collection of remaining units.
-	///
-	/// Warning: This method will clone units in order to create a new collection
-	/// and will be evaluated initially. When applicable prefer using [`exclude_types`]
-	/// on the iterator over units, since it's lazily evaluated and doesn't do any cloning operations.
-	///
-	/// [`exclude_types`]: UnitsIterator::exclude_types
-	pub fn exclude_types<T: Container<UnitTypeId> + Sync>(&self, types: &T) -> Self {
-		self.filter(|u| !types.contains(&u.type_id))
-	}
-
-	/// Leaves only units closer than given distance to target and makes new collection of them.
-	///
-	/// Warning: This method will clone units in order to create a new collection
-	/// and will be evaluated initially. When applicable prefer using [`closer`]
-	/// on the iterator over units, since it's lazily evaluated and doesn't do any cloning operations.
-	///
-	/// [`closer`]: crate::distance::DistanceIterator::closer
-	pub fn closer<P: Into<Point2> + Copy + Sync>(&self, distance: f32, target: P) -> Self {
-		self.filter(|u| u.is_closer(distance, target))
-	}
-	/// Leaves only units further than given distance to target and makes new collection of them.
-	///
-	/// Warning: This method will clone units in order to create a new collection
-	/// and will be evaluated initially. When applicable prefer using [`further`]
-	/// on the iterator over units, since it's lazily evaluated and doesn't do any cloning operations.
-	///
-	/// [`further`]: crate::distance::DistanceIterator::further
-	pub fn further<P: Into<Point2> + Copy + Sync>(&self, distance: f32, target: P) -> Self {
-		self.filter(|u| u.is_further(distance, target))
-	}
-
-	/// Returns closest from the collection unit to given target.
-	pub fn closest<P: Into<Point2> + Copy + Sync>(&self, target: P) -> Option<&Unit> {
-		self.min(|u| u.distance_squared(target))
-	}
-	/// Returns furthest from the collection unit to given target.
-	pub fn furthest<P: Into<Point2> + Copy + Sync>(&self, target: P) -> Option<&Unit> {
-		self.max(|u| u.distance_squared(target))
-	}
-
-	/// Returns distance from closest unit in the collection to given target.
-	pub fn closest_distance<P: Into<Point2> + Copy + Sync>(&self, target: P) -> Option<f32> {
-		self.min_value(|u| u.distance_squared(target))
-			.map(|dist| dist.sqrt())
-	}
-	/// Returns distance from furthest unit in the collection to given target.
-	pub fn furthest_distance<P: Into<Point2> + Copy + Sync>(&self, target: P) -> Option<f32> {
-		self.max_value(|u| u.distance_squared(target))
-			.map(|dist| dist.sqrt())
-	}
-
-	/// Returns squared distance from closest unit in the collection to given target.
-	pub fn closest_distance_squared<P: Into<Point2> + Copy + Sync>(&self, target: P) -> Option<f32> {
-		self.min_value(|u| u.distance_squared(target))
-	}
-	/// Returns squared distance from furthest unit in the collection to given target.
-	pub fn furthest_distance_squared<P: Into<Point2> + Copy + Sync>(&self, target: P) -> Option<f32> {
-		self.max_value(|u| u.distance_squared(target))
-	}
-
-	/// Returns sum of given unit values.
-	pub fn sum<T, F>(&self, f: F) -> T
-	where
-		T: Sum + Send,
-		F: Fn(&Unit) -> T + Send + Sync,
-	{
-		self.par_iter().map(f).sum::<T>()
-	}
-
-	/// Returns unit with minimum given predicate.
-	pub fn min<T, F>(&self, f: F) -> Option<&Unit>
-	where
-		T: PartialOrd,
-		F: Fn(&Unit) -> T + Send + Sync,
-	{
-		self.par_iter().min_by(cmp_by(f))
-	}
-	/// Returns minimum of given unit values.
-	pub fn min_value<T, F>(&self, f: F) -> Option<T>
-	where
-		T: PartialOrd + Send,
-		F: Fn(&Unit) -> T + Send + Sync,
-	{
-		self.par_iter().map(f).min_by(cmp)
-	}
-
-	/// Returns unit with maximum given predicate.
-	pub fn max<T, F>(&self, f: F) -> Option<&Unit>
-	where
-		T: PartialOrd,
-		F: Fn(&Unit) -> T + Sync + Send,
-	{
-		self.par_iter().max_by(cmp_by(f))
-	}
-	/// Returns maximum of given unit values.
-	pub fn max_value<T, F>(&self, f: F) -> Option<T>
-	where
-		T: PartialOrd + Send,
-		F: Fn(&Unit) -> T + Sync + Send,
-	{
-		self.par_iter().map(f).max_by(cmp)
-	}
-
-	/// Parallelly sorts the collection by given function.
-	pub fn par_sort<T, F>(&mut self, f: F)
-	where
-		T: PartialOrd,
-		F: Fn(&Unit) -> T + Sync + Send,
-	{
-		self.0.par_sort_by(cmp_by2(f));
-	}
-	/// Makes new collection parallelly sorted by given function.
-	/// Leaves original collection untouched.
-	pub fn par_sorted<T, F>(&self, f: F) -> Self
-	where
-		T: PartialOrd,
-		F: Fn(&Unit) -> T + Sync + Send,
-	{
-		let mut sorted = self.clone();
-		sorted.0.par_sort_by(cmp_by2(f));
-		sorted
-	}
-}
-
-#[cfg(feature = "rayon")]
-impl IntoParallelIterator for Units {
-	type Item = (u64, Unit);
-	type Iter = IntoParIter<u64, Unit>;
-
-	#[inline]
-	fn into_par_iter(self) -> Self::Iter {
-		self.0.into_par_iter()
-	}
-}
-#[cfg(feature = "rayon")]
-impl<'a> IntoParallelIterator for &'a Units {
-	type Item = (&'a u64, &'a Unit);
-	type Iter = ParIter<'a, u64, Unit>;
-
-	#[inline]
-	fn into_par_iter(self) -> Self::Iter {
-		self.0.par_iter()
-	}
-}
-#[cfg(feature = "rayon")]
-impl<'a> IntoParallelIterator for &'a mut Units {
-	type Item = (&'a u64, &'a mut Unit);
-	type Iter = ParIterMut<'a, u64, Unit>;
-
-	#[inline]
-	fn into_par_iter(self) -> Self::Iter {
-		self.0.par_iter_mut()
-	}
-}
-
-#[cfg(feature = "rayon")]
-impl ParallelExtend<Unit> for Units {
-	#[inline]
-	fn par_extend<T: IntoParallelIterator<Item = Unit>>(&mut self, par_iter: T) {
-		self.0.par_extend(par_iter.into_par_iter().map(|u| (u.tag, u)));
-	}
-}
-#[cfg(feature = "rayon")]
-impl ParallelExtend<(u64, Unit)> for Units {
-	#[inline]
-	fn par_extend<T: IntoParallelIterator<Item = (u64, Unit)>>(&mut self, par_iter: T) {
-		self.0.par_extend(par_iter);
-	}
-}
-
-#[cfg(feature = "rayon")]
-impl FromParallelIterator<Unit> for Units {
-	#[inline]
-	fn from_par_iter<I: IntoParallelIterator<Item = Unit>>(par_iter: I) -> Self {
-		Self(par_iter.into_par_iter().map(|u| (u.tag, u)).collect())
-	}
-}
-#[cfg(feature = "rayon")]
-impl FromParallelIterator<(u64, Unit)> for Units {
-	#[inline]
-	fn from_par_iter<I: IntoParallelIterator<Item = (u64, Unit)>>(par_iter: I) -> Self {
-		Self(par_iter.into_par_iter().collect())
-	}
-}
-
 /// Joins collections functionality to check if given item is present in it.
 /// Used in generics of some units methods.
 pub trait Container<T> {
@@ -979,214 +726,4 @@ impl<T: Eq + Hash, V> Container<T> for IndexMap<T, V> {
 	fn contains(&self, item: &T) -> bool {
 		self.contains_key(item)
 	}
-}
-
-use std::{borrow::Borrow, iter::Filter};
-
-/// Helper trait for iterators over units.
-pub trait UnitsIterator<'a, U: Borrow<Unit> + 'a>: Iterator<Item = U> + Sized {
-	/// Searches for unit with given tag and returns it if found.
-	fn find_tag(mut self, tag: u64) -> Option<U> {
-		self.find(|u| u.borrow().tag == tag)
-	}
-	/// Leaves only units with given tags.
-	fn find_tags<T>(self, tags: &'a T) -> Filter<Self, Box<dyn FnMut(&U) -> bool + 'a>>
-	where
-		T: Container<u64>,
-	{
-		self.filter(Box::new(move |u| tags.contains(&u.borrow().tag)))
-	}
-	/// Leaves only units of given type.
-	fn of_type(self, unit_type: UnitTypeId) -> Filter<Self, Box<dyn FnMut(&U) -> bool>> {
-		self.filter(Box::new(move |u| u.borrow().type_id == unit_type))
-	}
-	/// Excludes units of given type.
-	fn exclude_type(self, unit_type: UnitTypeId) -> Filter<Self, Box<dyn FnMut(&U) -> bool>> {
-		self.filter(Box::new(move |u| u.borrow().type_id != unit_type))
-	}
-	/// Leaves only units of given types.
-	fn of_types<T>(self, types: &'a T) -> Filter<Self, Box<dyn FnMut(&U) -> bool + 'a>>
-	where
-		T: Container<UnitTypeId>,
-	{
-		self.filter(Box::new(move |u| types.contains(&u.borrow().type_id)))
-	}
-	/// Excludes units of given types.
-	fn exclude_types<T>(self, types: &'a T) -> Filter<Self, Box<dyn FnMut(&U) -> bool + 'a>>
-	where
-		T: Container<UnitTypeId>,
-	{
-		self.filter(Box::new(move |u| !types.contains(&u.borrow().type_id)))
-	}
-	/// Leaves only non-flying units.
-	fn ground(self) -> Filter<Self, Box<dyn FnMut(&U) -> bool>> {
-		self.filter(Box::new(|u| !u.borrow().is_flying))
-	}
-	/// Leaves only flying units.
-	fn flying(self) -> Filter<Self, Box<dyn FnMut(&U) -> bool>> {
-		self.filter(Box::new(|u| u.borrow().is_flying))
-	}
-	/// Leaves only ready structures.
-	fn ready(self) -> Filter<Self, Box<dyn FnMut(&U) -> bool>> {
-		self.filter(Box::new(|u| u.borrow().is_ready()))
-	}
-	/// Leaves only structures in-progress.
-	fn not_ready(self) -> Filter<Self, Box<dyn FnMut(&U) -> bool>> {
-		self.filter(Box::new(|u| !u.borrow().is_ready()))
-	}
-	/// Leaves only units with no orders.
-	fn idle(self) -> Filter<Self, Box<dyn FnMut(&U) -> bool>> {
-		self.filter(Box::new(|u| u.borrow().is_idle()))
-	}
-	/// Leaves only units with no orders or that almost finished their orders.
-	fn almost_idle(self) -> Filter<Self, Box<dyn FnMut(&U) -> bool>> {
-		self.filter(Box::new(|u| u.borrow().is_almost_idle()))
-	}
-	/// Leaves only units with no orders.
-	/// Unlike [`idle`](Self::idle) this takes reactor on terran buildings into account.
-	fn unused(self) -> Filter<Self, Box<dyn FnMut(&U) -> bool>> {
-		self.filter(Box::new(|u| u.borrow().is_unused()))
-	}
-	/// Leaves only units with no orders or that almost finished their orders.
-	/// Unlike [`almost_idle`](Self::almost_idle) this takes reactor on terran buildings into account.
-	fn almost_unused(self) -> Filter<Self, Box<dyn FnMut(&U) -> bool>> {
-		self.filter(Box::new(|u| u.borrow().is_almost_unused()))
-	}
-	/// Leaves only units in attack range of given unit.
-	fn in_range_of(self, unit: U, gap: f32) -> Filter<Self, Box<dyn FnMut(&U) -> bool + 'a>> {
-		self.filter(Box::new(move |u| unit.borrow().in_range(u.borrow(), gap)))
-	}
-	/// Leaves only units that are close enough to attack given unit.
-	fn in_range(self, unit: U, gap: f32) -> Filter<Self, Box<dyn FnMut(&U) -> bool + 'a>> {
-		self.filter(Box::new(move |u| u.borrow().in_range(unit.borrow(), gap)))
-	}
-	/// Leaves only units in attack range of given unit.
-	/// Unlike [`in_range_of`](Self::in_range_of) this takes range upgrades into account.
-	fn in_real_range_of(self, unit: U, gap: f32) -> Filter<Self, Box<dyn FnMut(&U) -> bool + 'a>> {
-		self.filter(Box::new(move |u| unit.borrow().in_real_range(u.borrow(), gap)))
-	}
-	/// Leaves only units that are close enough to attack given unit.
-	/// Unlike [`in_range`](Self::in_range) this takes range upgrades into account.
-	fn in_real_range(self, unit: U, gap: f32) -> Filter<Self, Box<dyn FnMut(&U) -> bool + 'a>> {
-		self.filter(Box::new(move |u| u.borrow().in_real_range(unit.borrow(), gap)))
-	}
-	/// Leaves only units visible on current step.
-	fn visible(self) -> Filter<Self, Box<dyn FnMut(&U) -> bool>> {
-		self.filter(Box::new(|u| u.borrow().is_visible()))
-	}
-}
-#[cfg(feature = "rayon")]
-use rayon::iter::Filter as ParFilter;
-
-/// Helper trait for parallel iterators over units.
-#[cfg(feature = "rayon")]
-pub trait ParUnitsIterator<'a, U: Borrow<Unit> + Send + Sync + 'a>: ParallelIterator<Item = U> {
-	/// Searches for unit with given tag and returns it if found.
-	fn find_tag(self, tag: u64) -> Option<U> {
-		self.find_any(|u| u.borrow().tag == tag)
-	}
-	/// Leaves only units with given tags.
-	fn find_tags<T>(self, tags: &'a T) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync + 'a>>
-	where
-		T: Container<u64> + Sync,
-	{
-		self.filter(Box::new(move |u| tags.contains(&u.borrow().tag)))
-	}
-	/// Leaves only units of given type.
-	fn of_type(self, type_id: UnitTypeId) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync>> {
-		self.filter(Box::new(move |u| u.borrow().type_id == type_id))
-	}
-	/// Excludes units of given type.
-	fn exclude_type(self, type_id: UnitTypeId) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync>> {
-		self.filter(Box::new(move |u| u.borrow().type_id != type_id))
-	}
-	/// Leaves only units of given types.
-	fn of_types<T>(self, types: &'a T) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync + 'a>>
-	where
-		T: Container<UnitTypeId> + Sync,
-	{
-		self.filter(Box::new(move |u| types.contains(&u.borrow().type_id)))
-	}
-	/// Excludes units of given types.
-	fn exclude_types<T>(self, types: &'a T) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync + 'a>>
-	where
-		T: Container<UnitTypeId> + Sync,
-	{
-		self.filter(Box::new(move |u| !types.contains(&u.borrow().type_id)))
-	}
-	/// Leaves only non-flying units.
-	fn ground(self) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync>> {
-		self.filter(Box::new(|u| !u.borrow().is_flying))
-	}
-	/// Leaves only flying units.
-	fn flying(self) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync>> {
-		self.filter(Box::new(|u| u.borrow().is_flying))
-	}
-	/// Leaves only ready structures.
-	fn ready(self) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync>> {
-		self.filter(Box::new(|u| u.borrow().is_ready()))
-	}
-	/// Leaves only structures in-progress.
-	fn not_ready(self) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync>> {
-		self.filter(Box::new(|u| !u.borrow().is_ready()))
-	}
-	/// Leaves only units with no orders.
-	fn idle(self) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync>> {
-		self.filter(Box::new(|u| u.borrow().is_idle()))
-	}
-	/// Leaves only units with no orders or that almost finished their orders.
-	fn almost_idle(self) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync>> {
-		self.filter(Box::new(|u| u.borrow().is_almost_idle()))
-	}
-	/// Leaves only units with no orders.
-	/// Unlike [`idle`](Self::idle) this takes reactor on terran buildings into account.
-	fn unused(self) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync>> {
-		self.filter(Box::new(|u| u.borrow().is_unused()))
-	}
-	/// Leaves only units with no orders or that almost finished their orders.
-	/// Unlike [`almost_idle`](Self::almost_idle) this takes reactor on terran buildings into account.
-	fn almost_unused(self) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync>> {
-		self.filter(Box::new(|u| u.borrow().is_almost_unused()))
-	}
-	/// Leaves only units in attack range of given unit.
-	fn in_range_of(self, unit: U, gap: f32) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync + 'a>> {
-		self.filter(Box::new(move |u| unit.borrow().in_range(u.borrow(), gap)))
-	}
-	/// Leaves only units that are close enough to attack given unit.
-	fn in_range(self, unit: U, gap: f32) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync + 'a>> {
-		self.filter(Box::new(move |u| u.borrow().in_range(unit.borrow(), gap)))
-	}
-	/// Leaves only units in attack range of given unit.
-	/// Unlike [`in_range_of`](Self::in_range_of) this takes range upgrades into account.
-	fn in_real_range_of(
-		self,
-		unit: U,
-		gap: f32,
-	) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync + 'a>> {
-		self.filter(Box::new(move |u| unit.borrow().in_real_range(u.borrow(), gap)))
-	}
-	/// Leaves only units that are close enough to attack given unit.
-	/// Unlike [`in_range`](Self::in_range) this takes range upgrades into account.
-	fn in_real_range(self, unit: U, gap: f32) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync + 'a>> {
-		self.filter(Box::new(move |u| u.borrow().in_real_range(unit.borrow(), gap)))
-	}
-	/// Leaves only units visible on current step.
-	fn visible(self) -> ParFilter<Self, Box<dyn Fn(&U) -> bool + Send + Sync>> {
-		self.filter(Box::new(|u| u.borrow().is_visible()))
-	}
-}
-
-impl<'a, I, U> UnitsIterator<'a, U> for I
-where
-	I: Iterator<Item = U> + Sized,
-	U: Borrow<Unit> + 'a,
-{
-}
-
-#[cfg(feature = "rayon")]
-impl<'a, I, U> ParUnitsIterator<'a, U> for I
-where
-	I: ParallelIterator<Item = U>,
-	U: Borrow<Unit> + Send + Sync + 'a,
-{
 }

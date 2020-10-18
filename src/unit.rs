@@ -1692,6 +1692,12 @@ impl From<&Unit> for Point2 {
 		u.position
 	}
 }
+impl From<Unit> for Point2 {
+	#[inline]
+	fn from(u: Unit) -> Self {
+		u.position
+	}
+}
 
 impl Unit {
 	pub(crate) fn from_proto(data: SharedUnitData, visibility: &VisibilityMap, u: &ProtoUnit) -> Self {
@@ -1896,6 +1902,11 @@ pub trait Radius {
 }
 
 impl Radius for &Unit {
+	fn radius(&self) -> f32 {
+		self.radius
+	}
+}
+impl Radius for Unit {
 	fn radius(&self) -> f32 {
 		self.radius
 	}

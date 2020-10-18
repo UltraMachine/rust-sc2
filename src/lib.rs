@@ -334,7 +334,9 @@ extern crate log;
 /// Prefered usage: `use::rust_sc2::prelude::*;`.
 pub mod prelude {
 	#[cfg(feature = "rayon")]
-	pub use crate::units::ParUnitsIterator;
+	pub use crate::distance::rayon::{ParCenter, ParDistanceIterator, ParDistanceSlice};
+	#[cfg(feature = "rayon")]
+	pub use crate::units::rayon::ParUnitsIterator;
 	pub use crate::{
 		action::Target,
 		bot::PlacementOptions,
@@ -343,12 +345,12 @@ pub mod prelude {
 			SC2Result,
 		},
 		constants::{ALL_PRODUCERS, PRODUCERS, RESEARCHERS, TECH_REQUIREMENTS},
-		distance::*,
+		distance::{Center, Distance, DistanceIterator, DistanceSlice},
 		geometry::Point2,
 		ids::*,
 		player::{AIBuild, Computer, Difficulty, GameResult, Race},
 		unit::Unit,
-		units::{Units, UnitsIterator},
+		units::{iter::UnitsIterator, Units},
 		Event, Player, PlayerSettings,
 	};
 	#[doc(no_inline)]

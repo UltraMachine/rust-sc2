@@ -1332,7 +1332,7 @@ impl Bot {
 			.into_iter()
 			.zip(results.into_iter())
 			.find(|(_, res)| *res == ActionResult::Success)
-			.map(|(geyser, _)| geyser.1)
+			.map(|(geyser, _)| geyser)
 	}
 
 	/// Returns next possible location from [`expansions`](Self::expansions) closest to bot's start location
