@@ -234,8 +234,8 @@ impl Unit {
 		}
 	}
 	/// Name of the unit
-	pub fn name(&self) -> String {
-		self.type_data().map_or(String::new(), |data| data.name.clone())
+	pub fn name(&self) -> &str {
+		self.type_data().map_or("", |data| &data.name)
 	}
 	/// Checks if unit is worker.
 	pub fn is_worker(&self) -> bool {
