@@ -312,14 +312,14 @@ impl Unit {
 	/// Abilities available for unit to use.
 	///
 	/// Ability won't be avaliable if it's on cooldown, unit
-	/// is out of energy or bot hasn't got enough resources.
+	/// is out of energy or bot doesn't have enough resources.
 	pub fn abilities(&self) -> Option<FxHashSet<AbilityId>> {
 		self.data.abilities_units.lock_read().get(&self.tag).cloned()
 	}
 	/// Checks if ability is available for unit.
 	///
 	/// Ability won't be avaliable if it's on cooldown, unit
-	/// is out of energy or bot hasn't got enough resources.
+	/// is out of energy or bot doesn't have enough resources.
 	pub fn has_ability(&self, ability: AbilityId) -> bool {
 		self.data
 			.abilities_units
@@ -1050,12 +1050,12 @@ impl Unit {
 		*/
 
 		let (upgrades, target_upgrades) = {
-			let my_upgrade = self.data.upgrades.lock_read();
+			let my_upgrades = self.data.upgrades.lock_read();
 			let enemy_upgrades = self.data.enemy_upgrades.lock_read();
 			if self.is_mine() {
-				(my_upgrade, enemy_upgrades)
+				(my_upgrades, enemy_upgrades)
 			} else {
-				(enemy_upgrades, my_upgrade)
+				(enemy_upgrades, my_upgrades)
 			}
 		};
 

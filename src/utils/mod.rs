@@ -64,12 +64,12 @@ where
 /// - `data`: iterable collection of points (the same data should be passed in [`dbscan`]).
 /// - `distance`: function that should returns distance between 2 given points.
 /// - `epsilon`: maximum distance between neighbors.
-pub fn range_query<'a, DT, P, D, F>(data: DT, distance: F, epsilon: D) -> impl Fn(&P) -> FxIndexSet<P> + 'a
+pub fn range_query<'a, DT, P, D, F>(data: DT, distance: F, epsilon: D) -> impl Fn(&P) -> FxIndexSet<P>
 where
-	DT: IntoIterator<Item = &'a P> + Clone + 'a,
+	DT: IntoIterator<Item = &'a P> + Clone,
 	P: Eq + Hash + Clone + 'a,
-	D: PartialOrd + 'a,
-	F: Fn(&P, &P) -> D + 'a,
+	D: PartialOrd,
+	F: Fn(&P, &P) -> D,
 {
 	move |q: &P| {
 		data.clone()
