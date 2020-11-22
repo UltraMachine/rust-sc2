@@ -4,7 +4,7 @@ use crate::{
 	action::{Action, ActionResult, Commander, Target},
 	api::API,
 	client::SC2Result,
-	constants::{RaceValues, INHIBITOR_IDS, RACE_VALUES, TECH_ALIAS, UNIT_ALIAS},
+	consts::{RaceValues, INHIBITOR_IDS, RACE_VALUES, TECH_ALIAS, UNIT_ALIAS},
 	debug::{DebugCommand, Debugger},
 	distance::*,
 	game_data::{Cost, GameData},

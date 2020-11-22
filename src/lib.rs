@@ -344,7 +344,7 @@ pub mod prelude {
 			run_ladder_game, run_vs_computer, run_vs_human, LaunchOptions, RunnerMulti, RunnerSingle,
 			SC2Result,
 		},
-		constants::{ALL_PRODUCERS, PRODUCERS, RESEARCHERS, TECH_REQUIREMENTS},
+		consts::{ALL_PRODUCERS, PRODUCERS, RESEARCHERS, TECH_REQUIREMENTS},
 		distance::{Center, Distance, DistanceIterator, DistanceSlice},
 		geometry::Point2,
 		ids::*,
@@ -363,7 +363,7 @@ pub mod action;
 pub mod api;
 pub mod bot;
 pub mod client;
-pub mod constants;
+pub mod consts;
 pub mod debug;
 pub mod distance;
 pub mod game_data;

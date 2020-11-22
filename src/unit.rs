@@ -4,7 +4,7 @@
 use crate::{
 	action::{Commander, Target},
 	bot::{Locked, Reader, Rs, Rw},
-	constants::{
+	consts::{
 		RaceValues, DAMAGE_BONUS_PER_UPGRADE, FRAMES_PER_SECOND, MISSED_WEAPONS, OFF_CREEP_SPEED_UPGRADES,
 		SPEED_BUFFS, SPEED_ON_CREEP, SPEED_UPGRADES, WARPGATE_ABILITIES,
 	},
