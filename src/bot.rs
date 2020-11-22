@@ -26,13 +26,15 @@ use sc2_proto::{
 	query::{RequestQueryBuildingPlacement, RequestQueryPathing},
 	sc2api::Request,
 };
-use std::{panic, process::Child};
+use std::process::Child;
 
 #[cfg(feature = "enemies_cache")]
 use crate::{game_state::Effect, ids::EffectId, unit::DisplayType};
 
 #[cfg(feature = "rayon")]
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+#[cfg(feature = "rayon")]
+use std::sync::Arc;
 #[cfg(not(feature = "rayon"))]
 use std::{
 	cell::{Ref, RefCell, RefMut},
@@ -72,7 +74,7 @@ impl<T> Locked<T> for Rl<T> {
 	fn lock_read(&self) -> Reader<T> {
 		#[cfg(feature = "rayon")]
 		{
-			self.read().unwrap()
+			self.read()
 		}
 		#[cfg(not(feature = "rayon"))]
 		{
@@ -82,7 +84,7 @@ impl<T> Locked<T> for Rl<T> {
 	fn lock_write(&self) -> Writer<T> {
 		#[cfg(feature = "rayon")]
 		{
-			self.write().unwrap()
+			self.write()
 		}
 		#[cfg(not(feature = "rayon"))]
 		{

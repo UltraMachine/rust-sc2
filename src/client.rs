@@ -19,7 +19,6 @@ use std::{
 	io::Write,
 	net::TcpListener,
 	ops::{Deref, DerefMut},
-	panic,
 	process::{Child, Command},
 };
 use tungstenite::{client::AutoStream, connect, WebSocket};
