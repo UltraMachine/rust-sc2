@@ -171,7 +171,7 @@ where
 	raw.dead_units = dead_units;
 
 	// Upgrades
-	*raw.upgrades.lock_write() = raw_player
+	*raw.upgrades.write_lock() = raw_player
 		.get_upgrade_ids()
 		.iter()
 		.map(|u| UpgradeId::from_u32(*u).unwrap())
@@ -180,7 +180,7 @@ where
 	// Map
 	let map_state = res_raw.get_map_state();
 	// Creep
-	*raw.creep.lock_write() = PixelMap::from_proto(map_state.get_creep());
+	*raw.creep.write_lock() = PixelMap::from_proto(map_state.get_creep());
 
 	// Available abilities
 	let mut req = Request::new();
@@ -194,7 +194,7 @@ where
 	});
 
 	let res = bot.api().send(req)?;
-	*bot.abilities_units.lock_write() = res
+	*bot.abilities_units.write_lock() = res
 		.get_query()
 		.get_abilities()
 		.iter()

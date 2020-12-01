@@ -37,10 +37,14 @@ use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 #[cfg(feature = "rayon")]
-use std::sync::Arc;
+use std::sync::{
+	atomic::{AtomicBool, AtomicU32, Ordering},
+	Arc,
+};
+
 #[cfg(not(feature = "rayon"))]
 use std::{
-	cell::{Ref, RefCell, RefMut},
+	cell::{Cell, Ref, RefCell, RefMut},
 	rc::Rc,
 };
 
@@ -70,11 +74,11 @@ pub(crate) type Writer<'a, T> = RwLockWriteGuard<'a, T>;
 pub(crate) type Writer<'a, T> = RefMut<'a, T>;
 
 pub(crate) trait Locked<T> {
-	fn lock_read(&self) -> Reader<T>;
-	fn lock_write(&self) -> Writer<T>;
+	fn read_lock(&self) -> Reader<T>;
+	fn write_lock(&self) -> Writer<T>;
 }
 impl<T> Locked<T> for Rl<T> {
-	fn lock_read(&self) -> Reader<T> {
+	fn read_lock(&self) -> Reader<T> {
 		#[cfg(feature = "rayon")]
 		{
 			#[cfg(feature = "parking_lot")]
@@ -91,7 +95,7 @@ impl<T> Locked<T> for Rl<T> {
 			self.borrow()
 		}
 	}
-	fn lock_write(&self) -> Writer<T> {
+	fn write_lock(&self) -> Writer<T> {
 		#[cfg(feature = "rayon")]
 		{
 			#[cfg(feature = "parking_lot")]
@@ -107,6 +111,59 @@ impl<T> Locked<T> for Rl<T> {
 		{
 			self.borrow_mut()
 		}
+	}
+}
+
+pub(crate) trait LockOwned<T> {
+	fn get_locked(&self) -> T;
+	fn set_locked(&self, val: T);
+}
+
+#[cfg(feature = "rayon")]
+pub(crate) type LockBool = AtomicBool;
+#[cfg(not(feature = "rayon"))]
+pub(crate) type LockBool = Cell<bool>;
+
+impl LockOwned<bool> for LockBool {
+	fn get_locked(&self) -> bool {
+		#[cfg(feature = "rayon")]
+		{
+			self.load(Ordering::Relaxed)
+		}
+		#[cfg(not(feature = "rayon"))]
+		{
+			self.get()
+		}
+	}
+	fn set_locked(&self, val: bool) {
+		#[cfg(feature = "rayon")]
+		self.store(val, Ordering::Relaxed);
+		#[cfg(not(feature = "rayon"))]
+		self.set(val);
+	}
+}
+
+#[cfg(feature = "rayon")]
+pub(crate) type LockU32 = AtomicU32;
+#[cfg(not(feature = "rayon"))]
+pub(crate) type LockU32 = Cell<u32>;
+
+impl LockOwned<u32> for LockU32 {
+	fn get_locked(&self) -> u32 {
+		#[cfg(feature = "rayon")]
+		{
+			self.load(Ordering::Relaxed)
+		}
+		#[cfg(not(feature = "rayon"))]
+		{
+			self.get()
+		}
+	}
+	fn set_locked(&self, val: u32) {
+		#[cfg(feature = "rayon")]
+		self.store(val, Ordering::Relaxed);
+		#[cfg(not(feature = "rayon"))]
+		self.set(val);
 	}
 }
 
@@ -280,7 +337,8 @@ impl Default for Completion {
 pub struct Bot {
 	pub(crate) process: Option<Child>,
 	pub(crate) api: Option<API>,
-	pub(crate) game_step: Rw<u32>,
+	pub(crate) game_step: Rs<LockU32>,
+	pub(crate) allow_spam: Rs<LockBool>,
 	#[doc(hidden)]
 	pub disable_fog: bool,
 	/// Actual race of your bot.
@@ -364,12 +422,20 @@ impl Bot {
 	/// Must be bigger than `0`.
 	///
 	/// [`on_step`]: crate::Player::on_step
-	pub fn set_game_step(&mut self, val: u32) {
-		*self.game_step.lock_write() = val;
+	pub fn set_game_step(&self, val: u32) {
+		self.game_step.set_locked(val);
 	}
 	/// Returns current game step.
 	pub fn game_step(&self) -> u32 {
-		*self.game_step.lock_read()
+		self.game_step.get_locked()
+	}
+	/// Sets to `true`, allows units to forcibly execute commands, ignoring spam filter.
+	pub fn set_allow_spam(&self, val: bool) {
+		self.allow_spam.set_locked(val);
+	}
+	/// Returns `true` if units allowed to spam commands, `false` otherwise.
+	pub fn allow_spam(&self) -> bool {
+		self.allow_spam.get_locked()
 	}
 	/// Constructs new [`CountOptions`], used to count units fast and easy.
 	///
@@ -411,7 +477,7 @@ impl Bot {
 	pub(crate) fn get_actions(&mut self) -> &[Action] {
 		let actions = &mut self.actions;
 
-		let mut commander = self.commander.lock_write();
+		let mut commander = self.commander.write_lock();
 
 		if !commander.commands.is_empty() {
 			actions.extend(
@@ -532,15 +598,15 @@ impl Bot {
 	}
 	/// Checks if given upgrade is complete.
 	pub fn has_upgrade(&self, upgrade: UpgradeId) -> bool {
-		self.state.observation.raw.upgrades.lock_read().contains(&upgrade)
+		self.state.observation.raw.upgrades.read_lock().contains(&upgrade)
 	}
 	/// Checks if predicted opponent's upgrades contains given upgrade.
 	pub fn enemy_has_upgrade(&self, upgrade: UpgradeId) -> bool {
-		self.enemy_upgrades.lock_read().contains(&upgrade)
+		self.enemy_upgrades.read_lock().contains(&upgrade)
 	}
 	/// Returns mutable set of predicted opponent's upgrades.
 	pub fn enemy_upgrades(&self) -> Writer<FxHashSet<UpgradeId>> {
-		self.enemy_upgrades.lock_write()
+		self.enemy_upgrades.write_lock()
 	}
 	/// Checks if upgrade is in progress.
 	pub fn is_ordered_upgrade(&self, upgrade: UpgradeId) -> bool {
@@ -623,7 +689,7 @@ impl Bot {
 	}
 	/// Checks if given position has zerg's creep.
 	pub fn has_creep<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
-		self.state.observation.raw.creep.lock_read()[pos.into()].is_empty()
+		self.state.observation.raw.creep.read_lock()[pos.into()].is_empty()
 	}
 	pub(crate) fn init_data_for_unit(&mut self) {
 		self.data_for_unit = Rs::new(DataForUnit {
@@ -639,6 +705,7 @@ impl Bot {
 			upgrades: Rs::clone(&self.state.observation.raw.upgrades),
 			creep: Rs::clone(&self.state.observation.raw.creep),
 			game_step: Rs::clone(&self.game_step),
+			allow_spam: Rs::clone(&self.allow_spam),
 		});
 	}
 	pub(crate) fn prepare_start(&mut self) {
@@ -863,8 +930,8 @@ impl Bot {
 		self.current_units = current_units;
 		self.orders = orders;
 	}
-	pub(crate) fn update_units(&mut self, all_units: &Units) {
-		*self.last_units_health.lock_write() = self
+	pub(crate) fn update_units(&mut self, all_units: Units) {
+		*self.last_units_health.write_lock() = self
 			.units
 			.all
 			.iter()
@@ -873,9 +940,9 @@ impl Bot {
 
 		self.units.clear();
 
-		let mut techlab_tags = self.techlab_tags.lock_write();
-		let mut reactor_tags = self.reactor_tags.lock_write();
-		let mut max_cooldowns = self.max_cooldowns.lock_write();
+		let mut techlab_tags = self.techlab_tags.write_lock();
+		let mut reactor_tags = self.reactor_tags.write_lock();
+		let mut max_cooldowns = self.max_cooldowns.write_lock();
 		let mut saved_hallucinations = FxHashSet::default();
 
 		techlab_tags.clear();
@@ -1547,12 +1614,13 @@ impl Bot {
 impl Default for Bot {
 	fn default() -> Self {
 		Self {
-			game_step: Rs::new(Rl::new(1)),
+			game_step: Rs::new(LockU32::new(1)),
 			disable_fog: false,
 			race: Race::Random,
 			enemy_race: Race::Random,
 			process: None,
 			api: None,
+			allow_spam: Default::default(),
 			player_id: Default::default(),
 			enemy_player_id: Default::default(),
 			opponent_id: Default::default(),

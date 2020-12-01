@@ -42,9 +42,9 @@ where
 			let mut seed_set = neighbors;
 			while let Some(q) = seed_set.pop() {
 				if noise.remove(&q) {
-					clusters.get_mut(c).unwrap().push(q.clone());
+					clusters[c].push(q.clone());
 				} else if !solved.contains(&q) {
-					clusters.get_mut(c).unwrap().push(q.clone());
+					clusters[c].push(q.clone());
 					solved.insert(q.clone());
 					let neighbors = range_query(&q);
 					if neighbors.len() >= min_points {

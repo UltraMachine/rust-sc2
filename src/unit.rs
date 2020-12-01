@@ -3,7 +3,7 @@
 
 use crate::{
 	action::{Commander, Target},
-	bot::{Locked, Reader, Rs, Rw},
+	bot::{LockBool, LockOwned, LockU32, Locked, Reader, Rs, Rw},
 	consts::{
 		RaceValues, DAMAGE_BONUS_PER_UPGRADE, FRAMES_PER_SECOND, MISSED_WEAPONS, OFF_CREEP_SPEED_UPGRADES,
 		SPEED_BUFFS, SPEED_ON_CREEP, SPEED_UPGRADES, WARPGATE_ABILITIES,
@@ -38,7 +38,8 @@ pub(crate) struct DataForUnit {
 	pub upgrades: Rw<FxHashSet<UpgradeId>>,
 	pub enemy_upgrades: Rw<FxHashSet<UpgradeId>>,
 	pub creep: Rw<PixelMap>,
-	pub game_step: Rw<u32>,
+	pub game_step: Rs<LockU32>,
+	pub allow_spam: Rs<LockBool>,
 }
 
 /// Weapon target used in [`calculate_weapon_stats`](Unit::calculate_weapon_stats).
@@ -56,8 +57,6 @@ pub(crate) type SharedUnitData = Rs<DataForUnit>;
 #[derive(Clone)]
 pub struct Unit {
 	data: SharedUnitData,
-	/// Allows unit to forcibly execute commands, ignoring spam filter.
-	pub allow_spam: bool,
 
 	/////////////////////////////////////////////////
 	// Fields are populated based on type/alliance //
@@ -228,9 +227,9 @@ impl Unit {
 	}
 	fn upgrades(&self) -> Reader<FxHashSet<UpgradeId>> {
 		if self.is_mine() {
-			self.data.upgrades.lock_read()
+			self.data.upgrades.read_lock()
 		} else {
-			self.data.enemy_upgrades.lock_read()
+			self.data.enemy_upgrades.read_lock()
 		}
 	}
 	/// Name of the unit
@@ -285,17 +284,17 @@ impl Unit {
 	}
 	/// Terran building's addon is techlab if any.
 	pub fn has_techlab(&self) -> bool {
-		let techlab_tags = self.data.techlab_tags.lock_read();
+		let techlab_tags = self.data.techlab_tags.read_lock();
 		self.addon_tag.map_or(false, |tag| techlab_tags.contains(&tag))
 	}
 	/// Terran building's addon is reactor if any.
 	pub fn has_reactor(&self) -> bool {
-		let reactor_tags = self.data.reactor_tags.lock_read();
+		let reactor_tags = self.data.reactor_tags.read_lock();
 		self.addon_tag.map_or(false, |tag| reactor_tags.contains(&tag))
 	}
 	/// Unit was attacked on last step.
 	pub fn is_attacked(&self) -> bool {
-		self.hits() < self.data.last_units_health.lock_read().get(&self.tag).copied()
+		self.hits() < self.data.last_units_health.read_lock().get(&self.tag).copied()
 	}
 	/// The damage was taken by unit if it was attacked, otherwise it's `0`.
 	pub fn damage_taken(&self) -> u32 {
@@ -303,7 +302,7 @@ impl Unit {
 			Some(hits) => hits,
 			None => return 0,
 		};
-		let last_hits = match self.data.last_units_health.lock_read().get(&self.tag).copied() {
+		let last_hits = match self.data.last_units_health.read_lock().get(&self.tag).copied() {
 			Some(hits) => hits,
 			None => return 0,
 		};
@@ -314,7 +313,7 @@ impl Unit {
 	/// Ability won't be avaliable if it's on cooldown, unit
 	/// is out of energy or bot doesn't have enough resources.
 	pub fn abilities(&self) -> Option<FxHashSet<AbilityId>> {
-		self.data.abilities_units.lock_read().get(&self.tag).cloned()
+		self.data.abilities_units.read_lock().get(&self.tag).cloned()
 	}
 	/// Checks if ability is available for unit.
 	///
@@ -323,7 +322,7 @@ impl Unit {
 	pub fn has_ability(&self, ability: AbilityId) -> bool {
 		self.data
 			.abilities_units
-			.lock_read()
+			.read_lock()
 			.get(&self.tag)
 			.map_or(false, |abilities| abilities.contains(&ability))
 	}
@@ -542,7 +541,7 @@ impl Unit {
 
 		// ---- Creep ----
 		// On creep
-		if self.data.creep.lock_read()[self.position].is_set() {
+		if self.data.creep.read_lock()[self.position].is_set() {
 			if let Some(increase) = SPEED_ON_CREEP.get(&unit_type) {
 				speed *= increase;
 			}
@@ -560,7 +559,7 @@ impl Unit {
 	}
 	/// Distance unit can travel per one step.
 	pub fn distance_per_step(&self) -> f32 {
-		self.real_speed() / FRAMES_PER_SECOND * *self.data.game_step.lock_read() as f32
+		self.real_speed() / FRAMES_PER_SECOND * self.data.game_step.get_locked() as f32
 	}
 	/// Distance unit can travel until weapons be ready to fire.
 	pub fn distance_to_weapon_ready(&self) -> f32 {
@@ -768,7 +767,7 @@ impl Unit {
 	}
 	/// Returns max cooldown in frames for unit's weapon.
 	pub fn max_cooldown(&self) -> Option<f32> {
-		self.data.max_cooldowns.lock_read().get(&self.type_id).copied()
+		self.data.max_cooldowns.read_lock().get(&self.type_id).copied()
 	}
 	/// Returns weapon cooldown percentage (current cooldown divided by max cooldown).
 	/// Value in range from `0` to `1`.
@@ -1050,8 +1049,8 @@ impl Unit {
 		*/
 
 		let (upgrades, target_upgrades) = {
-			let my_upgrades = self.data.upgrades.lock_read();
-			let enemy_upgrades = self.data.enemy_upgrades.lock_read();
+			let my_upgrades = self.data.upgrades.read_lock();
+			let enemy_upgrades = self.data.enemy_upgrades.read_lock();
 			if self.is_mine() {
 				(my_upgrades, enemy_upgrades)
 			} else {
@@ -1550,7 +1549,7 @@ impl Unit {
 	pub fn toggle_autocast(&self, ability: AbilityId) {
 		self.data
 			.commander
-			.lock_write()
+			.write_lock()
 			.autocast
 			.entry(ability)
 			.or_default()
@@ -1558,7 +1557,7 @@ impl Unit {
 	}
 	/// Orders unit to execute given command.
 	pub fn command(&self, ability: AbilityId, target: Target, queue: bool) {
-		if !(queue || self.allow_spam || self.is_idle()) {
+		if !(queue || self.is_idle() || self.data.allow_spam.get_locked()) {
 			let last_order = &self.orders[0];
 			if ability == last_order.ability && target == last_order.target {
 				return;
@@ -1567,7 +1566,7 @@ impl Unit {
 
 		self.data
 			.commander
-			.lock_write()
+			.write_lock()
 			.commands
 			.entry((ability, target, queue))
 			.or_default()
@@ -1710,7 +1709,6 @@ impl Unit {
 		let type_id = UnitTypeId::from_u32(u.get_unit_type()).unwrap();
 		Self {
 			data,
-			allow_spam: false,
 			display_type: match DisplayType::from_proto(u.get_display_type()) {
 				DisplayType::Visible => {
 					if visibility[position].is_visible() {

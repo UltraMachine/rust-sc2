@@ -5,7 +5,7 @@
 
 use crate::{
 	api::API,
-	bot::{Bot, Locked, Rs},
+	bot::{Bot, LockOwned, Rs},
 	game_state::update_state,
 	paths::*,
 	player::Computer,
@@ -622,7 +622,7 @@ where
 	}
 	if !realtime {
 		let mut req = Request::new();
-		req.mut_step().set_count(*bot.game_step.lock_read());
+		req.mut_step().set_count(bot.game_step.get_locked());
 		bot.api().send_request(req)?;
 	}
 	Ok(())
@@ -679,7 +679,7 @@ where
 	}
 	if !realtime {
 		let mut req = Request::new();
-		req.mut_step().set_count(*bot.game_step.lock_read());
+		req.mut_step().set_count(bot.game_step.get_locked());
 		bot.api().send_request(req)?;
 	}
 	Ok(true)
