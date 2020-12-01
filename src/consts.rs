@@ -14,6 +14,17 @@ pub const GAME_SPEED: f32 = 1.4;
 /// Frames per second, calculated by `16 (default frames per second) * 1.4 (game speed)`.
 pub const FRAMES_PER_SECOND: f32 = 22.4;
 
+/// Units under effect of raven's anit-armor missile have this buff.
+/// It reduces armor and shield armor by 3 (armor can be negative at this point).
+#[cfg(windows)]
+pub const ANTI_ARMOR_BUFF: BuffId = BuffId::RavenShredderMissileArmorReductionUISubtruct;
+#[cfg(unix)]
+pub const ANTI_ARMOR_BUFF: BuffId = BuffId::RavenShredderMissileArmorReduction;
+/// Unit targeted by raven's anit-armor missile have this buff.
+pub const ANTI_ARMOR_TARGET: BuffId = BuffId::RavenShredderMissileTint;
+/// Units disabled by raven's interference matrix have this buff.
+pub const INTERFERENCE_MATRIX_BUFF: BuffId = BuffId::RavenScramblerMissile;
+
 #[cfg(windows)]
 pub(crate) const INHIBITOR_IDS: [UnitTypeId; 6] = [
 	UnitTypeId::InhibitorZoneSmall,
