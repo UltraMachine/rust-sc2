@@ -31,8 +31,11 @@ use std::process::Child;
 #[cfg(feature = "enemies_cache")]
 use crate::{game_state::Effect, ids::EffectId, unit::DisplayType};
 
-#[cfg(feature = "rayon")]
+#[cfg(feature = "parking_lot")]
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+#[cfg(not(feature = "parking_lot"))]
+use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+
 #[cfg(feature = "rayon")]
 use std::sync::Arc;
 #[cfg(not(feature = "rayon"))]
@@ -74,7 +77,14 @@ impl<T> Locked<T> for Rl<T> {
 	fn lock_read(&self) -> Reader<T> {
 		#[cfg(feature = "rayon")]
 		{
-			self.read()
+			#[cfg(feature = "parking_lot")]
+			{
+				self.read()
+			}
+			#[cfg(not(feature = "parking_lot"))]
+			{
+				self.read().unwrap()
+			}
 		}
 		#[cfg(not(feature = "rayon"))]
 		{
@@ -84,7 +94,14 @@ impl<T> Locked<T> for Rl<T> {
 	fn lock_write(&self) -> Writer<T> {
 		#[cfg(feature = "rayon")]
 		{
-			self.write()
+			#[cfg(feature = "parking_lot")]
+			{
+				self.write()
+			}
+			#[cfg(not(feature = "parking_lot"))]
+			{
+				self.write().unwrap()
+			}
 		}
 		#[cfg(not(feature = "rayon"))]
 		{
