@@ -219,43 +219,59 @@ where
 		.collect::<Units>();
 
 	// Updating units
-	bot.update_units(&units);
+	bot.update_units(units);
 
 	// Events
-	let mut enemy_is_random = bot.enemy_race.is_random();
-	for u in units.iter() {
-		if u.is_mine() {
-			let tag = u.tag;
-
-			if !bot.owned_tags.contains(&tag) {
-				bot.owned_tags.insert(tag);
-				if u.is_structure() {
-					if !(u.is_placeholder() || u.type_id == UnitTypeId::KD8Charge) {
-						if u.is_ready() {
-							bot.on_event(Event::ConstructionComplete(tag))?;
-						} else {
-							bot.on_event(Event::ConstructionStarted(tag))?;
-							bot.under_construction.insert(tag);
-						}
+	let mut events = vec![];
+	let mut owned_tags = vec![];
+	let mut under_construction = vec![];
+	let mut construction_complete = vec![];
+	for (tag, u) in bot.units.my.all.pairs() {
+		if !bot.owned_tags.contains(tag) {
+			owned_tags.push(*tag);
+			if u.is_structure() {
+				if !(u.is_placeholder() || u.type_id == UnitTypeId::KD8Charge) {
+					if u.is_ready() {
+						events.push(Event::ConstructionComplete(*tag));
+					} else {
+						events.push(Event::ConstructionStarted(*tag));
+						under_construction.push(*tag);
 					}
-				} else {
-					bot.on_event(Event::UnitCreated(tag))?;
 				}
-			} else if bot.under_construction.contains(&tag) && u.is_ready() {
-				bot.under_construction.remove(&tag);
-				bot.on_event(Event::ConstructionComplete(tag))?;
+			} else {
+				events.push(Event::UnitCreated(*tag));
 			}
-		} else if enemy_is_random && u.is_enemy() {
-			let race = u.race();
-
-			bot.on_event(Event::RandomRaceDetected(race))?;
-			bot.enemy_race = race;
-			enemy_is_random = false;
+		} else if bot.under_construction.contains(tag) && u.is_ready() {
+			construction_complete.push(*tag);
+			events.push(Event::ConstructionComplete(*tag));
 		}
 	}
+	for e in events {
+		bot.on_event(e)?;
+	}
+	for tag in owned_tags {
+		bot.owned_tags.insert(tag);
+	}
+	for tag in under_construction {
+		bot.under_construction.insert(tag);
+	}
+	for tag in construction_complete {
+		bot.under_construction.remove(&tag);
+	}
 
-	// Set units
-	bot.state.observation.raw.units = units;
+	if bot.enemy_race.is_random() {
+		if let Some(race) = bot
+			.units
+			.enemy
+			.all
+			.iter()
+			.map(|u| u.race())
+			.find(|r| !r.is_random())
+		{
+			bot.on_event(Event::RandomRaceDetected(race))?;
+			bot.enemy_race = race;
+		}
+	}
 
 	// Set visiblity
 	bot.state.observation.raw.visibility = visibility;
@@ -297,8 +313,6 @@ pub struct RawData {
 	pub psionic_matrix: Vec<PsionicMatrix>,
 	/// Current camera position
 	pub camera: Point2,
-	/// All current units.
-	pub units: Units,
 	/// Bot's ready upgrades.
 	pub upgrades: Rw<FxHashSet<UpgradeId>>,
 	/// Bot's visibility map.

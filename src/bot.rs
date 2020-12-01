@@ -4,7 +4,7 @@ use crate::{
 	action::{Action, ActionResult, Commander, Target},
 	api::API,
 	client::SC2Result,
-	consts::{RaceValues, INHIBITOR_IDS, RACE_VALUES, TECH_ALIAS, UNIT_ALIAS},
+	consts::{RaceValues, BURROWED_IDS, INHIBITOR_IDS, RACE_VALUES, TECH_ALIAS, UNIT_ALIAS},
 	debug::{DebugCommand, Debugger},
 	distance::*,
 	game_data::{Cost, GameData},
@@ -14,7 +14,7 @@ use crate::{
 	ids::{AbilityId, UnitTypeId, UpgradeId},
 	player::Race,
 	ramp::{Ramp, Ramps},
-	unit::{DataForUnit, SharedUnitData, Unit},
+	unit::{CloakState, DataForUnit, SharedUnitData, Unit},
 	units::{AllUnits, Units},
 	utils::{dbscan, range_query},
 	FromProto, IntoProto,
@@ -1097,7 +1097,7 @@ impl Bot {
 				_ => {}
 			}
 		});
-		units.all = all_units.clone();
+		units.all = all_units;
 
 		let enemies = &mut self.units.enemy;
 		let mark_hallucination = |u: u64, us: &mut Units| {
@@ -1111,6 +1111,26 @@ impl Bot {
 			mark_hallucination(u, &mut enemies.workers);
 		});
 		self.saved_hallucinations.extend(saved_hallucinations);
+
+		fn is_invisible(u: &Unit, detectors: &Units, scans: &[Effect], gap: f32) -> bool {
+			let additional = u.radius + gap;
+
+			for d in detectors.iter() {
+				if u.is_closer(additional + d.radius + d.detect_range, d) {
+					return false;
+				}
+			}
+
+			for scan in scans {
+				for p in &scan.positions {
+					if u.is_closer(additional + scan.radius, *p) {
+						return false;
+					}
+				}
+			}
+
+			true
+		}
 
 		#[cfg(feature = "enemies_cache")]
 		{
@@ -1132,26 +1152,10 @@ impl Bot {
 
 			let mut to_remove = Vec::<u64>::new();
 			let mut burrowed = Vec::<u64>::new();
+			let mut cloaked = Vec::<u64>::new();
 			let mut hidden = Vec::<u64>::new();
 			let enemy_is_zerg = self.enemy_race.is_zerg();
 
-			fn is_invisible(u: &Unit, detectors: &Units, scans: &[Effect]) -> bool {
-				for d in detectors.iter() {
-					if u.is_closer(u.radius + d.radius + d.detect_range, d) {
-						return false;
-					}
-				}
-
-				for scan in scans {
-					for p in &scan.positions {
-						if u.is_closer(u.radius + scan.radius, *p) {
-							return false;
-						}
-					}
-				}
-
-				true
-			}
 			let detectors = self.units.my.all.filter(|u| u.is_detector());
 			let scans = self
 				.state
@@ -1167,8 +1171,11 @@ impl Bot {
 			self.units.cached.all.iter().for_each(|u| {
 				if current.contains_tag(u.tag) {
 					// Mark as hidden undetected burrowed units - it's not possible to attack them.
-					if u.is_burrowed && u.is_visible() && is_invisible(u, &detectors, &scans) {
-						hidden.push(u.tag);
+					if u.is_burrowed
+						&& u.cloak != CloakState::Cloaked
+						&& is_invisible(u, &detectors, &scans, 0.0)
+					{
+						cloaked.push(u.tag);
 					}
 				} else if u.is_flying || !u.is_structure() {
 					// unit position visible, but it disappeared
@@ -1192,7 +1199,7 @@ impl Bot {
 											| UnitTypeId::Larva | UnitTypeId::Egg
 									) || (u.type_id == UnitTypeId::Drone
 									&& self.units.enemy.structures.iter().any(is_drone_close)))
-								&& is_invisible(u, &detectors, &scans)
+								&& is_invisible(u, &detectors, &scans, 0.0)
 							{
 								burrowed.push(u.tag);
 							// Whatever
@@ -1200,7 +1207,7 @@ impl Bot {
 								to_remove.push(u.tag);
 							}
 						// Was out of vision previously or burrowed but detected -> probably moved somewhere else
-						} else if !(u.is_burrowed && is_invisible(u, &detectors, &scans)) {
+						} else if !(u.is_burrowed && is_invisible(u, &detectors, &scans, 0.0)) {
 							to_remove.push(u.tag);
 						}
 					// Unit is out of vision -> marking as hidden
@@ -1224,10 +1231,26 @@ impl Bot {
 				}
 			});
 
-			let mark_burrowed = |u: u64, us: &mut Units| {
+			let mark_cloaked = |u: u64, us: &mut Units| {
 				if let Some(u) = us.get_mut(u) {
 					u.display_type = DisplayType::Hidden;
-					u.is_burrowed = true;
+					u.cloak = CloakState::Cloaked;
+				}
+			};
+			cloaked.into_iter().for_each(|u| {
+				mark_cloaked(u, &mut cache.all);
+				mark_cloaked(u, &mut cache.units);
+				mark_cloaked(u, &mut cache.workers);
+			});
+
+			let mark_burrowed = |u: u64, us: &mut Units| {
+				if let Some(u) = us.get_mut(u) {
+					if let Some(burrowed_id) = BURROWED_IDS.get(&u.type_id) {
+						u.type_id = *burrowed_id;
+						u.is_burrowed = true;
+						u.display_type = DisplayType::Hidden;
+						u.cloak = CloakState::Cloaked;
+					}
 				}
 			};
 			burrowed.into_iter().for_each(|u| {
@@ -1255,7 +1278,9 @@ impl Bot {
 		let mut enemies_ordered = FxHashMap::default();
 		let mut enemies_current = FxHashMap::default();
 
-		{
+		let mut enemy_detectors = Units::new();
+
+		({
 			#[cfg(not(feature = "enemies_cache"))]
 			{
 				&self.units.enemy.all
@@ -1264,9 +1289,13 @@ impl Bot {
 			{
 				&self.units.cached.all
 			}
-		}
+		})
 		.iter()
 		.for_each(|u| {
+			if u.is_detector() {
+				enemy_detectors.push(u.clone());
+			}
+
 			if u.is_structure() {
 				if u.is_ready() {
 					*enemies_current.entry(u.type_id).or_default() += 1;
@@ -1280,6 +1309,24 @@ impl Bot {
 
 		self.enemies_ordered = enemies_ordered;
 		self.enemies_current = enemies_current;
+
+		let enemy_scans = self
+			.state
+			.observation
+			.raw
+			.effects
+			.iter()
+			.filter(|e| e.id == EffectId::ScannerSweep && e.alliance.is_enemy())
+			.cloned()
+			.collect::<Vec<Effect>>();
+
+		self.units.my.all.iter_mut().for_each(|u| {
+			if let CloakState::Cloaked = u.cloak {
+				if !is_invisible(u, &enemy_detectors, &enemy_scans, 1.0) {
+					u.cloak = CloakState::CloakedDetected;
+				}
+			}
+		});
 	}
 
 	/// Simple wrapper around [`query_placement`](Self::query_placement).

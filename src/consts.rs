@@ -107,6 +107,19 @@ lazy_static! {
 			worker: UnitTypeId::Probe,
 		},
 	];
+	pub(crate) static ref BURROWED_IDS: HashMap<UnitTypeId, UnitTypeId> = hashmap![
+		UnitTypeId::LurkerMP => UnitTypeId::LurkerMPBurrowed,
+		UnitTypeId::Baneling => UnitTypeId::BanelingBurrowed,
+		UnitTypeId::Drone => UnitTypeId::DroneBurrowed,
+		UnitTypeId::Hydralisk => UnitTypeId::HydraliskBurrowed,
+		UnitTypeId::Roach => UnitTypeId::RoachBurrowed,
+		UnitTypeId::Zergling => UnitTypeId::ZerglingBurrowed,
+		UnitTypeId::Queen => UnitTypeId::QueenBurrowed,
+		UnitTypeId::Infestor => UnitTypeId::InfestorBurrowed,
+		UnitTypeId::Ultralisk => UnitTypeId::UltraliskBurrowed,
+		UnitTypeId::SwarmHostMP => UnitTypeId::SwarmHostBurrowedMP,
+		UnitTypeId::Ravager => UnitTypeId::RavagerBurrowed,
+	];
 	pub(crate) static ref TECH_ALIAS: HashMap<UnitTypeId, Vec<UnitTypeId>> = hashmap![
 		UnitTypeId::Assimilator => vec![UnitTypeId::AssimilatorRich],
 		UnitTypeId::AssimilatorRich => vec![UnitTypeId::Assimilator],

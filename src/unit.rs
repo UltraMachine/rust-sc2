@@ -5,8 +5,8 @@ use crate::{
 	action::{Commander, Target},
 	bot::{LockBool, LockOwned, LockU32, Locked, Reader, Rs, Rw},
 	consts::{
-		RaceValues, DAMAGE_BONUS_PER_UPGRADE, FRAMES_PER_SECOND, MISSED_WEAPONS, OFF_CREEP_SPEED_UPGRADES,
-		SPEED_BUFFS, SPEED_ON_CREEP, SPEED_UPGRADES, WARPGATE_ABILITIES,
+		RaceValues, ANTI_ARMOR_BUFF, DAMAGE_BONUS_PER_UPGRADE, FRAMES_PER_SECOND, MISSED_WEAPONS,
+		OFF_CREEP_SPEED_UPGRADES, SPEED_BUFFS, SPEED_ON_CREEP, SPEED_UPGRADES, WARPGATE_ABILITIES,
 	},
 	distance::Distance,
 	game_data::{Attribute, Cost, GameData, TargetType, UnitTypeData, Weapon},
@@ -93,11 +93,13 @@ pub struct Unit {
 	pub radius: f32,
 	/// The progress of building construction. Value from `0` to `1`.
 	pub build_progress: f32,
-	/// Cloak state of unit. Used in [`is_cloaked`], [`is_revealed`], [`can_be_attacked`].
+	/// Cloak state of unit. Used in [`is_cloaked`], [`is_revealed`],
+	/// [`can_be_attacked`], [`is_invisible`].
 	///
 	/// [`is_cloaked`]: Self::is_cloaked
 	/// [`is_revealed`]: Self::is_revealed
 	/// [`can_be_attacked`]: Self::can_be_attacked
+	/// [`is_invisible`]: Self::is_invisible
 	pub cloak: CloakState,
 	/// Set of buffs unit has.
 	pub buffs: FxHashSet<BuffId>,
@@ -412,12 +414,10 @@ impl Unit {
 	pub fn is_ally(&self) -> bool {
 		self.alliance.is_ally()
 	}
+
 	/// Checks if unit has cloak field turned on.
 	pub fn is_cloaked(&self) -> bool {
-		matches!(
-			self.cloak,
-			CloakState::Cloaked | CloakState::CloakedDetected | CloakState::CloakedAllied
-		)
+		matches!(self.cloak, CloakState::Cloaked | CloakState::CloakedDetected)
 	}
 	/// Checks if unit is cloaked, but detected.
 	pub fn is_revealed(&self) -> bool {
@@ -429,9 +429,9 @@ impl Unit {
 	}
 	/// Checks if unit is burrowed or cloaked, and not detected (i.e. must be detected to be attacked).
 	pub fn is_invisible(&self) -> bool {
-		matches!(self.cloak, CloakState::Cloaked | CloakState::CloakedAllied)
-			|| (self.is_burrowed && self.is_hidden())
+		matches!(self.cloak, CloakState::Cloaked)
 	}
+
 	/// Returns how much supply this unit uses.
 	pub fn supply_cost(&self) -> f32 {
 		self.type_data().map_or(0.0, |data| data.food_required)
@@ -1702,6 +1702,7 @@ impl Unit {
 		let pos = u.get_pos();
 		let position = Point2::from_proto(pos);
 		let type_id = UnitTypeId::from_u32(u.get_unit_type()).unwrap();
+		let is_burrowed = u.get_is_burrowed();
 		Self {
 			data,
 			display_type: match DisplayType::from_proto(u.get_display_type()) {
@@ -1723,7 +1724,11 @@ impl Unit {
 			facing: u.get_facing(),
 			radius: u.get_radius(),
 			build_progress: u.get_build_progress(),
-			cloak: CloakState::from_proto(u.get_cloak()),
+			cloak: if is_burrowed {
+				CloakState::Cloaked
+			} else {
+				CloakState::from_proto(u.get_cloak())
+			},
 			buffs: u
 				.get_buff_ids()
 				.iter()
@@ -1753,7 +1758,7 @@ impl Unit {
 			mineral_contents: u.mineral_contents.map(|x| x as u32),
 			vespene_contents: u.vespene_contents.map(|x| x as u32),
 			is_flying: u.get_is_flying(),
-			is_burrowed: u.get_is_burrowed(),
+			is_burrowed,
 			is_hallucination: u.get_is_hallucination(),
 			// Not populated for enemies
 			orders: u
@@ -1806,7 +1811,8 @@ impl Unit {
 	}
 }
 
-/// The display type of [`Unit`]. Can be accessed through [`display_type`](Unit::display_type) field.
+/// The display type of [`Unit`].
+/// Can be accessed through [`display_type`](Unit::display_type) field.
 #[variant_checkers]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum DisplayType {
@@ -1834,25 +1840,23 @@ impl FromProto<ProtoDisplayType> for DisplayType {
 /// Cloak state of [`Unit`]. Can be accessed through [`cloak`](Unit::cloak) field.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CloakState {
-	/// Under the fog, so unknown whether it's cloaked or not.
-	CloakedUnknown,
+	// Under the fog, so unknown whether it's cloaked or not.
+	// CloakedUnknown,
 	/// Is cloaked (i.e. invisible).
 	Cloaked,
 	/// Is cloaked, but visible because is detected (i.e. in range of detector, or orbital scan).
 	CloakedDetected,
 	/// Unit is not cloaked.
 	NotCloaked,
-	/// Is cloaked, but visible because it's owned or allied unit.
-	CloakedAllied,
+	// Is cloaked, but visible because it's owned or allied unit.
+	// CloakedAllied,
 }
 impl FromProto<ProtoCloakState> for CloakState {
 	fn from_proto(cloak_state: ProtoCloakState) -> Self {
 		match cloak_state {
-			ProtoCloakState::CloakedUnknown => CloakState::CloakedUnknown,
-			ProtoCloakState::Cloaked => CloakState::Cloaked,
+			ProtoCloakState::CloakedUnknown | ProtoCloakState::NotCloaked => CloakState::NotCloaked,
+			ProtoCloakState::Cloaked | ProtoCloakState::CloakedAllied => CloakState::Cloaked,
 			ProtoCloakState::CloakedDetected => CloakState::CloakedDetected,
-			ProtoCloakState::NotCloaked => CloakState::NotCloaked,
-			ProtoCloakState::CloakedAllied => CloakState::CloakedAllied,
 		}
 	}
 }
@@ -1881,7 +1885,8 @@ pub struct PassengerUnit {
 	pub type_id: UnitTypeId,
 }
 
-/// Rally point of production building. All rally points stored in [`rally_targets`](Unit::rally_targets) field.
+/// Rally point of production building.
+/// All rally points stored in [`rally_targets`](Unit::rally_targets) field.
 #[derive(Clone)]
 pub struct RallyTarget {
 	/// Rally point. Position building rallied on.
