@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
@@ -906,6 +908,7 @@ pub enum UnitTypeId {
 	InfestedTerran = 898,
 	MercCompound = 899,
 	SupplyDepotDrop = 900,
+	#[deprecated(note = "Use `UnitTypeId::LurkerDenMP` instead.")]
 	LurkerDen = 901,
 	D8Charge = 902,
 	ThorWreckage = 903,
@@ -915,8 +918,11 @@ pub enum UnitTypeId {
 	SSPowerupHealth = 907,
 	SSPowerupSideMissiles = 908,
 	SSPowerupStrongerMissiles = 909,
+	#[deprecated(note = "Use `UnitTypeId::LurkerMPEgg` instead.")]
 	LurkerEgg = 910,
+	#[deprecated(note = "Use `UnitTypeId::LurkerMP` instead.")]
 	Lurker = 911,
+	#[deprecated(note = "Use `UnitTypeId::LurkerMPBurrowed` instead.")]
 	LurkerBurrowed = 912,
 	ArchiveSealed = 913,
 	InfestedCivilian = 914,
@@ -2917,6 +2923,7 @@ pub enum UnitTypeId {
 	InfestedTerran = 898,
 	MercCompound = 899,
 	SupplyDepotDrop = 900,
+	#[deprecated(note = "Use `UnitTypeId::LurkerDenMP` instead.")]
 	LurkerDen = 901,
 	D8Charge = 902,
 	ThorWreckage = 903,
@@ -2926,8 +2933,11 @@ pub enum UnitTypeId {
 	SSPowerupHealth = 907,
 	SSPowerupSideMissiles = 908,
 	SSPowerupStrongerMissiles = 909,
+	#[deprecated(note = "Use `UnitTypeId::LurkerMPEgg` instead.")]
 	LurkerEgg = 910,
+	#[deprecated(note = "Use `UnitTypeId::LurkerMP` instead.")]
 	Lurker = 911,
+	#[deprecated(note = "Use `UnitTypeId::LurkerMPBurrowed` instead.")]
 	LurkerBurrowed = 912,
 	ArchiveSealed = 913,
 	InfestedCivilian = 914,

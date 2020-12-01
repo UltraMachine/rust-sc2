@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 

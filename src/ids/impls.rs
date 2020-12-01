@@ -107,7 +107,7 @@ impl UnitTypeId {
 			| UnitTypeId::CreepTumorMissile
 			| UnitTypeId::Lair
 			| UnitTypeId::HydraliskDen
-			| UnitTypeId::LurkerDen
+			| UnitTypeId::LurkerDenMP
 			| UnitTypeId::InfestationPit
 			| UnitTypeId::Spire
 			| UnitTypeId::NydusNetwork
@@ -177,9 +177,7 @@ impl UnitTypeId {
 			| UnitTypeId::RavagerBurrowed
 			| UnitTypeId::Hydralisk
 			| UnitTypeId::HydraliskBurrowed
-			| UnitTypeId::LurkerEgg
-			| UnitTypeId::Lurker
-			| UnitTypeId::LurkerBurrowed
+			| UnitTypeId::LurkerMPEgg
 			| UnitTypeId::LurkerMP
 			| UnitTypeId::LurkerMPBurrowed
 			| UnitTypeId::Infestor

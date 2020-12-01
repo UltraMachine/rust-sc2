@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
@@ -32,14 +34,20 @@ pub enum UpgradeId {
 	DurableMaterials = 24,
 	PersonalCloaking = 25,
 	GhostMoebiusReactor = 26,
+	#[deprecated(note = "Use `UpgradeId::TerranVehicleAndShipArmorsLevel1` instead.")]
 	TerranVehicleArmorsLevel1 = 27,
+	#[deprecated(note = "Use `UpgradeId::TerranVehicleAndShipArmorsLevel2` instead.")]
 	TerranVehicleArmorsLevel2 = 28,
+	#[deprecated(note = "Use `UpgradeId::TerranVehicleAndShipArmorsLevel3` instead.")]
 	TerranVehicleArmorsLevel3 = 29,
 	TerranVehicleWeaponsLevel1 = 30,
 	TerranVehicleWeaponsLevel2 = 31,
 	TerranVehicleWeaponsLevel3 = 32,
+	#[deprecated(note = "Use `UpgradeId::TerranVehicleAndShipArmorsLevel1` instead.")]
 	TerranShipArmorsLevel1 = 33,
+	#[deprecated(note = "Use `UpgradeId::TerranVehicleAndShipArmorsLevel2` instead.")]
 	TerranShipArmorsLevel2 = 34,
+	#[deprecated(note = "Use `UpgradeId::TerranVehicleAndShipArmorsLevel3` instead.")]
 	TerranShipArmorsLevel3 = 35,
 	TerranShipWeaponsLevel1 = 36,
 	TerranShipWeaponsLevel2 = 37,
@@ -103,6 +111,7 @@ pub enum UpgradeId {
 	BanelingBurrowMove = 95,
 	CombatDrugs = 96,
 	StrikeCannons = 97,
+	#[deprecated(note = "Use `UpgradeId::SmartServos` instead.")]
 	TransformationServos = 98,
 	PhoenixRangeUpgrade = 99,
 	TempestRangeUpgrade = 100,
@@ -138,6 +147,7 @@ pub enum UpgradeId {
 	AdeptPiercingAttack = 130,
 	CinematicMode = 131,
 	CursorDebug = 132,
+	#[deprecated(note = "Use `UpgradeId::CycloneLockOnDamageUpgrade` instead.")]
 	MagFieldLaunchers = 133,
 	EvolveGroovedSpines = 134,
 	EvolveMuscularAugments = 135,
@@ -193,6 +203,7 @@ pub enum UpgradeId {
 	CerberusMines = 185,
 	Hyperfluxor = 186,
 	TriLithiumPowerCells = 187,
+	#[deprecated(note = "Use `UpgradeId::PersonalCloaking` instead.")]
 	PermanentCloakGhost = 188,
 	PermanentCloakSpectre = 189,
 	UltrasonicPulse = 190,
@@ -213,6 +224,7 @@ pub enum UpgradeId {
 	X88TNapalmUpgrade = 205,
 	HurricaneMissiles = 206,
 	MechanicalRebirth = 207,
+	#[deprecated(note = "Use `UpgradeId::Stimpack` instead.")]
 	MarineStimpack = 208,
 	DarkTemplarTactics = 209,
 	ClusterWarheads = 210,
@@ -233,12 +245,15 @@ pub enum UpgradeId {
 	MultilockTargetingSystems = 225,
 	TurboChargedEngines = 226,
 	DistortionSensors = 227,
+	#[deprecated(note = "Use `UpgradeId::HighCapacityBarrels` instead.")]
 	InfernalPreIgniters = 228,
+	#[deprecated(note = "Use `UpgradeId::HighCapacityBarrels` instead.")]
 	HellionCampaignInfernalPreIgniter = 229,
 	NapalmFuelTanks = 230,
 	AuxiliaryMedBots = 231,
 	JuggernautPlating = 232,
 	MarauderLifeBoost = 233,
+	#[deprecated(note = "Use `UpgradeId::ShieldWall` instead.")]
 	CombatShield = 234,
 	ReaperU238Rounds = 235,
 	MaelstromRounds = 236,
@@ -253,6 +268,7 @@ pub enum UpgradeId {
 	AresClassWeaponsSystem = 245,
 	WhiteNapalm = 246,
 	ViralMunitions = 247,
+	#[deprecated(note = "Use `UpgradeId::PunisherGrenades` instead.")]
 	JackhammerConcussionGrenades = 248,
 	FireSuppressionSystems = 249,
 	FlareResearch = 250,
@@ -263,6 +279,7 @@ pub enum UpgradeId {
 	WraithCloak = 255,
 	SingularityCharge = 256,
 	GraviticThrusters = 257,
+	#[deprecated(note = "Use `UpgradeId::BattlecruiserEnableSpecializations` instead.")]
 	YamatoCannon = 258,
 	DefensiveMatrix = 259,
 	DarkProtoss = 260,
@@ -296,6 +313,7 @@ pub enum UpgradeId {
 	VoidRaySpeedUpgrade = 288,
 	SmartServos = 289,
 	ArmorPiercingRockets = 290,
+	#[deprecated(note = "Use `UpgradeId::CycloneLockOnDamageUpgrade` instead.")]
 	CycloneRapidFireLaunchers = 291,
 	RavenEnhancedMunitions = 292,
 	DiggingClaws = 293,
@@ -341,14 +359,20 @@ pub enum UpgradeId {
 	DurableMaterials = 24,
 	PersonalCloaking = 25,
 	GhostMoebiusReactor = 26,
+	#[deprecated(note = "Use `UpgradeId::TerranVehicleAndShipArmorsLevel1` instead.")]
 	TerranVehicleArmorsLevel1 = 27,
+	#[deprecated(note = "Use `UpgradeId::TerranVehicleAndShipArmorsLevel2` instead.")]
 	TerranVehicleArmorsLevel2 = 28,
+	#[deprecated(note = "Use `UpgradeId::TerranVehicleAndShipArmorsLevel3` instead.")]
 	TerranVehicleArmorsLevel3 = 29,
 	TerranVehicleWeaponsLevel1 = 30,
 	TerranVehicleWeaponsLevel2 = 31,
 	TerranVehicleWeaponsLevel3 = 32,
+	#[deprecated(note = "Use `UpgradeId::TerranVehicleAndShipArmorsLevel1` instead.")]
 	TerranShipArmorsLevel1 = 33,
+	#[deprecated(note = "Use `UpgradeId::TerranVehicleAndShipArmorsLevel2` instead.")]
 	TerranShipArmorsLevel2 = 34,
+	#[deprecated(note = "Use `UpgradeId::TerranVehicleAndShipArmorsLevel3` instead.")]
 	TerranShipArmorsLevel3 = 35,
 	TerranShipWeaponsLevel1 = 36,
 	TerranShipWeaponsLevel2 = 37,
@@ -412,6 +436,7 @@ pub enum UpgradeId {
 	BanelingBurrowMove = 95,
 	CombatDrugs = 96,
 	StrikeCannons = 97,
+	#[deprecated(note = "Use `UpgradeId::SmartServos` instead.")]
 	TransformationServos = 98,
 	PhoenixRangeUpgrade = 99,
 	TempestRangeUpgrade = 100,
@@ -447,6 +472,7 @@ pub enum UpgradeId {
 	AdeptPiercingAttack = 130,
 	CinematicMode = 131,
 	CursorDebug = 132,
+	#[deprecated(note = "Use `UpgradeId::CycloneLockOnDamageUpgrade` instead.")]
 	MagFieldLaunchers = 133,
 	EvolveGroovedSpines = 134,
 	EvolveMuscularAugments = 135,
@@ -502,6 +528,7 @@ pub enum UpgradeId {
 	CerberusMines = 185,
 	Hyperfluxor = 186,
 	TriLithiumPowerCells = 187,
+	#[deprecated(note = "Use `UpgradeId::PersonalCloaking` instead.")]
 	PermanentCloakGhost = 188,
 	PermanentCloakSpectre = 189,
 	UltrasonicPulse = 190,
@@ -522,6 +549,7 @@ pub enum UpgradeId {
 	X88TNapalmUpgrade = 205,
 	HurricaneMissiles = 206,
 	MechanicalRebirth = 207,
+	#[deprecated(note = "Use `UpgradeId::Stimpack` instead.")]
 	MarineStimpack = 208,
 	DarkTemplarTactics = 209,
 	ClusterWarheads = 210,
@@ -542,12 +570,15 @@ pub enum UpgradeId {
 	MultilockTargetingSystems = 225,
 	TurboChargedEngines = 226,
 	DistortionSensors = 227,
+	#[deprecated(note = "Use `UpgradeId::HighCapacityBarrels` instead.")]
 	InfernalPreIgniters = 228,
+	#[deprecated(note = "Use `UpgradeId::HighCapacityBarrels` instead.")]
 	HellionCampaignInfernalPreIgniter = 229,
 	NapalmFuelTanks = 230,
 	AuxiliaryMedBots = 231,
 	JuggernautPlating = 232,
 	MarauderLifeBoost = 233,
+	#[deprecated(note = "Use `UpgradeId::ShieldWall` instead.")]
 	CombatShield = 234,
 	ReaperU238Rounds = 235,
 	MaelstromRounds = 236,
@@ -562,6 +593,7 @@ pub enum UpgradeId {
 	AresClassWeaponsSystem = 245,
 	WhiteNapalm = 246,
 	ViralMunitions = 247,
+	#[deprecated(note = "Use `UpgradeId::PunisherGrenades` instead.")]
 	JackhammerConcussionGrenades = 248,
 	FireSuppressionSystems = 249,
 	FlareResearch = 250,
@@ -572,6 +604,7 @@ pub enum UpgradeId {
 	WraithCloak = 255,
 	SingularityCharge = 256,
 	GraviticThrusters = 257,
+	#[deprecated(note = "Use `UpgradeId::BattlecruiserEnableSpecializations` instead.")]
 	YamatoCannon = 258,
 	DefensiveMatrix = 259,
 	DarkProtoss = 260,
@@ -605,6 +638,7 @@ pub enum UpgradeId {
 	VoidRaySpeedUpgrade = 288,
 	SmartServos = 289,
 	ArmorPiercingRockets = 290,
+	#[deprecated(note = "Use `UpgradeId::CycloneLockOnDamageUpgrade` instead.")]
 	CycloneRapidFireLaunchers = 291,
 	RavenEnhancedMunitions = 292,
 	DiggingClaws = 293,

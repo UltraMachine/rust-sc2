@@ -3,6 +3,8 @@ from pathlib import Path
 from sys import argv
 
 HEAD = """\
+#![allow(deprecated)]
+
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 """
@@ -12,6 +14,41 @@ DERIVES = """\
 """
 ENUM_NAMES = ("UnitTypeId", "AbilityId", "UpgradeId", "BuffId", "EffectId")
 FILE_NAMES = ("unit_typeid", "ability_id", "upgrade_id", "buff_id", "effect_id")
+
+MIMICS = {
+	"UnitTypeId": {
+		"Lurker": "LurkerMP",
+		"LurkerBurrowed": "LurkerMPBurrowed",
+		"LurkerDen": "LurkerDenMP",
+		"LurkerEgg": "LurkerMPEgg",
+	},
+	"UpgradeId": {
+		"TerranVehicleArmorsLevel1": "TerranVehicleAndShipArmorsLevel1",
+		"TerranVehicleArmorsLevel2": "TerranVehicleAndShipArmorsLevel2",
+		"TerranVehicleArmorsLevel3": "TerranVehicleAndShipArmorsLevel3",
+		"TerranShipArmorsLevel1": "TerranVehicleAndShipArmorsLevel1",
+		"TerranShipArmorsLevel2": "TerranVehicleAndShipArmorsLevel2",
+		"TerranShipArmorsLevel3": "TerranVehicleAndShipArmorsLevel3",
+		"MarineStimpack": "Stimpack",
+		"CombatShield": "ShieldWall",
+		"JackhammerConcussionGrenades": "PunisherGrenades",
+		"InfernalPreIgniters": "HighCapacityBarrels",
+		"HellionCampaignInfernalPreIgniter": "HighCapacityBarrels",
+		"TransformationServos": "SmartServos",
+		"CycloneRapidFireLaunchers": "CycloneLockOnDamageUpgrade",
+		"MagFieldLaunchers": "CycloneLockOnDamageUpgrade",
+		"PermanentCloakGhost": "PersonalCloaking",
+		"YamatoCannon": "BattlecruiserEnableSpecializations",
+	},
+}
+
+
+def mimic(id, enum):
+	try:
+		id = MIMICS[enum][id]
+	except KeyError:
+		return ""
+	return f'\t#[deprecated(note = "Use `{enum}::{id}` instead.")]\n'
 
 
 def parse_simple(d, data):
@@ -97,6 +134,17 @@ def parse_data(data, version=None):
 	)
 
 
+def gen_enum(enum, name):
+	return (
+		f"{DERIVES}\npub enum {name} {{\n"
+		+ "".join(
+			mimic(k, name) + f"\t{k} = {v},\n"
+			for k, v in sorted(enum.items(), key=lambda x: x[1])
+		)
+		+ "}\n"
+	)
+
+
 def generate():
 	mod = [
 		[
@@ -122,32 +170,13 @@ def generate():
 		ENUM_NAMES, FILE_NAMES, enums_latest, enums_4_10
 	):
 		if enum == enum_linux:
-			generated = (
-				HEAD
-				+ "\n"
-				+ f"{DERIVES}\npub enum {name} {{\n"
-				+ "".join(
-					f"\t{k} = {v},\n"
-					for k, v in sorted(enum.items(), key=lambda x: x[1])
-				)
-				+ "}\n"
-			)
+			generated = f"{HEAD}\n{gen_enum(enum, name)}"
 		else:
 			generated = (
-				HEAD
-				+ "\n"
-				+ f'#[cfg(target_os = "windows")]\n{DERIVES}\npub enum {name} {{\n'
-				+ "".join(
-					f"\t{k} = {v},\n"
-					for k, v in sorted(enum.items(), key=lambda x: x[1])
-				)
-				+ "}\n\n"
-				+ f'#[cfg(target_os = "linux")]\n{DERIVES}\npub enum {name} {{\n'
-				+ "".join(
-					f"\t{k} = {v},\n"
-					for k, v in sorted(enum_linux.items(), key=lambda x: x[1])
-				)
-				+ "}\n"
+				f'{HEAD}\n#[cfg(target_os = "windows")]\n'
+				+ gen_enum(enum, name)
+				+ '\n#[cfg(target_os = "linux")]\n'
+				+ gen_enum(enum_linux, name)
 			)
 
 		(Path.cwd() / "src" / "ids" / f"{file}.rs").write_text(generated)
