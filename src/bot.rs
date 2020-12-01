@@ -4,14 +4,15 @@ use crate::{
 	action::{Action, ActionResult, Commander, Target},
 	api::API,
 	client::SC2Result,
-	consts::{RaceValues, BURROWED_IDS, INHIBITOR_IDS, RACE_VALUES, TECH_ALIAS, UNIT_ALIAS},
+	consts::{RaceValues, INHIBITOR_IDS, RACE_VALUES, TECH_ALIAS, UNIT_ALIAS},
 	debug::{DebugCommand, Debugger},
 	distance::*,
 	game_data::{Cost, GameData},
 	game_info::GameInfo,
+	game_state::Effect,
 	game_state::{Alliance, GameState},
 	geometry::Point2,
-	ids::{AbilityId, UnitTypeId, UpgradeId},
+	ids::{AbilityId, EffectId, UnitTypeId, UpgradeId},
 	player::Race,
 	ramp::{Ramp, Ramps},
 	unit::{CloakState, DataForUnit, SharedUnitData, Unit},
@@ -29,11 +30,11 @@ use sc2_proto::{
 use std::process::Child;
 
 #[cfg(feature = "enemies_cache")]
-use crate::{game_state::Effect, ids::EffectId, unit::DisplayType};
+use crate::{consts::BURROWED_IDS, unit::DisplayType};
 
 #[cfg(feature = "parking_lot")]
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-#[cfg(not(feature = "parking_lot"))]
+#[cfg(all(not(feature = "parking_lot"), feature = "rayon"))]
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 #[cfg(feature = "rayon")]
