@@ -15,7 +15,7 @@ use crate::{
 	ids::{AbilityId, EffectId, UnitTypeId, UpgradeId},
 	player::Race,
 	ramp::{Ramp, Ramps},
-	unit::{CloakState, DataForUnit, SharedUnitData, Unit},
+	unit::{DataForUnit, SharedUnitData, Unit},
 	units::{AllUnits, Units},
 	utils::{dbscan, range_query},
 	FromProto, IntoProto,
@@ -1172,10 +1172,7 @@ impl Bot {
 			self.units.cached.all.iter().for_each(|u| {
 				if current.contains_tag(u.tag) {
 					// Mark as hidden undetected burrowed units - it's not possible to attack them.
-					if u.is_burrowed
-						&& u.cloak != CloakState::Cloaked
-						&& is_invisible(u, &detectors, &scans, 0.0)
-					{
+					if u.is_burrowed && u.is_revealed && is_invisible(u, &detectors, &scans, 0.0) {
 						cloaked.push(u.tag);
 					}
 				} else if u.is_flying || !u.is_structure() {
@@ -1235,7 +1232,7 @@ impl Bot {
 			let mark_cloaked = |u: u64, us: &mut Units| {
 				if let Some(u) = us.get_mut(u) {
 					u.display_type = DisplayType::Hidden;
-					u.cloak = CloakState::Cloaked;
+					u.is_revealed = false;
 				}
 			};
 			cloaked.into_iter().for_each(|u| {
@@ -1247,10 +1244,10 @@ impl Bot {
 			let mark_burrowed = |u: u64, us: &mut Units| {
 				if let Some(u) = us.get_mut(u) {
 					if let Some(burrowed_id) = BURROWED_IDS.get(&u.type_id) {
+						u.display_type = DisplayType::Hidden;
 						u.type_id = *burrowed_id;
 						u.is_burrowed = true;
-						u.display_type = DisplayType::Hidden;
-						u.cloak = CloakState::Cloaked;
+						u.is_cloaked = true;
 					}
 				}
 			};
@@ -1322,10 +1319,8 @@ impl Bot {
 			.collect::<Vec<Effect>>();
 
 		self.units.my.all.iter_mut().for_each(|u| {
-			if let CloakState::Cloaked = u.cloak {
-				if !is_invisible(u, &enemy_detectors, &enemy_scans, 1.0) {
-					u.cloak = CloakState::CloakedDetected;
-				}
+			if u.is_cloaked && !(u.is_revealed || is_invisible(u, &enemy_detectors, &enemy_scans, 1.0)) {
+				u.is_revealed = true;
 			}
 		});
 	}

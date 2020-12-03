@@ -93,14 +93,10 @@ pub struct Unit {
 	pub radius: f32,
 	/// The progress of building construction. Value from `0` to `1`.
 	pub build_progress: f32,
-	/// Cloak state of unit. Used in [`is_cloaked`], [`is_revealed`],
-	/// [`can_be_attacked`], [`is_invisible`].
-	///
-	/// [`is_cloaked`]: Self::is_cloaked
-	/// [`is_revealed`]: Self::is_revealed
-	/// [`can_be_attacked`]: Self::can_be_attacked
-	/// [`is_invisible`]: Self::is_invisible
-	pub cloak: CloakState,
+	/// `true` when unit is burrowed or has cloak field turned on.
+	pub is_cloaked: bool,
+	/// `true` when unit is detected.
+	pub is_revealed: bool,
 	/// Set of buffs unit has.
 	pub buffs: FxHashSet<BuffId>,
 	/// Detection range of detector or `0` if unit is not detector.
@@ -415,21 +411,15 @@ impl Unit {
 		self.alliance.is_ally()
 	}
 
-	/// Checks if unit has cloak field turned on.
-	pub fn is_cloaked(&self) -> bool {
-		matches!(self.cloak, CloakState::Cloaked | CloakState::CloakedDetected)
-	}
-	/// Checks if unit is cloaked, but detected.
-	pub fn is_revealed(&self) -> bool {
-		matches!(self.cloak, CloakState::CloakedDetected)
-	}
 	/// Checks if unit is detected or not even cloaked.
+	#[inline]
 	pub fn can_be_attacked(&self) -> bool {
-		matches!(self.cloak, CloakState::NotCloaked | CloakState::CloakedDetected)
+		self.is_revealed || !self.is_cloaked
 	}
 	/// Checks if unit is burrowed or cloaked, and not detected (i.e. must be detected to be attacked).
+	#[inline]
 	pub fn is_invisible(&self) -> bool {
-		matches!(self.cloak, CloakState::Cloaked)
+		self.is_cloaked && !self.is_revealed
 	}
 
 	/// Returns how much supply this unit uses.
@@ -1703,6 +1693,15 @@ impl Unit {
 		let position = Point2::from_proto(pos);
 		let type_id = UnitTypeId::from_u32(u.get_unit_type()).unwrap();
 		let is_burrowed = u.get_is_burrowed();
+		let (is_cloaked, is_revealed) = if is_burrowed {
+			(true, false)
+		} else {
+			match u.get_cloak() {
+				ProtoCloakState::CloakedUnknown | ProtoCloakState::NotCloaked => (false, false),
+				ProtoCloakState::Cloaked | ProtoCloakState::CloakedAllied => (true, false),
+				ProtoCloakState::CloakedDetected => (true, true),
+			}
+		};
 		Self {
 			data,
 			display_type: match DisplayType::from_proto(u.get_display_type()) {
@@ -1724,11 +1723,8 @@ impl Unit {
 			facing: u.get_facing(),
 			radius: u.get_radius(),
 			build_progress: u.get_build_progress(),
-			cloak: if is_burrowed {
-				CloakState::Cloaked
-			} else {
-				CloakState::from_proto(u.get_cloak())
-			},
+			is_cloaked,
+			is_revealed,
 			buffs: u
 				.get_buff_ids()
 				.iter()
@@ -1833,30 +1829,6 @@ impl FromProto<ProtoDisplayType> for DisplayType {
 			ProtoDisplayType::Snapshot => DisplayType::Snapshot,
 			ProtoDisplayType::Hidden => DisplayType::Hidden,
 			ProtoDisplayType::Placeholder => DisplayType::Placeholder,
-		}
-	}
-}
-
-/// Cloak state of [`Unit`]. Can be accessed through [`cloak`](Unit::cloak) field.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CloakState {
-	// Under the fog, so unknown whether it's cloaked or not.
-	// CloakedUnknown,
-	/// Is cloaked (i.e. invisible).
-	Cloaked,
-	/// Is cloaked, but visible because is detected (i.e. in range of detector, or orbital scan).
-	CloakedDetected,
-	/// Unit is not cloaked.
-	NotCloaked,
-	// Is cloaked, but visible because it's owned or allied unit.
-	// CloakedAllied,
-}
-impl FromProto<ProtoCloakState> for CloakState {
-	fn from_proto(cloak_state: ProtoCloakState) -> Self {
-		match cloak_state {
-			ProtoCloakState::CloakedUnknown | ProtoCloakState::NotCloaked => CloakState::NotCloaked,
-			ProtoCloakState::Cloaked | ProtoCloakState::CloakedAllied => CloakState::Cloaked,
-			ProtoCloakState::CloakedDetected => CloakState::CloakedDetected,
 		}
 	}
 }
