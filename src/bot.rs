@@ -515,31 +515,53 @@ impl Bot {
 		self.game_data
 			.units
 			.get(&unit)
-			.map_or_else(Default::default, |data| data.cost())
+			.map_or_else(Cost::default, |data| data.cost())
 	}
 	/// Returns correct cost of building given unit type.
 	pub fn get_unit_cost(&self, unit: UnitTypeId) -> Cost {
-		let mut cost = self
-			.game_data
-			.units
-			.get(&unit)
-			.map_or_else(Default::default, |data| data.cost());
+		let mut cost = self.get_unit_api_cost(unit);
 		match unit {
-			UnitTypeId::OrbitalCommand | UnitTypeId::PlanetaryFortress => {
-				cost.minerals = 150;
-			}
-			UnitTypeId::Reactor => {
-				cost.minerals = 50;
-				cost.vespene = 50;
-			}
-			UnitTypeId::TechLab => {
-				cost.minerals = 50;
+			UnitTypeId::OverlordTransport => {
+				cost.minerals = 25;
 				cost.vespene = 25;
 			}
-			UnitTypeId::Zergling => {
+			UnitTypeId::Zergling | UnitTypeId::ZerglingBurrowed => {
 				cost.minerals *= 2;
+				cost.supply *= 2.0;
 			}
-			_ => {}
+			_ => {
+				let pred = self.get_unit_api_cost(match unit {
+					UnitTypeId::Baneling | UnitTypeId::BanelingBurrowed => UnitTypeId::Zergling,
+					UnitTypeId::Ravager | UnitTypeId::RavagerBurrowed => UnitTypeId::Roach,
+					UnitTypeId::LurkerMP | UnitTypeId::LurkerMPBurrowed => UnitTypeId::Hydralisk,
+					UnitTypeId::Overseer | UnitTypeId::OverseerSiegeMode => UnitTypeId::Overlord,
+					UnitTypeId::BroodLord => UnitTypeId::Corruptor,
+					UnitTypeId::OrbitalCommand
+					| UnitTypeId::OrbitalCommandFlying
+					| UnitTypeId::PlanetaryFortress => UnitTypeId::CommandCenter,
+					UnitTypeId::Lair => UnitTypeId::Hatchery,
+					UnitTypeId::Hive => UnitTypeId::Lair,
+					UnitTypeId::GreaterSpire => UnitTypeId::Spire,
+					UnitTypeId::Hatchery
+					| UnitTypeId::SpineCrawler
+					| UnitTypeId::SporeCrawler
+					| UnitTypeId::Extractor
+					| UnitTypeId::SpawningPool
+					| UnitTypeId::EvolutionChamber
+					| UnitTypeId::RoachWarren
+					| UnitTypeId::BanelingNest
+					| UnitTypeId::HydraliskDen
+					| UnitTypeId::LurkerDenMP
+					| UnitTypeId::InfestationPit
+					| UnitTypeId::Spire
+					| UnitTypeId::NydusNetwork
+					| UnitTypeId::UltraliskCavern => UnitTypeId::Drone,
+					_ => return cost,
+				});
+				cost.minerals -= pred.minerals;
+				cost.vespene -= pred.vespene;
+				cost.supply = (cost.supply - pred.supply).max(0.0);
+			}
 		}
 		cost
 	}
@@ -954,7 +976,7 @@ impl Bot {
 			macro_rules! add_to {
 				($group:expr) => {{
 					$group.push(u.clone());
-					}};
+				}};
 			}
 
 			match u.alliance {
