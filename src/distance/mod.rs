@@ -1,7 +1,7 @@
 //! Traits for comparing distance between points and units.
 
 use crate::{geometry::Point2, units::iter::filter_fold};
-use std::{cmp::Ordering, iter::FromIterator, vec::IntoIter};
+use std::{cmp::Ordering, vec::IntoIter};
 
 #[cfg(feature = "rayon")]
 pub mod rayon;
@@ -105,7 +105,7 @@ where
 	/// When applicable, unstable sorting is preferred because it is generally faster than stable sorting
 	/// and it doesn't allocate auxiliary memory. See [`sort_unstable_by_distance`](Self::sort_unstable_by_distance).
 	fn sort_by_distance<T: Into<Point2>>(self, target: T) -> IntoIter<Self::Item> {
-		let mut v = Vec::from_iter(self);
+		let mut v: Vec<_> = self.collect();
 		let target = target.into();
 		v.sort_by(dist_to(target));
 		v.into_iter()
@@ -115,7 +115,7 @@ where
 	/// This sort is unstable (i.e., may reorder equal elements),
 	/// in-place (i.e., does not allocate), and `O(n * log(n))` worst-case.
 	fn sort_unstable_by_distance<T: Into<Point2>>(self, target: T) -> IntoIter<Self::Item> {
-		let mut v = Vec::from_iter(self);
+		let mut v: Vec<_> = self.collect();
 		let target = target.into();
 		v.sort_unstable_by(dist_to(target));
 		v.into_iter()
