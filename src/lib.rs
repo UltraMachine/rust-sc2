@@ -300,7 +300,7 @@ you'll need to provide suitable binaries for each ladder.
 Because of version differences ids are conditionally compiled for windows and linux.
 
 [SC2AI]: https://sc2ai.net
-[AI Arena]: https://ai-arena.net
+[AI Arena]: https://aiarena.net
 [`examples`]: https://github.com/UltraMachine/rust-sc2/tree/master/examples
 
 [`Race`]: player::Race
