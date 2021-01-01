@@ -803,13 +803,16 @@ impl Bot {
 				|(p1, _), (p2, _)| p1.distance_squared(*p2),
 				RESOURCE_SPREAD,
 			),
-			4,
+			1,
 		)
 		.0;
 
 		const OFFSET: isize = 7;
 		let offsets = iproduct!((-OFFSET..=OFFSET), (-OFFSET..=OFFSET))
-			.filter(|(x, y)| x * x + y * y <= 64)
+			.filter(|(x, y)| {
+				let d = x * x + y * y;
+				16 < d && d <= 64
+			})
 			.collect::<Vec<(isize, isize)>>();
 
 		self.expansions = resource_groups
@@ -832,7 +835,7 @@ impl Bot {
 								let far_enough = |r: &Unit| {
 									let dist = pos.distance_squared(r);
 									distance_sum += dist;
-									dist > if r.is_geyser() { 49.0 } else { 36.0 }
+									dist >= if r.is_geyser() { 49.0 } else { 36.0 }
 								};
 								if resources.iter().all(far_enough) {
 									return Some((pos, distance_sum));
