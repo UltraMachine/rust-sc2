@@ -1254,6 +1254,7 @@ impl Bot {
 			let mark_cloaked = |u: u64, us: &mut Units| {
 				if let Some(u) = us.get_mut(u) {
 					u.display_type = DisplayType::Hidden;
+					u.is_cloaked = true;
 					u.is_revealed = false;
 				}
 			};
@@ -1270,6 +1271,7 @@ impl Bot {
 						u.type_id = *burrowed_id;
 						u.is_burrowed = true;
 						u.is_cloaked = true;
+						u.is_revealed = false;
 					}
 				}
 			};
