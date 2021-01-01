@@ -27,7 +27,7 @@ use sc2_proto::{
 	query::{RequestQueryBuildingPlacement, RequestQueryPathing},
 	sc2api::Request,
 };
-use std::process::Child;
+use std::{fmt, process::Child};
 
 #[cfg(feature = "enemies_cache")]
 use crate::{consts::BURROWED_IDS, unit::DisplayType};
@@ -291,6 +291,35 @@ impl<'a> CountOptions<'a> {
 					+ TECH_ALIAS
 						.get(&unit_id)
 						.map_or(0, |alias| alias.iter().copied().map(count).sum::<usize>())
+			}
+		}
+	}
+}
+
+impl fmt::Debug for CountOptions<'_> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		let bot = self.bot;
+		if self.enemies {
+			match self.completion {
+				Completion::Complete => bot.enemies_current.fmt(f),
+				Completion::Ordered => bot.enemies_ordered.fmt(f),
+				Completion::All => {
+					write!(f, "current: ")?;
+					bot.enemies_current.fmt(f)?;
+					write!(f, "\nordered: ")?;
+					bot.enemies_ordered.fmt(f)
+				}
+			}
+		} else {
+			match self.completion {
+				Completion::Complete => bot.current_units.fmt(f),
+				Completion::Ordered => bot.orders.fmt(f),
+				Completion::All => {
+					write!(f, "current: ")?;
+					bot.current_units.fmt(f)?;
+					write!(f, "\nordered: ")?;
+					bot.orders.fmt(f)
+				}
 			}
 		}
 	}
