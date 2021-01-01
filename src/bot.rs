@@ -1498,13 +1498,9 @@ impl Bot {
 			})
 			.copied()
 			.collect::<Vec<(Point2, Point2)>>();
+		let start = Target::Pos(self.start_location);
 		let paths = self
-			.query_pathing(
-				expansions
-					.iter()
-					.map(|(loc, _)| (Target::Pos(self.start_location), *loc))
-					.collect(),
-			)
+			.query_pathing(expansions.iter().map(|(loc, _)| (start, *loc)).collect())
 			.unwrap();
 
 		expansions
@@ -1525,13 +1521,9 @@ impl Bot {
 			})
 			.copied()
 			.collect::<Vec<(Point2, Point2)>>();
+		let start = Target::Pos(self.enemy_start);
 		let paths = self
-			.query_pathing(
-				expansions
-					.iter()
-					.map(|(loc, _)| (Target::Pos(self.enemy_start), *loc))
-					.collect(),
-			)
+			.query_pathing(expansions.iter().map(|(loc, _)| (start, *loc)).collect())
 			.unwrap();
 
 		expansions
