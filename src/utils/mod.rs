@@ -24,9 +24,9 @@ where
 	let mut clusters = Vec::<Vec<P>>::new();
 	let mut noise = FxHashSet::<P>::default();
 	let mut solved = FxHashSet::<P>::default();
-	data.into_iter().for_each(|p| {
+	for p in data {
 		if solved.contains(&p) {
-			return;
+			continue;
 		}
 		solved.insert(p.clone());
 
@@ -54,7 +54,7 @@ where
 			}
 			c += 1;
 		}
-	});
+	}
 	(clusters, noise)
 }
 

@@ -1055,15 +1055,17 @@ impl Unit {
 
 				let mut target_has_guardian_shield = false;
 
-				target.buffs.iter().for_each(|buff| match buff {
-					BuffId::GuardianShield => target_has_guardian_shield = true,
-					_ => {
-						if *buff == ANTI_ARMOR_BUFF {
-							enemy_armor -= 3;
-							enemy_shield_armor -= 3;
+				for buff in &target.buffs {
+					match buff {
+						BuffId::GuardianShield => target_has_guardian_shield = true,
+						_ => {
+							if *buff == ANTI_ARMOR_BUFF {
+								enemy_armor -= 3;
+								enemy_shield_armor -= 3;
+							}
 						}
 					}
-				});
+				}
 
 				if !target_upgrades.is_empty() {
 					if target.race().is_terran() {
@@ -1116,11 +1118,13 @@ impl Unit {
 		let mut speed_modifier = 1.0;
 		let mut range_modifier = 0.0;
 
-		self.buffs.iter().for_each(|buff| match buff {
-			BuffId::Stimpack | BuffId::StimpackMarauder => speed_modifier /= 1.5,
-			BuffId::TimeWarpProduction => speed_modifier *= 2.0,
-			_ => {}
-		});
+		for buff in &self.buffs {
+			match buff {
+				BuffId::Stimpack | BuffId::StimpackMarauder => speed_modifier /= 1.5,
+				BuffId::TimeWarpProduction => speed_modifier *= 2.0,
+				_ => {}
+			}
+		}
 
 		if !upgrades.is_empty() {
 			match self.type_id {

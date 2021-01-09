@@ -969,7 +969,7 @@ impl Bot {
 			.iter()
 			.filter(|u| !u.is_hallucination)
 			.for_each(|u| {
-				u.orders.iter().for_each(|order| {
+				for order in &u.orders {
 					let ability = order.ability;
 					if ability.is_constructing() {
 						if let Target::Pos(pos) = order.target {
@@ -977,7 +977,7 @@ impl Bot {
 						};
 					}
 					*orders.entry(ability).or_default() += 1;
-				});
+				}
 
 				if u.is_ready() {
 					*current_units.entry(u.type_id).or_default() += 1;
@@ -1014,7 +1014,7 @@ impl Bot {
 		reactor_tags.clear();
 
 		let units = &mut self.units;
-		all_units.iter().for_each(|u| {
+		for u in &all_units {
 			macro_rules! add_to {
 				($group:expr) => {{
 					$group.push(u.clone());
@@ -1161,7 +1161,7 @@ impl Bot {
 				}
 				_ => {}
 			}
-		});
+		}
 		units.all = all_units;
 
 		let enemies = &mut self.units.enemy;
@@ -1170,17 +1170,17 @@ impl Bot {
 				u.is_hallucination = true;
 			}
 		};
-		self.saved_hallucinations.iter().for_each(|&u| {
+		for &u in &self.saved_hallucinations {
 			mark_hallucination(u, &mut enemies.all);
 			mark_hallucination(u, &mut enemies.units);
 			mark_hallucination(u, &mut enemies.workers);
-		});
+		}
 		self.saved_hallucinations.extend(saved_hallucinations);
 
 		fn is_invisible(u: &Unit, detectors: &Units, scans: &[Effect], gap: f32) -> bool {
 			let additional = u.radius + gap;
 
-			for d in detectors.iter() {
+			for d in detectors {
 				if u.is_closer(additional + d.radius + d.detect_range, d) {
 					return false;
 				}
@@ -1233,7 +1233,7 @@ impl Bot {
 				.collect::<Vec<Effect>>();
 
 			let current = &self.units.enemy.all;
-			self.units.cached.all.iter().for_each(|u| {
+			for u in &self.units.cached.all {
 				if current.contains_tag(u.tag) {
 					// Mark as hidden undetected burrowed units - it's not possible to attack them.
 					if u.is_burrowed && u.is_revealed && is_invisible(u, &detectors, &scans, 0.0) {
@@ -1280,10 +1280,10 @@ impl Bot {
 				} else {
 					to_remove.push(u.tag);
 				}
-			});
+			}
 
 			let cache = &mut self.units.cached;
-			to_remove.into_iter().for_each(|u| {
+			for u in to_remove {
 				cache.all.remove(u);
 				cache.units.remove(u);
 				cache.workers.remove(u);
@@ -1291,7 +1291,7 @@ impl Bot {
 					cache.structures.remove(u);
 					cache.townhalls.remove(u);
 				}
-			});
+			}
 
 			let mark_cloaked = |u: u64, us: &mut Units| {
 				if let Some(u) = us.get_mut(u) {
@@ -1300,11 +1300,11 @@ impl Bot {
 					u.is_revealed = false;
 				}
 			};
-			cloaked.into_iter().for_each(|u| {
+			for u in cloaked {
 				mark_cloaked(u, &mut cache.all);
 				mark_cloaked(u, &mut cache.units);
 				mark_cloaked(u, &mut cache.workers);
-			});
+			}
 
 			let mark_burrowed = |u: u64, us: &mut Units| {
 				if let Some(u) = us.get_mut(u) {
@@ -1317,18 +1317,18 @@ impl Bot {
 					}
 				}
 			};
-			burrowed.into_iter().for_each(|u| {
+			for u in burrowed {
 				mark_burrowed(u, &mut cache.all);
 				mark_burrowed(u, &mut cache.units);
 				mark_burrowed(u, &mut cache.workers);
-			});
+			}
 
 			let mark_hidden = |u: u64, us: &mut Units| {
 				if let Some(u) = us.get_mut(u) {
 					u.display_type = DisplayType::Hidden;
 				}
 			};
-			hidden.into_iter().for_each(|u| {
+			for u in hidden {
 				mark_hidden(u, &mut cache.all);
 				mark_hidden(u, &mut cache.units);
 				mark_hidden(u, &mut cache.workers);
@@ -1336,7 +1336,7 @@ impl Bot {
 					mark_hidden(u, &mut cache.structures);
 					mark_hidden(u, &mut cache.townhalls);
 				}
-			});
+			}
 		}
 
 		let mut enemies_ordered = FxHashMap::default();
@@ -1632,16 +1632,16 @@ impl Bot {
 		let mut req = Request::new();
 		let req_pathing = req.mut_query().mut_pathing();
 
-		paths.iter().for_each(|(start, goal)| {
+		for (start, goal) in paths {
 			let mut pathing = RequestQueryPathing::new();
 			match start {
-				Target::Tag(tag) => pathing.set_unit_tag(*tag),
+				Target::Tag(tag) => pathing.set_unit_tag(tag),
 				Target::Pos(pos) => pathing.set_start_pos(pos.into_proto()),
 				Target::None => panic!("start pos is not specified in query pathing request"),
 			}
 			pathing.set_end_pos(goal.into_proto());
 			req_pathing.push(pathing);
-		});
+		}
 
 		let res = self.api().send(req)?;
 		Ok(res
@@ -1673,15 +1673,15 @@ impl Bot {
 		req_query.set_ignore_resource_requirements(!check_resources);
 		let req_placement = req_query.mut_placements();
 
-		places.iter().for_each(|(ability, pos, builder)| {
+		for (ability, pos, builder) in places {
 			let mut placement = RequestQueryBuildingPlacement::new();
 			placement.set_ability_id(ability.to_i32().unwrap());
 			placement.set_target_pos(pos.into_proto());
 			if let Some(tag) = builder {
-				placement.set_placing_unit_tag(*tag);
+				placement.set_placing_unit_tag(tag);
 			}
 			req_placement.push(placement);
-		});
+		}
 
 		let res = self.api().send(req)?;
 		Ok(res

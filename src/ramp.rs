@@ -43,7 +43,7 @@ impl Ramp {
 		let mut max = u8::MIN;
 		let mut result = Vec::new();
 
-		self.points.iter().for_each(|&p| {
+		for &p in &self.points {
 			let h = self.height[p];
 			match h.cmp(&max) {
 				Ordering::Greater => {
@@ -53,7 +53,7 @@ impl Ramp {
 				Ordering::Equal => result.push(p),
 				_ => {}
 			}
-		});
+		}
 
 		result
 	}
@@ -62,7 +62,7 @@ impl Ramp {
 		let mut min = u8::MAX;
 		let mut result = Vec::new();
 
-		self.points.iter().for_each(|&p| {
+		for &p in &self.points {
 			let h = self.height[p];
 			match h.cmp(&min) {
 				Ordering::Less => {
@@ -72,7 +72,7 @@ impl Ramp {
 				Ordering::Equal => result.push(p),
 				_ => {}
 			}
-		});
+		}
 
 		result
 	}

@@ -574,12 +574,12 @@ fn join_game2(settings: &PlayerSettings, api: &mut API, ports: Option<&Ports>) -
 		server_ports.set_base_port(ports.server.1);
 
 		let client_ports = req_join_game.mut_client_ports();
-		ports.client.iter().for_each(|client| {
+		for client in &ports.client {
 			let mut port_set = PortSet::new();
 			port_set.set_game_port(client.0);
 			port_set.set_base_port(client.1);
 			client_ports.push(port_set);
-		});
+		}
 	}
 
 	api.send_only(req)?;
@@ -616,7 +616,9 @@ where
 	if !bot_actions.is_empty() {
 		let mut req = Request::new();
 		let actions = req.mut_action().mut_actions();
-		bot_actions.iter().for_each(|a| actions.push(a.into_proto()));
+		for a in bot_actions {
+			actions.push(a.into_proto());
+		}
 		bot.clear_actions();
 		bot.api().send_request(req)?;
 	}
@@ -655,7 +657,9 @@ where
 		// println!("{:?}: {:?}", iteration, bot_actions);
 		let mut req = Request::new();
 		let actions = req.mut_action().mut_actions();
-		bot_actions.iter().for_each(|a| actions.push(a.into_proto()));
+		for a in bot_actions {
+			actions.push(a.into_proto());
+		}
 		bot.clear_actions();
 		bot.api().send_request(req)?;
 		/*

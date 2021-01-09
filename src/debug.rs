@@ -227,67 +227,69 @@ impl IntoProto<ProtoDebugCommand> for &DebugCommand {
 impl IntoProto<ProtoDebugDraw> for &[DebugDraw] {
 	fn into_proto(self) -> ProtoDebugDraw {
 		let mut cmds = ProtoDebugDraw::new();
-		self.iter().for_each(|drawing| match drawing {
-			DebugDraw::Text(text, pos, color, size) => {
-				let mut proto_text = DebugText::new();
-				proto_text.set_text(text.to_string());
-				match pos {
-					DebugPos::Screen((x, y)) => {
-						let pos = proto_text.mut_virtual_pos();
-						pos.set_x(*x);
-						pos.set_y(*y);
+		for drawing in self {
+			match drawing {
+				DebugDraw::Text(text, pos, color, size) => {
+					let mut proto_text = DebugText::new();
+					proto_text.set_text(text.to_string());
+					match pos {
+						DebugPos::Screen((x, y)) => {
+							let pos = proto_text.mut_virtual_pos();
+							pos.set_x(*x);
+							pos.set_y(*y);
+						}
+						DebugPos::World(p) => proto_text.set_world_pos(p.into_proto()),
 					}
-					DebugPos::World(p) => proto_text.set_world_pos(p.into_proto()),
+					if let Some((r, g, b)) = color {
+						let proto_color = proto_text.mut_color();
+						proto_color.set_r(*r);
+						proto_color.set_g(*g);
+						proto_color.set_b(*b);
+					}
+					if let Some(s) = size {
+						proto_text.set_size(*s);
+					}
+					cmds.mut_text().push(proto_text);
 				}
-				if let Some((r, g, b)) = color {
-					let proto_color = proto_text.mut_color();
-					proto_color.set_r(*r);
-					proto_color.set_g(*g);
-					proto_color.set_b(*b);
+				DebugDraw::Line(p0, p1, color) => {
+					let mut proto_line = DebugLine::new();
+					let line = proto_line.mut_line();
+					line.set_p0(p0.into_proto());
+					line.set_p1(p1.into_proto());
+					if let Some((r, g, b)) = color {
+						let proto_color = proto_line.mut_color();
+						proto_color.set_r(*r);
+						proto_color.set_g(*g);
+						proto_color.set_b(*b);
+					}
+					cmds.mut_lines().push(proto_line);
 				}
-				if let Some(s) = size {
-					proto_text.set_size(*s);
+				DebugDraw::Box(p0, p1, color) => {
+					let mut proto_box = DebugBox::new();
+					proto_box.set_min(p0.into_proto());
+					proto_box.set_max(p1.into_proto());
+					if let Some((r, g, b)) = color {
+						let proto_color = proto_box.mut_color();
+						proto_color.set_r(*r);
+						proto_color.set_g(*g);
+						proto_color.set_b(*b);
+					}
+					cmds.mut_boxes().push(proto_box);
 				}
-				cmds.mut_text().push(proto_text);
+				DebugDraw::Sphere(pos, radius, color) => {
+					let mut proto_sphere = DebugSphere::new();
+					proto_sphere.set_p(pos.into_proto());
+					proto_sphere.set_r(*radius);
+					if let Some((r, g, b)) = color {
+						let proto_color = proto_sphere.mut_color();
+						proto_color.set_r(*r);
+						proto_color.set_g(*g);
+						proto_color.set_b(*b);
+					}
+					cmds.mut_spheres().push(proto_sphere);
+				}
 			}
-			DebugDraw::Line(p0, p1, color) => {
-				let mut proto_line = DebugLine::new();
-				let line = proto_line.mut_line();
-				line.set_p0(p0.into_proto());
-				line.set_p1(p1.into_proto());
-				if let Some((r, g, b)) = color {
-					let proto_color = proto_line.mut_color();
-					proto_color.set_r(*r);
-					proto_color.set_g(*g);
-					proto_color.set_b(*b);
-				}
-				cmds.mut_lines().push(proto_line);
-			}
-			DebugDraw::Box(p0, p1, color) => {
-				let mut proto_box = DebugBox::new();
-				proto_box.set_min(p0.into_proto());
-				proto_box.set_max(p1.into_proto());
-				if let Some((r, g, b)) = color {
-					let proto_color = proto_box.mut_color();
-					proto_color.set_r(*r);
-					proto_color.set_g(*g);
-					proto_color.set_b(*b);
-				}
-				cmds.mut_boxes().push(proto_box);
-			}
-			DebugDraw::Sphere(pos, radius, color) => {
-				let mut proto_sphere = DebugSphere::new();
-				proto_sphere.set_p(pos.into_proto());
-				proto_sphere.set_r(*radius);
-				if let Some((r, g, b)) = color {
-					let proto_color = proto_sphere.mut_color();
-					proto_color.set_r(*r);
-					proto_color.set_g(*g);
-					proto_color.set_b(*b);
-				}
-				cmds.mut_spheres().push(proto_sphere);
-			}
-		});
+		}
 		cmds
 	}
 }

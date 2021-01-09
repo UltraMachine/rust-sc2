@@ -185,13 +185,13 @@ where
 	// Available abilities
 	let mut req = Request::new();
 	let req_query_abilities = req.mut_query().mut_abilities();
-	res_raw.get_units().iter().for_each(|u| {
+	for u in res_raw.get_units() {
 		if matches!(u.get_alliance(), ProtoAlliance::value_Self) {
 			let mut req_unit = RequestQueryAvailableAbilities::new();
 			req_unit.set_unit_tag(u.get_tag());
 			req_query_abilities.push(req_unit);
 		}
-	});
+	}
 
 	let res = bot.api().send(req)?;
 	*bot.abilities_units.write_lock() = res
