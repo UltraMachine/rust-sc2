@@ -1384,11 +1384,24 @@ impl Bot {
 			.cloned()
 			.collect::<Vec<Effect>>();
 
-		self.units.my.all.iter_mut().for_each(|u| {
-			if u.is_cloaked && !(u.is_revealed || is_invisible(u, &enemy_detectors, &enemy_scans, 1.0)) {
+		let mut revealed = Vec::<u64>::new();
+
+		for u in &self.units.my.all {
+			if !(u.is_revealed || is_invisible(u, &enemy_detectors, &enemy_scans, 1.0)) {
+				revealed.push(u.tag);
+			}
+		}
+
+		let mark_revealed = |u: u64, us: &mut Units| {
+			if let Some(u) = us.get_mut(u) {
 				u.is_revealed = true;
 			}
-		});
+		};
+		let my = &mut self.units.my;
+		for u in revealed {
+			mark_revealed(u, &mut my.all);
+			mark_revealed(u, &mut my.units);
+		}
 	}
 
 	/// Simple wrapper around [`query_placement`](Self::query_placement).
