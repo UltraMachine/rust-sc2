@@ -12,7 +12,7 @@ license-file = "LICENSE"
 sc2-proto = { git = "https://github.com/UltraMachine/sc2-proto-rs" }
 # sc2-proto = { path = "../sc2-proto-rs" }
 sc2-macro = { path = "sc2-macro" }
-tungstenite = "^0.11.1"
+tungstenite = "^0.12.0"
 url = "^2.1.1"
 protobuf = "^2.17.0"
 ndarray = "^0.14.0"
