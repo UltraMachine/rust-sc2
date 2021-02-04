@@ -1,4 +1,7 @@
 # rust-sc2
+[![crates.io](https://img.shields.io/crates/v/rust-sc2.svg)](https://crates.io/crates/rust-sc2)
+[![Documentation](https://docs.rs/rust-sc2/badge.svg)](https://docs.rs/rust-sc2)
+
 Rust implementation of StarCraft II API
 
 The library aims to be simple and easy to use, being very fast and functional at the same time. However, it provides both high and low level abstractions. This lib is inspired by [python-sc2](https://github.com/BurnySc2/python-sc2) lib, so people might find it easy to switch to rust-sc2. It was originally created because other rust libs were old, not functional and low level.
@@ -17,6 +20,11 @@ error: could not compile `rust-sc2`.
 ```
 
 Add to dependencies in Cargo.toml:
+```toml
+[dependencies]
+rust-sc2 = "1"
+```
+Or if you want developer version directly from github:
 ```toml
 [dependencies]
 rust-sc2 = { git = "https://github.com/UltraMachine/rust-sc2" }
