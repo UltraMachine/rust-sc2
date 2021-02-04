@@ -1,6 +1,6 @@
 [package]
 name = "rust-sc2"
-version = "0.9.0"
+version = "1.0.0"
 authors = ["Armageddon <lunyx1337@gmail.com>"]
 edition = "2018"
 description = "Rust implementation of StarCraft II API"
@@ -9,9 +9,9 @@ readme = "README.md"
 license-file = "LICENSE"
 
 [dependencies]
-sc2-proto = { git = "https://github.com/UltraMachine/sc2-proto-rs" }
+sc2-proto = "0.2.3"
 # sc2-proto = { path = "../sc2-proto-rs" }
-sc2-macro = { path = "sc2-macro" }
+sc2-macro = { path = "sc2-macro", version = "1" }
 tungstenite = "^0.12.0"
 url = "^2.1.1"
 protobuf = "^2.17.0"

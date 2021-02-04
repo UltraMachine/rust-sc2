@@ -1,8 +1,12 @@
 [package]
 name = "sc2-proc-macro"
-version = "0.8.5"
+version = "1.0.0"
 authors = ["Armageddon <lunyx1337@gmail.com>"]
 edition = "2018"
+description = "Procedural macros for rust-sc2 API"
+repository = "https://github.com/UltraMachine/rust-sc2"
+readme = "../../README.md"
+license-file = "../../LICENSE"
 
 [lib]
 proc-macro = true
