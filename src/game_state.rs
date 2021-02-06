@@ -233,7 +233,7 @@ where
 		if !bot.owned_tags.contains(tag) {
 			owned_tags.push(*tag);
 			if u.is_structure() {
-				if !(u.is_placeholder() || u.type_id == UnitTypeId::KD8Charge) {
+				if !(u.is_placeholder() || u.type_id() == UnitTypeId::KD8Charge) {
 					if u.is_ready() {
 						events.push(Event::ConstructionComplete(*tag));
 					} else {

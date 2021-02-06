@@ -3,7 +3,7 @@
 
 use crate::{
 	action::{Commander, Target},
-	bot::{LockBool, LockOwned, LockU32, Locked, Reader, Rs, Rw},
+	bot::{LockBool, LockOwned, LockU32, Locked, Reader, Rl, Rs, Rw},
 	consts::{
 		RaceValues, ANTI_ARMOR_BUFF, DAMAGE_BONUS_PER_UPGRADE, FRAMES_PER_SECOND, MISSED_WEAPONS,
 		OFF_CREEP_SPEED_UPGRADES, SPEED_BUFFS, SPEED_ON_CREEP, SPEED_UPGRADES, WARPGATE_ABILITIES,
@@ -42,6 +42,55 @@ pub(crate) struct DataForUnit {
 	pub allow_spam: Rs<LockBool>,
 }
 
+pub(crate) struct UnitBase {
+	pub display_type: Rl<DisplayType>,
+	pub alliance: Alliance,
+	pub tag: u64,
+	pub type_id: Rl<UnitTypeId>,
+	pub owner: u32,
+	pub position: Point2,
+	pub position3d: Point3,
+	pub facing: f32,
+	pub radius: f32,
+	pub build_progress: f32,
+	pub is_cloaked: LockBool,
+	pub is_revealed: LockBool,
+	pub buffs: FxHashSet<BuffId>,
+	pub detect_range: f32,
+	pub radar_range: f32,
+	pub is_selected: bool,
+	pub is_on_screen: bool,
+	pub is_blip: bool,
+	pub is_powered: bool,
+	pub is_active: bool,
+	pub attack_upgrade_level: u32,
+	pub armor_upgrade_level: i32,
+	pub shield_upgrade_level: i32,
+	pub health: Option<u32>,
+	pub health_max: Option<u32>,
+	pub shield: Option<u32>,
+	pub shield_max: Option<u32>,
+	pub energy: Option<u32>,
+	pub energy_max: Option<u32>,
+	pub mineral_contents: Option<u32>,
+	pub vespene_contents: Option<u32>,
+	pub is_flying: bool,
+	pub is_burrowed: LockBool,
+	pub is_hallucination: LockBool,
+	pub orders: Vec<UnitOrder>,
+	pub addon_tag: Option<u64>,
+	pub passengers: Vec<PassengerUnit>,
+	pub cargo_space_taken: Option<u32>,
+	pub cargo_space_max: Option<u32>,
+	pub assigned_harvesters: Option<u32>,
+	pub ideal_harvesters: Option<u32>,
+	pub weapon_cooldown: Option<f32>,
+	pub engaged_target_tag: Option<u64>,
+	pub buff_duration_remain: Option<u32>,
+	pub buff_duration_max: Option<u32>,
+	pub rally_targets: Vec<RallyTarget>,
+}
+
 /// Weapon target used in [`calculate_weapon_stats`](Unit::calculate_weapon_stats).
 pub enum CalcTarget<'a> {
 	/// Specific unit.
@@ -57,14 +106,23 @@ pub(crate) type SharedUnitData = Rs<DataForUnit>;
 #[derive(Clone)]
 pub struct Unit {
 	data: SharedUnitData,
+	pub(crate) base: Rs<UnitBase>,
+}
 
+impl Unit {
 	/////////////////////////////////////////////////
 	// Fields are populated based on type/alliance //
 	/////////////////////////////////////////////////
 	/// How unit is displayed (i.e. visibility of unit).
-	pub display_type: DisplayType,
+	#[inline]
+	pub fn display_type(&self) -> DisplayType {
+		*self.base.display_type.read_lock()
+	}
 	/// Unit is owned, enemy or just neutral.
-	pub alliance: Alliance,
+	#[inline]
+	pub fn alliance(&self) -> Alliance {
+		self.base.alliance
+	}
 
 	/// Unique and constant for each unit tag. Used to find exactly the same unit in bunch of [`Units`].
 	/// See also [`get`], [`get_mut`] and [`find_tags`].
@@ -73,53 +131,116 @@ pub struct Unit {
 	/// [`get`]: crate::units::Units::get
 	/// [`get_mut`]: crate::units::Units::get_mut
 	/// [`find_tags`]: crate::units::Units::find_tags
-	pub tag: u64,
+	#[inline]
+	pub fn tag(&self) -> u64 {
+		self.base.tag
+	}
 	/// The type of unit.
-	pub type_id: UnitTypeId,
+	#[inline]
+	pub fn type_id(&self) -> UnitTypeId {
+		*self.base.type_id.read_lock()
+	}
 	/// Player id of the owner. Normally it should match your [`player_id`] for owned units
 	/// and [`enemy_player_id`] for opponent's units.
 	///
 	/// [`player_id`]: crate::bot::Bot::player_id
 	/// [`enemy_player_id`]: crate::bot::Bot::enemy_player_id
-	pub owner: u32,
+	#[inline]
+	pub fn owner(&self) -> u32 {
+		self.base.owner
+	}
 	/// Position on 2D grid.
-	pub position: Point2,
+	#[inline]
+	pub fn position(&self) -> Point2 {
+		self.base.position
+	}
 	/// Position in 3D world space.
-	pub position3d: Point3,
+	#[inline]
+	pub fn position3d(&self) -> Point3 {
+		self.base.position3d
+	}
 	/// Unit rotation angle (i.e. the direction unit is facing).
 	/// Value in range `[0, 2π)`.
-	pub facing: f32,
+	#[inline]
+	pub fn facing(&self) -> f32 {
+		self.base.facing
+	}
 	/// Radius of the unit.
-	pub radius: f32,
+	#[inline]
+	pub fn radius(&self) -> f32 {
+		self.base.radius
+	}
 	/// The progress of building construction. Value from `0` to `1`.
-	pub build_progress: f32,
+	#[inline]
+	pub fn build_progress(&self) -> f32 {
+		self.base.build_progress
+	}
 	/// `true` when unit is burrowed or has cloak field turned on.
-	pub is_cloaked: bool,
+	#[inline]
+	pub fn is_cloaked(&self) -> bool {
+		self.base.is_cloaked.get_locked()
+	}
 	/// `true` when unit is detected.
-	pub is_revealed: bool,
+	#[inline]
+	pub fn is_revealed(&self) -> bool {
+		self.base.is_revealed.get_locked()
+	}
 	/// Set of buffs unit has.
-	pub buffs: FxHashSet<BuffId>,
+	#[inline]
+	pub fn buffs(&self) -> &FxHashSet<BuffId> {
+		&self.base.buffs
+	}
 	/// Detection range of detector or `0` if unit is not detector.
 	/// See also [`is_detector`](Self::is_detector).
-	pub detect_range: f32,
+	#[inline]
+	pub fn detect_range(&self) -> f32 {
+		self.base.detect_range
+	}
 	/// Range of terran's sensor tower.
-	pub radar_range: f32,
+	#[inline]
+	pub fn radar_range(&self) -> f32 {
+		self.base.radar_range
+	}
 	/// Unit is selected.
-	pub is_selected: bool,
+	#[inline]
+	pub fn is_selected(&self) -> bool {
+		self.base.is_selected
+	}
 	/// Unit is visible in game window.
-	pub is_on_screen: bool,
+	#[inline]
+	pub fn is_on_screen(&self) -> bool {
+		self.base.is_on_screen
+	}
 	/// Enemies detected by sensor tower.
-	pub is_blip: bool,
+	#[inline]
+	pub fn is_blip(&self) -> bool {
+		self.base.is_blip
+	}
 	/// Protoss structure is powered by pylon.
-	pub is_powered: bool,
+	#[inline]
+	pub fn is_powered(&self) -> bool {
+		self.base.is_powered
+	}
 	/// Building is training/researching (i.e. animated).
-	pub is_active: bool,
+	#[inline]
+	pub fn is_active(&self) -> bool {
+		self.base.is_active
+	}
 	/// General attack upgrade level without considering buffs and special upgrades.
-	pub attack_upgrade_level: u32,
+	#[inline]
+	pub fn attack_upgrade_level(&self) -> u32 {
+		self.base.attack_upgrade_level
+	}
 	/// General armor upgrade level without considering buffs and special upgrades.
-	pub armor_upgrade_level: i32,
+	#[inline]
+	pub fn armor_upgrade_level(&self) -> i32 {
+		self.base.armor_upgrade_level
+	}
 	/// General shield upgrade level without considering buffs and special upgrades.
-	pub shield_upgrade_level: i32,
+	#[inline]
+	pub fn shield_upgrade_level(&self) -> i32 {
+		self.base.shield_upgrade_level
+	}
 
 	/////////////////////////////////
 	// Not populated for snapshots //
@@ -127,47 +248,80 @@ pub struct Unit {
 	/// Current health of unit.
 	///
 	/// Note: Not populated for snapshots.
-	pub health: Option<u32>,
+	#[inline]
+	pub fn health(&self) -> Option<u32> {
+		self.base.health
+	}
 	/// Maximum health of unit.
 	///
 	/// Note: Not populated for snapshots.
-	pub health_max: Option<u32>,
+	#[inline]
+	pub fn health_max(&self) -> Option<u32> {
+		self.base.health_max
+	}
 	/// Current shield of protoss unit.
 	///
 	/// Note: Not populated for snapshots.
-	pub shield: Option<u32>,
+	#[inline]
+	pub fn shield(&self) -> Option<u32> {
+		self.base.shield
+	}
 	/// Maximum shield of protoss unit.
 	///
 	/// Note: Not populated for snapshots.
-	pub shield_max: Option<u32>,
+	#[inline]
+	pub fn shield_max(&self) -> Option<u32> {
+		self.base.shield_max
+	}
 	/// Current energy of caster unit.
 	///
 	/// Note: Not populated for snapshots.
-	pub energy: Option<u32>,
+	#[inline]
+	pub fn energy(&self) -> Option<u32> {
+		self.base.energy
+	}
 	/// Maximum energy of caster unit.
 	///
 	/// Note: Not populated for snapshots.
-	pub energy_max: Option<u32>,
+	#[inline]
+	pub fn energy_max(&self) -> Option<u32> {
+		self.base.energy_max
+	}
 	/// Amount of minerals left in mineral field.
 	///
 	/// Note: Not populated for snapshots.
-	pub mineral_contents: Option<u32>,
+	#[inline]
+	pub fn mineral_contents(&self) -> Option<u32> {
+		self.base.mineral_contents
+	}
 	/// Amount of vespene gas left in vespene geyser.
 	///
 	/// Note: Not populated for snapshots.
-	pub vespene_contents: Option<u32>,
+	#[inline]
+	pub fn vespene_contents(&self) -> Option<u32> {
+		self.base.vespene_contents
+	}
 	/// Unit is flying.
 	///
 	/// Note: Not populated for snapshots.
-	pub is_flying: bool,
+	#[inline]
+	pub fn is_flying(&self) -> bool {
+		self.base.is_flying
+	}
 	/// Zerg unit is burrowed.
 	///
 	/// Note: Not populated for snapshots.
-	pub is_burrowed: bool,
+	#[inline]
+	pub fn is_burrowed(&self) -> bool {
+		self.base.is_burrowed.get_locked()
+	}
 	/// Is hallucination created by protoss sentry.
 	///
 	/// Note: Not populated for snapshots.
-	pub is_hallucination: bool,
+	#[inline]
+	pub fn is_hallucination(&self) -> bool {
+		self.base.is_hallucination.get_locked()
+	}
 
 	///////////////////////////////
 	// Not populated for enemies //
@@ -175,53 +329,87 @@ pub struct Unit {
 	/// Current orders of unit.
 	///
 	/// Note: Not populated for enemies.
-	pub orders: Vec<UnitOrder>,
+	#[inline]
+	pub fn orders(&self) -> &[UnitOrder] {
+		&self.base.orders
+	}
 	/// Tag of addon if any.
 	///
 	/// Note: Not populated for enemies.
-	pub addon_tag: Option<u64>,
+	#[inline]
+	pub fn addon_tag(&self) -> Option<u64> {
+		self.base.addon_tag
+	}
 	/// Units inside transport or bunker.
 	///
 	/// Note: Not populated for enemies.
-	pub passengers: Vec<PassengerUnit>,
+	#[inline]
+	pub fn passengers(&self) -> &[PassengerUnit] {
+		&self.base.passengers
+	}
 	/// Used space of transport or bunker.
 	///
 	/// Note: Not populated for enemies.
-	pub cargo_space_taken: Option<u32>,
+	#[inline]
+	pub fn cargo_space_taken(&self) -> Option<u32> {
+		self.base.cargo_space_taken
+	}
 	/// Maximum space of transport or bunker.
 	///
 	/// Note: Not populated for enemies.
-	pub cargo_space_max: Option<u32>,
+	#[inline]
+	pub fn cargo_space_max(&self) -> Option<u32> {
+		self.base.cargo_space_max
+	}
 	/// Current number of workers on gas or base.
 	///
 	/// Note: Not populated for enemies.
-	pub assigned_harvesters: Option<u32>,
+	#[inline]
+	pub fn assigned_harvesters(&self) -> Option<u32> {
+		self.base.assigned_harvesters
+	}
 	/// Ideal number of workers on gas or base.
 	///
 	/// Note: Not populated for enemies.
-	pub ideal_harvesters: Option<u32>,
+	#[inline]
+	pub fn ideal_harvesters(&self) -> Option<u32> {
+		self.base.ideal_harvesters
+	}
 	/// Frames left until weapon will be ready to shot.
 	///
 	/// Note: Not populated for enemies.
-	pub weapon_cooldown: Option<f32>,
-	pub engaged_target_tag: Option<u64>,
+	#[inline]
+	pub fn weapon_cooldown(&self) -> Option<f32> {
+		self.base.weapon_cooldown
+	}
+	#[inline]
+	pub fn engaged_target_tag(&self) -> Option<u64> {
+		self.base.engaged_target_tag
+	}
 	/// How long a buff or unit is still around (e.g. mule, broodling, chronoboost).
 	///
 	/// Note: Not populated for enemies.
-	pub buff_duration_remain: Option<u32>,
+	#[inline]
+	pub fn buff_duration_remain(&self) -> Option<u32> {
+		self.base.buff_duration_remain
+	}
 	/// How long the maximum duration of buff or unit (e.g. mule, broodling, chronoboost).
 	///
 	/// Note: Not populated for enemies.
-	pub buff_duration_max: Option<u32>,
+	#[inline]
+	pub fn buff_duration_max(&self) -> Option<u32> {
+		self.base.buff_duration_max
+	}
 	/// All rally points of structure.
 	///
 	/// Note: Not populated for enemies.
-	pub rally_targets: Vec<RallyTarget>,
-}
+	#[inline]
+	pub fn rally_targets(&self) -> &[RallyTarget] {
+		&self.base.rally_targets
+	}
 
-impl Unit {
 	fn type_data(&self) -> Option<&UnitTypeData> {
-		self.data.game_data.units.get(&self.type_id)
+		self.data.game_data.units.get(&self.type_id())
 	}
 	fn upgrades(&self) -> Reader<FxHashSet<UpgradeId>> {
 		if self.is_mine() {
@@ -236,19 +424,19 @@ impl Unit {
 	}
 	/// Checks if unit is worker.
 	pub fn is_worker(&self) -> bool {
-		self.type_id.is_worker()
+		self.type_id().is_worker()
 	}
 	/// Checks if it's townhall.
 	pub fn is_townhall(&self) -> bool {
-		self.type_id.is_townhall()
+		self.type_id().is_townhall()
 	}
 	/// Checks if it's addon.
 	pub fn is_addon(&self) -> bool {
-		self.type_id.is_addon()
+		self.type_id().is_addon()
 	}
 	/// Checks if unit is melee attacker.
 	pub fn is_melee(&self) -> bool {
-		self.type_id.is_melee()
+		self.type_id().is_melee()
 	}
 	/// Checks if it's mineral field.
 	pub fn is_mineral(&self) -> bool {
@@ -262,37 +450,39 @@ impl Unit {
 	#[rustfmt::skip::macros(matches)]
 	pub fn is_detector(&self) -> bool {
 		matches!(
-			self.type_id,
+			self.type_id(),
 			UnitTypeId::Observer
 				| UnitTypeId::ObserverSiegeMode
 				| UnitTypeId::Raven
 				| UnitTypeId::Overseer
 				| UnitTypeId::OverseerSiegeMode
 		) || (self.is_ready()
-			&& (matches!(self.type_id, UnitTypeId::MissileTurret | UnitTypeId::SporeCrawler)
-				|| (matches!(self.type_id, UnitTypeId::PhotonCannon) && self.is_powered)))
+			&& (matches!(
+				self.type_id(),
+				UnitTypeId::MissileTurret | UnitTypeId::SporeCrawler
+			) || (matches!(self.type_id(), UnitTypeId::PhotonCannon) && self.is_powered())))
 	}
 	/// Building construction complete.
 	pub fn is_ready(&self) -> bool {
-		(self.build_progress - 1.0).abs() < f32::EPSILON
+		(self.build_progress() - 1.0).abs() < f32::EPSILON
 	}
 	/// Terran building has addon.
 	pub fn has_addon(&self) -> bool {
-		self.addon_tag.is_some()
+		self.addon_tag().is_some()
 	}
 	/// Terran building's addon is techlab if any.
 	pub fn has_techlab(&self) -> bool {
 		let techlab_tags = self.data.techlab_tags.read_lock();
-		self.addon_tag.map_or(false, |tag| techlab_tags.contains(&tag))
+		self.addon_tag().map_or(false, |tag| techlab_tags.contains(&tag))
 	}
 	/// Terran building's addon is reactor if any.
 	pub fn has_reactor(&self) -> bool {
 		let reactor_tags = self.data.reactor_tags.read_lock();
-		self.addon_tag.map_or(false, |tag| reactor_tags.contains(&tag))
+		self.addon_tag().map_or(false, |tag| reactor_tags.contains(&tag))
 	}
 	/// Unit was attacked on last step.
 	pub fn is_attacked(&self) -> bool {
-		self.hits() < self.data.last_units_health.read_lock().get(&self.tag).copied()
+		self.hits() < self.data.last_units_health.read_lock().get(&self.tag()).copied()
 	}
 	/// The damage was taken by unit if it was attacked, otherwise it's `0`.
 	pub fn damage_taken(&self) -> u32 {
@@ -300,7 +490,7 @@ impl Unit {
 			Some(hits) => hits,
 			None => return 0,
 		};
-		let last_hits = match self.data.last_units_health.read_lock().get(&self.tag).copied() {
+		let last_hits = match self.data.last_units_health.read_lock().get(&self.tag()).copied() {
 			Some(hits) => hits,
 			None => return 0,
 		};
@@ -311,7 +501,7 @@ impl Unit {
 	/// Ability won't be avaliable if it's on cooldown, unit
 	/// is out of energy or bot doesn't have enough resources.
 	pub fn abilities(&self) -> Option<FxHashSet<AbilityId>> {
-		self.data.abilities_units.read_lock().get(&self.tag).cloned()
+		self.data.abilities_units.read_lock().get(&self.tag()).cloned()
 	}
 	/// Checks if ability is available for unit.
 	///
@@ -321,7 +511,7 @@ impl Unit {
 		self.data
 			.abilities_units
 			.read_lock()
-			.get(&self.tag)
+			.get(&self.tag())
 			.map_or(false, |abilities| abilities.contains(&ability))
 	}
 	/// Race of unit, dependent on it's type.
@@ -330,11 +520,11 @@ impl Unit {
 	}
 	/// There're some units inside transport or bunker.
 	pub fn has_cargo(&self) -> bool {
-		self.cargo_space_taken.map_or(false, |taken| taken > 0)
+		self.cargo_space_taken().map_or(false, |taken| taken > 0)
 	}
 	/// Free space left in transport or bunker.
 	pub fn cargo_left(&self) -> Option<u32> {
-		Some(self.cargo_space_max? - self.cargo_space_taken?)
+		Some(self.cargo_space_max()? - self.cargo_space_taken()?)
 	}
 	/// Half of [`building_size`](Self::building_size), but `2.5` for addons.
 	pub fn footprint_radius(&self) -> Option<f32> {
@@ -375,51 +565,51 @@ impl Unit {
 	}
 	/// Returns point with given offset towards unit face direction.
 	pub fn towards_facing(&self, offset: f32) -> Point2 {
-		self.position
-			.offset(offset * self.facing.cos(), offset * self.facing.sin())
+		self.position()
+			.offset(offset * self.facing().cos(), offset * self.facing().sin())
 	}
 	/// Checks if unit is fully visible.
 	pub fn is_visible(&self) -> bool {
-		self.display_type.is_visible()
+		self.display_type().is_visible()
 	}
 	/// Checks if unit is snapshot (i.e. hidden in fog of war or on high ground).
 	pub fn is_snapshot(&self) -> bool {
-		self.display_type.is_snapshot()
+		self.display_type().is_snapshot()
 	}
 	/// Checks if unit is fully hidden.
 	pub fn is_hidden(&self) -> bool {
-		self.display_type.is_hidden()
+		self.display_type().is_hidden()
 	}
 	/// Checks if unit is building placeholder.
 	pub fn is_placeholder(&self) -> bool {
-		self.display_type.is_placeholder()
+		self.display_type().is_placeholder()
 	}
 	/// Checks if unit is owned.
 	pub fn is_mine(&self) -> bool {
-		self.alliance.is_mine()
+		self.alliance().is_mine()
 	}
 	/// Checks if unit is enemy.
 	pub fn is_enemy(&self) -> bool {
-		self.alliance.is_enemy()
+		self.alliance().is_enemy()
 	}
 	/// Checks if unit is neutral.
 	pub fn is_neutral(&self) -> bool {
-		self.alliance.is_neutral()
+		self.alliance().is_neutral()
 	}
 	/// Checks if unit is allied, but not owned.
 	pub fn is_ally(&self) -> bool {
-		self.alliance.is_ally()
+		self.alliance().is_ally()
 	}
 
 	/// Checks if unit is detected or not even cloaked.
 	#[inline]
 	pub fn can_be_attacked(&self) -> bool {
-		self.is_revealed || !self.is_cloaked
+		self.is_revealed() || !self.is_cloaked()
 	}
 	/// Checks if unit is burrowed or cloaked, and not detected (i.e. must be detected to be attacked).
 	#[inline]
 	pub fn is_invisible(&self) -> bool {
-		self.is_cloaked && !self.is_revealed
+		self.is_cloaked() && !self.is_revealed()
 	}
 
 	/// Returns how much supply this unit uses.
@@ -433,8 +623,8 @@ impl Unit {
 	/// Returns health percentage (current health divided by max health).
 	/// Value in range from `0` to `1`.
 	pub fn health_percentage(&self) -> Option<f32> {
-		let current = self.health?;
-		let max = self.health_max?;
+		let current = self.health()?;
+		let max = self.health_max()?;
 		if max == 0 {
 			return None;
 		}
@@ -443,8 +633,8 @@ impl Unit {
 	/// Returns shield percentage (current shield divided by max shield).
 	/// Value in range from `0` to `1`.
 	pub fn shield_percentage(&self) -> Option<f32> {
-		let current = self.shield?;
-		let max = self.shield_max?;
+		let current = self.shield()?;
+		let max = self.shield_max()?;
 		if max == 0 {
 			return None;
 		}
@@ -453,8 +643,8 @@ impl Unit {
 	/// Returns energy percentage (current energy divided by max energy).
 	/// Value in range from `0` to `1`.
 	pub fn energy_percentage(&self) -> Option<f32> {
-		let current = self.energy?;
-		let max = self.energy_max?;
+		let current = self.energy()?;
+		let max = self.energy_max()?;
 		if max == 0 {
 			return None;
 		}
@@ -464,7 +654,7 @@ impl Unit {
 	///
 	/// Not populated for snapshots.
 	pub fn hits(&self) -> Option<u32> {
-		match (self.health, self.shield) {
+		match (self.health(), self.shield()) {
 			(Some(health), Some(shield)) => Some(health + shield),
 			(Some(health), None) => Some(health),
 			(None, Some(shield)) => Some(shield),
@@ -475,7 +665,7 @@ impl Unit {
 	///
 	/// Not populated for snapshots.
 	pub fn hits_max(&self) -> Option<u32> {
-		match (self.health_max, self.shield_max) {
+		match (self.health_max(), self.shield_max()) {
 			(Some(health), Some(shield)) => Some(health + shield),
 			(Some(health), None) => Some(health),
 			(None, Some(shield)) => Some(shield),
@@ -503,12 +693,12 @@ impl Unit {
 	/// Returns actual speed of the unit calculated including buffs and upgrades.
 	pub fn real_speed(&self) -> f32 {
 		let mut speed = self.speed();
-		let unit_type = self.type_id;
+		let unit_type = self.type_id();
 
 		// ---- Buffs ----
 		// Ultralisk has passive ability "Frenzied" which makes it immune to speed altering buffs
 		if unit_type != UnitTypeId::Ultralisk {
-			for buff in &self.buffs {
+			for buff in self.buffs() {
 				match buff {
 					BuffId::MedivacSpeedBoost => return speed * 1.7,
 					BuffId::VoidRaySwarmDamageBoost => return speed * 0.75,
@@ -531,7 +721,7 @@ impl Unit {
 
 		// ---- Creep ----
 		// On creep
-		if self.data.creep.read_lock()[self.position].is_set() {
+		if self.data.creep.read_lock()[self.position()].is_set() {
 			if let Some(increase) = SPEED_ON_CREEP.get(&unit_type) {
 				speed *= increase;
 			}
@@ -553,7 +743,7 @@ impl Unit {
 	}
 	/// Distance unit can travel until weapons be ready to fire.
 	pub fn distance_to_weapon_ready(&self) -> f32 {
-		self.real_speed() / FRAMES_PER_SECOND * self.weapon_cooldown.unwrap_or(0.0)
+		self.real_speed() / FRAMES_PER_SECOND * self.weapon_cooldown().unwrap_or(0.0)
 	}
 	/// Attributes of unit, dependent on it's type.
 	pub fn attributes(&self) -> &[Attribute] {
@@ -610,11 +800,11 @@ impl Unit {
 	}
 	/// Checks if unit has given buff.
 	pub fn has_buff(&self, buff: BuffId) -> bool {
-		self.buffs.contains(&buff)
+		self.buffs().contains(&buff)
 	}
 	/// Checks if unit has any from given buffs.
 	pub fn has_any_buff<'a, B: IntoIterator<Item = &'a BuffId>>(&self, buffs: B) -> bool {
-		buffs.into_iter().any(|b| self.buffs.contains(&b))
+		buffs.into_iter().any(|b| self.buffs().contains(&b))
 	}
 	/// Checks if worker is carrying minerals.
 	pub fn is_carrying_minerals(&self) -> bool {
@@ -642,7 +832,7 @@ impl Unit {
 
 	#[inline]
 	pub fn weapons(&self) -> &[Weapon] {
-		match self.type_id {
+		match self.type_id() {
 			UnitTypeId::Changeling
 			| UnitTypeId::ChangelingZealot
 			| UnitTypeId::ChangelingMarineShield
@@ -653,7 +843,7 @@ impl Unit {
 				.type_data()
 				.map(|data| data.weapons.as_slice())
 				.filter(|weapons| !weapons.is_empty())
-				.or_else(|| match self.type_id {
+				.or_else(|| match self.type_id() {
 					UnitTypeId::BanelingBurrowed | UnitTypeId::BanelingCocoon => {
 						MISSED_WEAPONS.get(&UnitTypeId::Baneling).map(|ws| ws.as_slice())
 					}
@@ -738,11 +928,11 @@ impl Unit {
 			return false;
 		}
 
-		if target.type_id == UnitTypeId::Colossus {
+		if target.type_id() == UnitTypeId::Colossus {
 			!weapons.is_empty()
 		} else {
 			let not_target = {
-				if target.is_flying {
+				if target.is_flying() {
 					TargetType::Ground
 				} else {
 					TargetType::Air
@@ -753,16 +943,16 @@ impl Unit {
 	}
 	/// Checks if unit's weapon is on cooldown.
 	pub fn on_cooldown(&self) -> bool {
-		self.weapon_cooldown.map_or(false, |cool| cool > f32::EPSILON)
+		self.weapon_cooldown().map_or(false, |cool| cool > f32::EPSILON)
 	}
 	/// Returns max cooldown in frames for unit's weapon.
 	pub fn max_cooldown(&self) -> Option<f32> {
-		self.data.max_cooldowns.read_lock().get(&self.type_id).copied()
+		self.data.max_cooldowns.read_lock().get(&self.type_id()).copied()
 	}
 	/// Returns weapon cooldown percentage (current cooldown divided by max cooldown).
 	/// Value in range from `0` to `1`.
 	pub fn cooldown_percentage(&self) -> Option<f32> {
-		let current = self.weapon_cooldown?;
+		let current = self.weapon_cooldown()?;
 		let max = self.max_cooldown()?;
 		if max == 0.0 {
 			return None;
@@ -794,7 +984,7 @@ impl Unit {
 			return 0.0;
 		}
 
-		if target.type_id == UnitTypeId::Colossus {
+		if target.type_id() == UnitTypeId::Colossus {
 			weapons
 				.iter()
 				.map(|w| w.range)
@@ -802,7 +992,7 @@ impl Unit {
 				.unwrap_or(0.0)
 		} else {
 			let not_target = {
-				if target.is_flying {
+				if target.is_flying() {
 					TargetType::Ground
 				} else {
 					TargetType::Air
@@ -821,7 +1011,7 @@ impl Unit {
 			.find(|w| !w.target.is_air())
 			.map_or(0.0, |w| {
 				let upgrades = self.upgrades();
-				match self.type_id {
+				match self.type_id() {
 					UnitTypeId::Hydralisk => {
 						if upgrades.contains(&UpgradeId::EvolveGroovedSpines) {
 							return w.range + 1.0;
@@ -849,7 +1039,7 @@ impl Unit {
 			.find(|w| !w.target.is_ground())
 			.map_or(0.0, |w| {
 				let upgrades = self.upgrades();
-				match self.type_id {
+				match self.type_id() {
 					UnitTypeId::Hydralisk => {
 						if upgrades.contains(&UpgradeId::EvolveGroovedSpines) {
 							return w.range + 1.0;
@@ -880,7 +1070,7 @@ impl Unit {
 
 		let extract_range = |w: &Weapon| {
 			let upgrades = self.upgrades();
-			match self.type_id {
+			match self.type_id() {
 				UnitTypeId::Hydralisk => {
 					if upgrades.contains(&UpgradeId::EvolveGroovedSpines) {
 						return w.range + 1.0;
@@ -901,7 +1091,7 @@ impl Unit {
 			w.range
 		};
 
-		if target.type_id == UnitTypeId::Colossus {
+		if target.type_id() == UnitTypeId::Colossus {
 			weapons
 				.iter()
 				.map(extract_range)
@@ -909,7 +1099,7 @@ impl Unit {
 				.unwrap_or(0.0)
 		} else {
 			let not_target = {
-				if target.is_flying {
+				if target.is_flying() {
 					TargetType::Ground
 				} else {
 					TargetType::Air
@@ -948,7 +1138,7 @@ impl Unit {
 
 		let extract_dps = |w: &Weapon| w.damage as f32 * (w.attacks as f32) / w.speed;
 
-		if target.type_id == UnitTypeId::Colossus {
+		if target.type_id() == UnitTypeId::Colossus {
 			weapons
 				.iter()
 				.map(extract_dps)
@@ -956,7 +1146,7 @@ impl Unit {
 				.unwrap_or(0.0)
 		} else {
 			let not_target = {
-				if target.is_flying {
+				if target.is_flying() {
 					TargetType::Ground
 				} else {
 					TargetType::Air
@@ -1050,12 +1240,12 @@ impl Unit {
 
 		let (not_target, attributes, target_unit) = match target {
 			CalcTarget::Unit(target) => {
-				let mut enemy_armor = target.armor() + target.armor_upgrade_level;
-				let mut enemy_shield_armor = target.shield_upgrade_level;
+				let mut enemy_armor = target.armor() + target.armor_upgrade_level();
+				let mut enemy_shield_armor = target.shield_upgrade_level();
 
 				let mut target_has_guardian_shield = false;
 
-				for buff in &target.buffs {
+				for buff in target.buffs() {
 					match buff {
 						BuffId::GuardianShield => target_has_guardian_shield = true,
 						_ => {
@@ -1074,7 +1264,7 @@ impl Unit {
 							enemy_armor += 2;
 						}
 					} else if matches!(
-						target.type_id,
+						target.type_id(),
 						UnitTypeId::Ultralisk | UnitTypeId::UltraliskBurrowed
 					) && target_upgrades.contains(&UpgradeId::ChitinousPlating)
 					{
@@ -1083,9 +1273,9 @@ impl Unit {
 				}
 
 				(
-					if matches!(target.type_id, UnitTypeId::Colossus) {
+					if matches!(target.type_id(), UnitTypeId::Colossus) {
 						TargetType::Any
-					} else if target.is_flying {
+					} else if target.is_flying() {
 						TargetType::Ground
 					} else {
 						TargetType::Air
@@ -1118,7 +1308,7 @@ impl Unit {
 		let mut speed_modifier = 1.0;
 		let mut range_modifier = 0.0;
 
-		for buff in &self.buffs {
+		for buff in self.buffs() {
 			match buff {
 				BuffId::Stimpack | BuffId::StimpackMarauder => speed_modifier /= 1.5,
 				BuffId::TimeWarpProduction => speed_modifier *= 2.0,
@@ -1127,7 +1317,7 @@ impl Unit {
 		}
 
 		if !upgrades.is_empty() {
-			match self.type_id {
+			match self.type_id() {
 				UnitTypeId::Zergling => {
 					if upgrades.contains(&UpgradeId::Zerglingattackspeed) {
 						speed_modifier /= 1.4;
@@ -1157,12 +1347,12 @@ impl Unit {
 			}
 		}
 
-		let damage_bonus_per_upgrade = DAMAGE_BONUS_PER_UPGRADE.get(&self.type_id);
+		let damage_bonus_per_upgrade = DAMAGE_BONUS_PER_UPGRADE.get(&self.type_id());
 		let extract_weapon_stats = |w: &Weapon| {
 			let damage_bonus_per_upgrade = damage_bonus_per_upgrade.and_then(|bonus| bonus.get(&w.target));
 
 			let mut damage = w.damage
-				+ (self.attack_upgrade_level
+				+ (self.attack_upgrade_level()
 					* damage_bonus_per_upgrade.and_then(|bonus| bonus.0).unwrap_or(1));
 			let speed = w.speed * speed_modifier;
 			let range = w.range + range_modifier;
@@ -1180,7 +1370,7 @@ impl Unit {
 
 						if let Attribute::Light = attribute {
 							if upgrades.contains(&UpgradeId::HighCapacityBarrels) {
-								match self.type_id {
+								match self.type_id() {
 									UnitTypeId::Hellion => damage_bonus_per_upgrade += 5,
 									UnitTypeId::HellionTank => damage_bonus_per_upgrade += 12,
 									_ => {}
@@ -1188,7 +1378,8 @@ impl Unit {
 							}
 						}
 
-						let mut bonus_damage = bonus + (self.attack_upgrade_level * damage_bonus_per_upgrade);
+						let mut bonus_damage =
+							bonus + (self.attack_upgrade_level() * damage_bonus_per_upgrade);
 
 						if let Attribute::Armored = attribute {
 							if self.has_buff(BuffId::VoidRaySwarmDamageBoost) {
@@ -1213,7 +1404,7 @@ impl Unit {
 					let mut shield_damage = 0;
 					let mut health_damage = 0;
 
-					if let Some(enemy_shield) = target.shield.filter(|shield| shield > &0) {
+					if let Some(enemy_shield) = target.shield().filter(|shield| shield > &0) {
 						let enemy_shield_armor = if target_has_guardian_shield && range >= 2.0 {
 							enemy_shield_armor + 2
 						} else {
@@ -1231,7 +1422,7 @@ impl Unit {
 						}
 					}
 
-					if let Some(enemy_health) = target.health.filter(|health| health > &0) {
+					if let Some(enemy_health) = target.health().filter(|health| health > &0) {
 						let enemy_armor = if target_has_guardian_shield && range >= 2.0 {
 							enemy_armor + 2
 						} else {
@@ -1274,7 +1465,7 @@ impl Unit {
 	/// See also [`in_real_range`](Self::in_real_range) which uses actual range of unit for calculations.
 	pub fn in_range(&self, target: &Unit, gap: f32) -> bool {
 		let range = {
-			if matches!(target.type_id, UnitTypeId::Colossus) {
+			if matches!(target.type_id(), UnitTypeId::Colossus) {
 				match self
 					.weapons()
 					.iter()
@@ -1285,7 +1476,7 @@ impl Unit {
 					None => return false,
 				}
 			} else {
-				let range = if target.is_flying {
+				let range = if target.is_flying() {
 					self.air_range()
 				} else {
 					self.ground_range()
@@ -1296,11 +1487,11 @@ impl Unit {
 				range
 			}
 		};
-		let total_range = self.radius + target.radius + range + gap;
+		let total_range = self.radius() + target.radius() + range + gap;
 		let distance = self.distance_squared(target);
 
 		// Takes into account that Sieged Tank has a minimum range of 2
-		(self.type_id != UnitTypeId::SiegeTankSieged || distance > 4.0)
+		(self.type_id() != UnitTypeId::SiegeTankSieged || distance > 4.0)
 			&& distance <= total_range * total_range
 	}
 	/// Checks if unit is close enough to be attacked by given threat.
@@ -1319,11 +1510,11 @@ impl Unit {
 			return false;
 		}
 
-		let total_range = self.radius + target.radius + range + gap;
+		let total_range = self.radius() + target.radius() + range + gap;
 		let distance = self.distance_squared(target);
 
 		// Takes into account that Sieged Tank has a minimum range of 2
-		(self.type_id != UnitTypeId::SiegeTankSieged || distance > 4.0)
+		(self.type_id() != UnitTypeId::SiegeTankSieged || distance > 4.0)
 			&& distance <= total_range * total_range
 	}
 	/// Checks if unit is close enough to be attacked by given threat.
@@ -1340,7 +1531,7 @@ impl Unit {
 	{
 		if let Some(data) = self.data.game_data.abilities.get(&ability_id) {
 			if let Some(cast_range) = data.cast_range {
-				return (cast_range + self.radius + target.radius() + gap).powi(2)
+				return (cast_range + self.radius() + target.radius() + gap).powi(2)
 					>= self.distance_squared(target);
 			}
 		}
@@ -1355,7 +1546,7 @@ impl Unit {
 	}
 	/// Returns (ability, target, progress) of the current unit order or `None` if it's idle.
 	pub fn order(&self) -> Option<(AbilityId, Target, f32)> {
-		self.orders
+		self.orders()
 			.first()
 			.map(|order| (order.ability, order.target, order.progress))
 	}
@@ -1364,7 +1555,7 @@ impl Unit {
 		if self.is_idle() {
 			Target::None
 		} else {
-			self.orders[0].target
+			self.orders()[0].target
 		}
 	}
 	/// Returns target point of unit's order if any.
@@ -1386,21 +1577,21 @@ impl Unit {
 		if self.is_idle() {
 			None
 		} else {
-			Some(self.orders[0].ability)
+			Some(self.orders()[0].ability)
 		}
 	}
 	/// Checks if unit don't have any orders currently.
 	pub fn is_idle(&self) -> bool {
-		self.orders.is_empty()
+		self.orders().is_empty()
 	}
 	/// Checks if unit don't have any orders currently or it's order is more than 95% complete.
 	pub fn is_almost_idle(&self) -> bool {
-		self.is_idle() || (self.orders.len() == 1 && self.orders[0].progress >= 0.95)
+		self.is_idle() || (self.orders().len() == 1 && self.orders()[0].progress >= 0.95)
 	}
 	/// Checks if production building with reactor don't have any orders currently.
 	pub fn is_unused(&self) -> bool {
 		if self.has_reactor() {
-			self.orders.len() < 2
+			self.orders().len() < 2
 		} else {
 			self.is_idle()
 		}
@@ -1409,8 +1600,8 @@ impl Unit {
 	/// or it's order is more than 95% complete.
 	pub fn is_almost_unused(&self) -> bool {
 		if self.has_reactor() {
-			self.orders.len() < 2
-				|| (self.orders.len() == 2 && self.orders.iter().any(|order| order.progress >= 0.95))
+			self.orders().len() < 2
+				|| (self.orders().len() == 2 && self.orders().iter().any(|order| order.progress >= 0.95))
 		} else {
 			self.is_almost_idle()
 		}
@@ -1419,13 +1610,13 @@ impl Unit {
 	///
 	/// Doesn't work with enemies.
 	pub fn is_using(&self, ability: AbilityId) -> bool {
-		!self.is_idle() && self.orders[0].ability == ability
+		!self.is_idle() && self.orders()[0].ability == ability
 	}
 	/// Checks if unit is using any of given abilities.
 	///
 	/// Doesn't work with enemies.
 	pub fn is_using_any<A: Container<AbilityId>>(&self, abilities: &A) -> bool {
-		!self.is_idle() && abilities.contains(&self.orders[0].ability)
+		!self.is_idle() && abilities.contains(&self.orders()[0].ability)
 	}
 	/// Checks if unit is currently attacking.
 	///
@@ -1434,7 +1625,7 @@ impl Unit {
 	pub fn is_attacking(&self) -> bool {
 		!self.is_idle()
 			&& matches!(
-				self.orders[0].ability,
+				self.orders()[0].ability,
 				AbilityId::Attack
 					| AbilityId::AttackAttack
 					| AbilityId::AttackAttackTowards
@@ -1460,7 +1651,7 @@ impl Unit {
 	pub fn is_repairing(&self) -> bool {
 		!self.is_idle()
 			&& matches!(
-				self.orders[0].ability,
+				self.orders()[0].ability,
 				AbilityId::EffectRepair | AbilityId::EffectRepairSCV | AbilityId::EffectRepairMule
 			)
 	}
@@ -1482,7 +1673,7 @@ impl Unit {
 	pub fn is_collecting(&self) -> bool {
 		!self.is_idle()
 			&& matches!(
-				self.orders[0].ability,
+				self.orders()[0].ability,
 				AbilityId::HarvestGather | AbilityId::HarvestReturn
 			)
 	}
@@ -1490,7 +1681,7 @@ impl Unit {
 	///
 	/// Doesn't work with enemies.
 	pub fn is_constructing(&self) -> bool {
-		!self.is_idle() && self.orders[0].ability.is_constructing()
+		!self.is_idle() && self.orders()[0].ability.is_constructing()
 	}
 	/// Checks if terran building is currently making addon.
 	///
@@ -1498,7 +1689,7 @@ impl Unit {
 	pub fn is_making_addon(&self) -> bool {
 		!self.is_idle()
 			&& matches!(
-				self.orders[0].ability,
+				self.orders()[0].ability,
 				AbilityId::BuildTechLabBarracks
 					| AbilityId::BuildReactorBarracks
 					| AbilityId::BuildTechLabFactory
@@ -1513,7 +1704,7 @@ impl Unit {
 	pub fn is_making_techlab(&self) -> bool {
 		!self.is_idle()
 			&& matches!(
-				self.orders[0].ability,
+				self.orders()[0].ability,
 				AbilityId::BuildTechLabBarracks
 					| AbilityId::BuildTechLabFactory
 					| AbilityId::BuildTechLabStarport
@@ -1525,7 +1716,7 @@ impl Unit {
 	pub fn is_making_reactor(&self) -> bool {
 		!self.is_idle()
 			&& matches!(
-				self.orders[0].ability,
+				self.orders()[0].ability,
 				AbilityId::BuildReactorBarracks
 					| AbilityId::BuildReactorFactory
 					| AbilityId::BuildReactorStarport
@@ -1542,12 +1733,12 @@ impl Unit {
 			.autocast
 			.entry(ability)
 			.or_default()
-			.push(self.tag);
+			.push(self.tag());
 	}
 	/// Orders unit to execute given command.
 	pub fn command(&self, ability: AbilityId, target: Target, queue: bool) {
 		if !(queue || self.is_idle() || self.data.allow_spam.get_locked()) {
-			let last_order = &self.orders[0];
+			let last_order = &self.orders()[0];
 			if ability == last_order.ability && target == last_order.target {
 				return;
 			}
@@ -1559,7 +1750,7 @@ impl Unit {
 			.commands
 			.entry((ability, target, queue))
 			.or_default()
-			.push(self.tag);
+			.push(self.tag());
 	}
 	/// Orders unit to use given ability (This is equivalent of `unit.command(ability, Target::None, queue)`).
 	pub fn use_ability(&self, ability: AbilityId, queue: bool) {
@@ -1681,13 +1872,13 @@ impl Unit {
 impl From<&Unit> for Point2 {
 	#[inline]
 	fn from(u: &Unit) -> Self {
-		u.position
+		u.position()
 	}
 }
 impl From<Unit> for Point2 {
 	#[inline]
 	fn from(u: Unit) -> Self {
-		u.position
+		u.position()
 	}
 }
 
@@ -1708,105 +1899,107 @@ impl Unit {
 		};
 		Self {
 			data,
-			display_type: match DisplayType::from_proto(u.get_display_type()) {
-				DisplayType::Visible => {
-					if visibility[position].is_visible() {
-						DisplayType::Visible
-					} else {
-						DisplayType::Snapshot
-					}
-				}
-				x => x,
-			},
-			alliance: Alliance::from_proto(u.get_alliance()),
-			tag: u.get_tag(),
-			type_id,
-			owner: u.get_owner() as u32,
-			position,
-			position3d: Point3::from_proto(pos),
-			facing: u.get_facing(),
-			radius: u.get_radius(),
-			build_progress: u.get_build_progress(),
-			is_cloaked,
-			is_revealed,
-			buffs: u
-				.get_buff_ids()
-				.iter()
-				.map(|b| BuffId::from_u32(*b).unwrap())
-				.collect(),
-			detect_range: match type_id {
-				UnitTypeId::Observer => 11.0,
-				UnitTypeId::ObserverSiegeMode => 13.75,
-				_ => u.get_detect_range(),
-			},
-			radar_range: u.get_radar_range(),
-			is_selected: u.get_is_selected(),
-			is_on_screen: u.get_is_on_screen(),
-			is_blip: u.get_is_blip(),
-			is_powered: u.get_is_powered(),
-			is_active: u.get_is_active(),
-			attack_upgrade_level: u.get_attack_upgrade_level() as u32,
-			armor_upgrade_level: u.get_armor_upgrade_level(),
-			shield_upgrade_level: u.get_shield_upgrade_level(),
-			// Not populated for snapshots
-			health: u.health.map(|x| x as u32),
-			health_max: u.health_max.map(|x| x as u32),
-			shield: u.shield.map(|x| x as u32),
-			shield_max: u.shield_max.map(|x| x as u32),
-			energy: u.energy.map(|x| x as u32),
-			energy_max: u.energy_max.map(|x| x as u32),
-			mineral_contents: u.mineral_contents.map(|x| x as u32),
-			vespene_contents: u.vespene_contents.map(|x| x as u32),
-			is_flying: u.get_is_flying(),
-			is_burrowed,
-			is_hallucination: u.get_is_hallucination(),
-			// Not populated for enemies
-			orders: u
-				.get_orders()
-				.iter()
-				.map(|order| UnitOrder {
-					ability: AbilityId::from_u32(order.get_ability_id()).unwrap(),
-					target: match &order.target {
-						Some(ProtoTarget::target_world_space_pos(pos)) => {
-							Target::Pos(Point2::from_proto(pos))
+			base: Rs::new(UnitBase {
+				display_type: Rl::new(match DisplayType::from_proto(u.get_display_type()) {
+					DisplayType::Visible => {
+						if visibility[position].is_visible() {
+							DisplayType::Visible
+						} else {
+							DisplayType::Snapshot
 						}
-						Some(ProtoTarget::target_unit_tag(tag)) => Target::Tag(*tag),
-						None => Target::None,
-					},
-					progress: order.get_progress(),
-				})
-				.collect(),
-			addon_tag: u.add_on_tag,
-			passengers: u
-				.get_passengers()
-				.iter()
-				.map(|p| PassengerUnit {
-					tag: p.get_tag(),
-					health: p.get_health(),
-					health_max: p.get_health_max(),
-					shield: p.get_shield(),
-					shield_max: p.get_shield_max(),
-					energy: p.get_energy(),
-					energy_max: p.get_energy_max(),
-					type_id: UnitTypeId::from_u32(p.get_unit_type()).unwrap(),
-				})
-				.collect(),
-			cargo_space_taken: u.cargo_space_taken.map(|x| x as u32),
-			cargo_space_max: u.cargo_space_max.map(|x| x as u32),
-			assigned_harvesters: u.assigned_harvesters.map(|x| x as u32),
-			ideal_harvesters: u.ideal_harvesters.map(|x| x as u32),
-			weapon_cooldown: u.weapon_cooldown,
-			engaged_target_tag: u.engaged_target_tag,
-			buff_duration_remain: u.buff_duration_remain.map(|x| x as u32),
-			buff_duration_max: u.buff_duration_max.map(|x| x as u32),
-			rally_targets: u
-				.get_rally_targets()
-				.iter()
-				.map(|t| RallyTarget {
-					point: Point2::from_proto(t.get_point()),
-					tag: t.tag,
-				})
-				.collect(),
+					}
+					x => x,
+				}),
+				alliance: Alliance::from_proto(u.get_alliance()),
+				tag: u.get_tag(),
+				type_id: Rl::new(type_id),
+				owner: u.get_owner() as u32,
+				position,
+				position3d: Point3::from_proto(pos),
+				facing: u.get_facing(),
+				radius: u.get_radius(),
+				build_progress: u.get_build_progress(),
+				is_cloaked: LockBool::new(is_cloaked),
+				is_revealed: LockBool::new(is_revealed),
+				buffs: u
+					.get_buff_ids()
+					.iter()
+					.map(|b| BuffId::from_u32(*b).unwrap())
+					.collect(),
+				detect_range: match type_id {
+					UnitTypeId::Observer => 11.0,
+					UnitTypeId::ObserverSiegeMode => 13.75,
+					_ => u.get_detect_range(),
+				},
+				radar_range: u.get_radar_range(),
+				is_selected: u.get_is_selected(),
+				is_on_screen: u.get_is_on_screen(),
+				is_blip: u.get_is_blip(),
+				is_powered: u.get_is_powered(),
+				is_active: u.get_is_active(),
+				attack_upgrade_level: u.get_attack_upgrade_level() as u32,
+				armor_upgrade_level: u.get_armor_upgrade_level(),
+				shield_upgrade_level: u.get_shield_upgrade_level(),
+				// Not populated for snapshots
+				health: u.health.map(|x| x as u32),
+				health_max: u.health_max.map(|x| x as u32),
+				shield: u.shield.map(|x| x as u32),
+				shield_max: u.shield_max.map(|x| x as u32),
+				energy: u.energy.map(|x| x as u32),
+				energy_max: u.energy_max.map(|x| x as u32),
+				mineral_contents: u.mineral_contents.map(|x| x as u32),
+				vespene_contents: u.vespene_contents.map(|x| x as u32),
+				is_flying: u.get_is_flying(),
+				is_burrowed: LockBool::new(is_burrowed),
+				is_hallucination: LockBool::new(u.get_is_hallucination()),
+				// Not populated for enemies
+				orders: u
+					.get_orders()
+					.iter()
+					.map(|order| UnitOrder {
+						ability: AbilityId::from_u32(order.get_ability_id()).unwrap(),
+						target: match &order.target {
+							Some(ProtoTarget::target_world_space_pos(pos)) => {
+								Target::Pos(Point2::from_proto(pos))
+							}
+							Some(ProtoTarget::target_unit_tag(tag)) => Target::Tag(*tag),
+							None => Target::None,
+						},
+						progress: order.get_progress(),
+					})
+					.collect(),
+				addon_tag: u.add_on_tag,
+				passengers: u
+					.get_passengers()
+					.iter()
+					.map(|p| PassengerUnit {
+						tag: p.get_tag(),
+						health: p.get_health(),
+						health_max: p.get_health_max(),
+						shield: p.get_shield(),
+						shield_max: p.get_shield_max(),
+						energy: p.get_energy(),
+						energy_max: p.get_energy_max(),
+						type_id: UnitTypeId::from_u32(p.get_unit_type()).unwrap(),
+					})
+					.collect(),
+				cargo_space_taken: u.cargo_space_taken.map(|x| x as u32),
+				cargo_space_max: u.cargo_space_max.map(|x| x as u32),
+				assigned_harvesters: u.assigned_harvesters.map(|x| x as u32),
+				ideal_harvesters: u.ideal_harvesters.map(|x| x as u32),
+				weapon_cooldown: u.weapon_cooldown,
+				engaged_target_tag: u.engaged_target_tag,
+				buff_duration_remain: u.buff_duration_remain.map(|x| x as u32),
+				buff_duration_max: u.buff_duration_max.map(|x| x as u32),
+				rally_targets: u
+					.get_rally_targets()
+					.iter()
+					.map(|t| RallyTarget {
+						point: Point2::from_proto(t.get_point()),
+						tag: t.tag,
+					})
+					.collect(),
+			}),
 		}
 	}
 }
@@ -1881,11 +2074,11 @@ pub trait Radius {
 
 impl Radius for &Unit {
 	fn radius(&self) -> f32 {
-		self.radius
+		Unit::radius(self)
 	}
 }
 impl Radius for Unit {
 	fn radius(&self) -> f32 {
-		self.radius
+		self.radius()
 	}
 }

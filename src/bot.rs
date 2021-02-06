@@ -697,7 +697,7 @@ impl Bot {
 			.iter()
 			.filter(|s| s.is_ready())
 			.find_map(|s| {
-				s.orders
+				s.orders()
 					.iter()
 					.find(|order| order.ability == ability)
 					.map(|order| order.progress)
@@ -824,17 +824,17 @@ impl Bot {
 		self.race_values = Rs::new(RACE_VALUES[&self.race].clone());
 
 		if let Some(townhall) = self.units.my.townhalls.first() {
-			self.start_location = townhall.position;
+			self.start_location = townhall.position();
 		}
 		self.enemy_start = self.game_info.start_locations[0];
 
 		let resources = self.units.resources.closer(11.0, self.start_location);
 		self.start_center =
-			(resources.sum(|r| r.position) + self.start_location) / (resources.len() + 1) as f32;
+			(resources.sum(|r| r.position()) + self.start_location) / (resources.len() + 1) as f32;
 
 		let resources = self.units.resources.closer(11.0, self.enemy_start);
 		self.enemy_start_center =
-			(resources.sum(|r| r.position) + self.enemy_start) / (resources.len() + 1) as f32;
+			(resources.sum(|r| r.position()) + self.enemy_start) / (resources.len() + 1) as f32;
 
 		// Calculating expansion locations
 
@@ -843,11 +843,11 @@ impl Bot {
 		let all_resources = self
 			.units
 			.resources
-			.filter(|r| r.type_id != UnitTypeId::MineralField450);
+			.filter(|r| r.type_id() != UnitTypeId::MineralField450);
 
 		let positions = all_resources
 			.iter()
-			.map(|r| (r.position, r.tag))
+			.map(|r| (r.position(), r.tag()))
 			.collect::<Vec<(Point2, u64)>>();
 
 		let resource_groups = dbscan(
@@ -880,7 +880,7 @@ impl Bot {
 						self.start_location,
 						self.start_center,
 						Alliance::Own,
-						self.units.my.townhalls.first().map(|t| t.tag),
+						self.units.my.townhalls.first().map(|t| t.tag()),
 					)
 				} else if center.is_closer(4.0, self.enemy_start_center) {
 					(self.enemy_start, self.enemy_start_center, Alliance::Enemy, None)
@@ -908,7 +908,7 @@ impl Bot {
 
 					(
 						location,
-						(resources.sum(|r| r.position) + location) / (resources.len() + 1) as f32,
+						(resources.sum(|r| r.position()) + location) / (resources.len() + 1) as f32,
 						Alliance::Neutral,
 						None,
 					)
@@ -918,9 +918,9 @@ impl Bot {
 				let mut geysers = vec![];
 				for r in resources {
 					if r.is_geyser() {
-						minerals.push(r.tag);
+						minerals.push(r.tag());
 					} else {
-						geysers.push(r.tag);
+						geysers.push(r.tag());
 					}
 				}
 
@@ -1063,9 +1063,9 @@ impl Bot {
 			.my
 			.all
 			.iter()
-			.filter(|u| !u.is_hallucination)
+			.filter(|u| !u.is_hallucination())
 			.for_each(|u| {
-				for order in &u.orders {
+				for order in u.orders() {
 					let ability = order.ability;
 					if ability.is_constructing() {
 						if let Target::Pos(pos) = order.target {
@@ -1076,10 +1076,10 @@ impl Bot {
 				}
 
 				if u.is_ready() {
-					*current_units.entry(u.type_id).or_default() += 1;
-				} else if let Some(data) = self.game_data.units.get(&u.type_id) {
+					*current_units.entry(u.type_id()).or_default() += 1;
+				} else if let Some(data) = self.game_data.units.get(&u.type_id()) {
 					if let Some(ability) = data.ability {
-						constructed.entry((u.position, ability)).or_insert(true);
+						constructed.entry((u.position(), ability)).or_insert(true);
 					}
 				}
 			});
@@ -1096,7 +1096,7 @@ impl Bot {
 			.units
 			.all
 			.iter()
-			.filter_map(|u| Some((u.tag, u.hits()?)))
+			.filter_map(|u| Some((u.tag(), u.hits()?)))
 			.collect();
 
 		self.units.clear();
@@ -1121,8 +1121,8 @@ impl Bot {
 				}};
 			}
 
-			match u.alliance {
-				Alliance::Neutral => match u.type_id {
+			match u.alliance() {
+				Alliance::Neutral => match u.type_id() {
 					UnitTypeId::XelNagaTower => add_to!(units.watchtowers),
 
 					UnitTypeId::RichMineralField
@@ -1157,9 +1157,9 @@ impl Bot {
 					_ => add_to!(units.destructables),
 				},
 				Alliance::Own => {
-					if let Some(cooldown) = u.weapon_cooldown {
+					if let Some(cooldown) = u.weapon_cooldown() {
 						max_cooldowns
-							.entry(u.type_id)
+							.entry(u.type_id())
 							.and_modify(|max| {
 								if cooldown > *max {
 									*max = cooldown;
@@ -1176,7 +1176,7 @@ impl Bot {
 							add_to!(units.placeholders);
 						} else {
 							add_to!(units.structures);
-							match u.type_id {
+							match u.type_id() {
 								UnitTypeId::CommandCenter
 								| UnitTypeId::OrbitalCommand
 								| UnitTypeId::PlanetaryFortress
@@ -1184,7 +1184,7 @@ impl Bot {
 								| UnitTypeId::Lair
 								| UnitTypeId::Hive
 								| UnitTypeId::Nexus => {
-									expansions.insert(u.position, (Alliance::Own, Some(u.tag)));
+									expansions.insert(u.position(), (Alliance::Own, Some(u.tag())));
 									add_to!(units.townhalls);
 								}
 								UnitTypeId::CommandCenterFlying | UnitTypeId::OrbitalCommandFlying => {
@@ -1202,14 +1202,14 @@ impl Bot {
 								| UnitTypeId::BarracksTechLab
 								| UnitTypeId::FactoryTechLab
 								| UnitTypeId::StarportTechLab => {
-									techlab_tags.insert(u.tag);
+									techlab_tags.insert(u.tag());
 								}
 
 								UnitTypeId::Reactor
 								| UnitTypeId::BarracksReactor
 								| UnitTypeId::FactoryReactor
 								| UnitTypeId::StarportReactor => {
-									reactor_tags.insert(u.tag);
+									reactor_tags.insert(u.tag());
 								}
 
 								_ => {}
@@ -1217,7 +1217,7 @@ impl Bot {
 						}
 					} else {
 						add_to!(units.units);
-						match u.type_id {
+						match u.type_id() {
 							UnitTypeId::SCV | UnitTypeId::Probe | UnitTypeId::Drone => add_to!(units.workers),
 							UnitTypeId::Larva => add_to!(units.larvas),
 							_ => {}
@@ -1227,14 +1227,14 @@ impl Bot {
 				Alliance::Enemy => {
 					let units = &mut units.enemy;
 
-					if u.is_hallucination {
-						saved_hallucinations.insert(u.tag);
+					if u.is_hallucination() {
+						saved_hallucinations.insert(u.tag());
 					}
 
 					add_to!(units.all);
 					if u.is_structure() {
 						add_to!(units.structures);
-						match u.type_id {
+						match u.type_id() {
 							UnitTypeId::CommandCenter
 							| UnitTypeId::OrbitalCommand
 							| UnitTypeId::PlanetaryFortress
@@ -1242,7 +1242,7 @@ impl Bot {
 							| UnitTypeId::Lair
 							| UnitTypeId::Hive
 							| UnitTypeId::Nexus => {
-								expansions.insert(u.position, (Alliance::Enemy, Some(u.tag)));
+								expansions.insert(u.position(), (Alliance::Enemy, Some(u.tag())));
 								add_to!(units.townhalls);
 							}
 							UnitTypeId::CommandCenterFlying | UnitTypeId::OrbitalCommandFlying => {
@@ -1260,7 +1260,7 @@ impl Bot {
 						}
 					} else {
 						add_to!(units.units);
-						match u.type_id {
+						match u.type_id() {
 							UnitTypeId::SCV | UnitTypeId::Probe | UnitTypeId::Drone => add_to!(units.workers),
 							UnitTypeId::Larva => add_to!(units.larvas),
 							_ => {}
@@ -1273,15 +1273,10 @@ impl Bot {
 		units.all = all_units;
 
 		let enemies = &mut self.units.enemy;
-		let mark_hallucination = |u: u64, us: &mut Units| {
-			if let Some(u) = us.get_mut(u) {
-				u.is_hallucination = true;
-			}
-		};
 		for &u in &self.saved_hallucinations {
-			mark_hallucination(u, &mut enemies.all);
-			mark_hallucination(u, &mut enemies.units);
-			mark_hallucination(u, &mut enemies.workers);
+			if let Some(u) = enemies.all.get_mut(u) {
+				u.base.is_hallucination.set_locked(true);
+			}
 		}
 		self.saved_hallucinations.extend(saved_hallucinations);
 
@@ -1292,10 +1287,10 @@ impl Bot {
 		}
 
 		fn is_invisible(u: &Unit, detectors: &Units, scans: &[Effect], gap: f32) -> bool {
-			let additional = u.radius + gap;
+			let additional = u.radius() + gap;
 
 			for d in detectors {
-				if u.is_closer(additional + d.radius + d.detect_range, d) {
+				if u.is_closer(additional + d.radius() + d.detect_range(), d) {
 					return false;
 				}
 			}
@@ -1348,51 +1343,51 @@ impl Bot {
 
 			let current = &self.units.enemy.all;
 			for u in &self.units.cached.all {
-				if current.contains_tag(u.tag) {
+				if current.contains_tag(u.tag()) {
 					// Mark as hidden undetected burrowed units - it's not possible to attack them.
-					if u.is_burrowed && u.is_revealed && is_invisible(u, &detectors, &scans, 0.0) {
-						cloaked.push(u.tag);
+					if u.is_burrowed() && u.is_revealed() && is_invisible(u, &detectors, &scans, 0.0) {
+						cloaked.push(u.tag());
 					}
-				} else if u.is_flying || !u.is_structure() {
+				} else if u.is_flying() || !u.is_structure() {
 					// unit position visible, but it disappeared
-					if self.is_visible(u.position) {
+					if self.is_visible(u.position()) {
 						// Was visible previously
 						if u.is_visible() {
 							// Is zerg ground unit -> probably burrowed
 							let is_drone_close = |s: &Unit| {
-								(s.build_progress < 0.1
-									|| (s.type_id == UnitTypeId::Extractor && s.is_ready()))
-									&& u.is_closer(u.radius + s.radius + 1.0, s)
+								(s.build_progress() < 0.1
+									|| (s.type_id() == UnitTypeId::Extractor && s.is_ready()))
+									&& u.is_closer(u.radius() + s.radius() + 1.0, s)
 							};
 							if enemy_is_zerg
-								&& !(u.is_flying
+								&& !(u.is_flying()
 									|| matches!(
-										u.type_id,
+										u.type_id(),
 										UnitTypeId::Changeling
 											| UnitTypeId::ChangelingZealot | UnitTypeId::ChangelingMarineShield
 											| UnitTypeId::ChangelingMarine | UnitTypeId::ChangelingZerglingWings
 											| UnitTypeId::ChangelingZergling | UnitTypeId::Broodling
 											| UnitTypeId::Larva | UnitTypeId::Egg
-									) || (u.type_id == UnitTypeId::Drone
+									) || (u.type_id() == UnitTypeId::Drone
 									&& self.units.enemy.structures.iter().any(is_drone_close)))
 								&& is_invisible(u, &detectors, &scans, 0.0)
 							{
-								burrowed.push(u.tag);
+								burrowed.push(u.tag());
 							// Whatever
 							} else {
-								to_remove.push(u.tag);
+								to_remove.push(u.tag());
 							}
 						// Was out of vision previously or burrowed but detected -> probably moved somewhere else
-						} else if !(u.is_burrowed && is_invisible(u, &detectors, &scans, 0.0)) {
-							to_remove.push(u.tag);
+						} else if !(u.is_burrowed() && is_invisible(u, &detectors, &scans, 0.0)) {
+							to_remove.push(u.tag());
 						}
 					// Unit is out of vision -> marking as hidden
 					} else {
-						hidden.push(u.tag);
+						hidden.push(u.tag());
 					}
 				// Structure got destroyed
 				} else {
-					to_remove.push(u.tag);
+					to_remove.push(u.tag());
 				}
 			}
 
@@ -1407,48 +1402,31 @@ impl Bot {
 				}
 			}
 
-			let mark_cloaked = |u: u64, us: &mut Units| {
-				if let Some(u) = us.get_mut(u) {
-					u.display_type = DisplayType::Hidden;
-					u.is_cloaked = true;
-					u.is_revealed = false;
-				}
-			};
 			for u in cloaked {
-				mark_cloaked(u, &mut cache.all);
-				mark_cloaked(u, &mut cache.units);
-				mark_cloaked(u, &mut cache.workers);
+				if let Some(u) = cache.all.get_mut(u) {
+					let u = &u.base;
+					*u.display_type.write_lock() = DisplayType::Hidden;
+					u.is_cloaked.set_locked(true);
+					u.is_revealed.set_locked(false);
+				}
 			}
 
-			let mark_burrowed = |u: u64, us: &mut Units| {
-				if let Some(u) = us.get_mut(u) {
-					if let Some(burrowed_id) = BURROWED_IDS.get(&u.type_id) {
-						u.display_type = DisplayType::Hidden;
-						u.type_id = *burrowed_id;
-						u.is_burrowed = true;
-						u.is_cloaked = true;
-						u.is_revealed = false;
+			for u in burrowed {
+				if let Some(u) = cache.all.get_mut(u) {
+					if let Some(burrowed_id) = BURROWED_IDS.get(&u.type_id()) {
+						let u = &u.base;
+						*u.display_type.write_lock() = DisplayType::Hidden;
+						*u.type_id.write_lock() = *burrowed_id;
+						u.is_burrowed.set_locked(true);
+						u.is_cloaked.set_locked(true);
+						u.is_revealed.set_locked(false);
 					}
 				}
-			};
-			for u in burrowed {
-				mark_burrowed(u, &mut cache.all);
-				mark_burrowed(u, &mut cache.units);
-				mark_burrowed(u, &mut cache.workers);
 			}
 
-			let mark_hidden = |u: u64, us: &mut Units| {
-				if let Some(u) = us.get_mut(u) {
-					u.display_type = DisplayType::Hidden;
-				}
-			};
 			for u in hidden {
-				mark_hidden(u, &mut cache.all);
-				mark_hidden(u, &mut cache.units);
-				mark_hidden(u, &mut cache.workers);
-				if enemy_is_terran {
-					mark_hidden(u, &mut cache.structures);
-					mark_hidden(u, &mut cache.townhalls);
+				if let Some(u) = cache.all.get_mut(u) {
+					*u.base.display_type.write_lock() = DisplayType::Hidden;
 				}
 			}
 		}
@@ -1476,12 +1454,12 @@ impl Bot {
 
 			if u.is_structure() {
 				if u.is_ready() {
-					*enemies_current.entry(u.type_id).or_default() += 1;
+					*enemies_current.entry(u.type_id()).or_default() += 1;
 				} else {
-					*enemies_ordered.entry(u.type_id).or_default() += 1;
+					*enemies_ordered.entry(u.type_id()).or_default() += 1;
 				}
-			} else if !u.is_hallucination {
-				*enemies_current.entry(u.type_id).or_default() += 1;
+			} else if !u.is_hallucination() {
+				*enemies_current.entry(u.type_id()).or_default() += 1;
 			}
 		});
 
@@ -1501,20 +1479,15 @@ impl Bot {
 		let mut revealed = Vec::<u64>::new();
 
 		for u in &self.units.my.all {
-			if !(u.is_revealed || is_invisible(u, &enemy_detectors, &enemy_scans, 1.0)) {
-				revealed.push(u.tag);
+			if !(u.is_revealed() || is_invisible(u, &enemy_detectors, &enemy_scans, 1.0)) {
+				revealed.push(u.tag());
 			}
 		}
 
-		let mark_revealed = |u: u64, us: &mut Units| {
-			if let Some(u) = us.get_mut(u) {
-				u.is_revealed = true;
-			}
-		};
-		let my = &mut self.units.my;
 		for u in revealed {
-			mark_revealed(u, &mut my.all);
-			mark_revealed(u, &mut my.units);
+			if let Some(u) = self.units.my.all.get_mut(u) {
+				u.base.is_revealed.set_locked(true);
+			}
 		}
 	}
 
@@ -1645,7 +1618,7 @@ impl Bot {
 		let geysers = self.units.vespene_geysers.closer(11.0, base);
 		let results = self
 			.query_placement(
-				geysers.iter().map(|u| (ability, u.position, None)).collect(),
+				geysers.iter().map(|u| (ability, u.position(), None)).collect(),
 				false,
 			)
 			.unwrap();

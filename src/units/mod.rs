@@ -147,7 +147,7 @@ impl Units {
 	/// replaces it and returns previous unit.
 	#[inline]
 	pub fn push(&mut self, u: Unit) -> Option<Unit> {
-		self.0.insert(u.tag, u)
+		self.0.insert(u.tag(), u)
 	}
 
 	/// Removes and returns last unit from the collection.
@@ -254,7 +254,7 @@ impl Units {
 	///
 	/// [`of_type`]: UnitsIterator::of_type
 	pub fn of_type(&self, unit_type: UnitTypeId) -> Self {
-		self.filter(|u| u.type_id == unit_type)
+		self.filter(|u| u.type_id() == unit_type)
 	}
 	/// Excludes all units of given type and makes a new collection of remaining units.
 	///
@@ -264,14 +264,14 @@ impl Units {
 	///
 	/// [`exclude_type`]: UnitsIterator::exclude_type
 	pub fn exclude_type(&self, unit_type: UnitTypeId) -> Self {
-		self.filter(|u| u.type_id != unit_type)
+		self.filter(|u| u.type_id() != unit_type)
 	}
 	/// Returns central position of all units in the collection or `None` if collection is empty.
 	pub fn center(&self) -> Option<Point2> {
 		if self.is_empty() {
 			None
 		} else {
-			Some(self.sum(|u| u.position) / self.len() as f32)
+			Some(self.sum(|u| u.position()) / self.len() as f32)
 		}
 	}
 	/// Leaves only non-flying units and makes new collection of them.
@@ -282,7 +282,7 @@ impl Units {
 	///
 	/// [`ground`]: UnitsIterator::ground
 	pub fn ground(&self) -> Self {
-		self.filter(|u| !u.is_flying)
+		self.filter(|u| !u.is_flying())
 	}
 	/// Leaves only flying units and makes new collection of them.
 	///
@@ -292,7 +292,7 @@ impl Units {
 	///
 	/// [`flying`]: UnitsIterator::flying
 	pub fn flying(&self) -> Self {
-		self.filter(|u| u.is_flying)
+		self.filter(|u| u.is_flying())
 	}
 	/// Leaves only ready structures and makes new collection of them.
 	///
@@ -437,7 +437,7 @@ impl Units {
 impl FromIterator<Unit> for Units {
 	#[inline]
 	fn from_iter<I: IntoIterator<Item = Unit>>(iter: I) -> Self {
-		Self(iter.into_iter().map(|u| (u.tag, u)).collect())
+		Self(iter.into_iter().map(|u| (u.tag(), u)).collect())
 	}
 }
 impl FromIterator<(u64, Unit)> for Units {
@@ -478,7 +478,7 @@ impl<'a> IntoIterator for &'a mut Units {
 impl Extend<Unit> for Units {
 	#[inline]
 	fn extend<T: IntoIterator<Item = Unit>>(&mut self, iter: T) {
-		self.0.extend(iter.into_iter().map(|u| (u.tag, u)));
+		self.0.extend(iter.into_iter().map(|u| (u.tag(), u)));
 	}
 }
 impl Extend<(u64, Unit)> for Units {

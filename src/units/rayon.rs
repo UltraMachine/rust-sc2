@@ -57,7 +57,7 @@ impl Units {
 	where
 		F: Fn(&&Unit) -> bool + Sync + Send,
 	{
-		Self(self.par_iter().filter(f).map(|u| (u.tag, u.clone())).collect())
+		Self(self.par_iter().filter(f).map(|u| (u.tag(), u.clone())).collect())
 	}
 
 	/// Leaves only units of given types and makes a new collection of them.
@@ -68,7 +68,7 @@ impl Units {
 	///
 	/// [`of_types`]: super::UnitsIterator::of_types
 	pub fn of_types<T: Container<UnitTypeId> + Sync>(&self, types: &T) -> Self {
-		self.filter(|u| types.contains(&u.type_id))
+		self.filter(|u| types.contains(&u.type_id()))
 	}
 
 	/// Excludes units of given types and makes a new collection of remaining units.
@@ -79,7 +79,7 @@ impl Units {
 	///
 	/// [`exclude_types`]: super::UnitsIterator::exclude_types
 	pub fn exclude_types<T: Container<UnitTypeId> + Sync>(&self, types: &T) -> Self {
-		self.filter(|u| !types.contains(&u.type_id))
+		self.filter(|u| !types.contains(&u.type_id()))
 	}
 
 	/// Leaves only units closer than given distance to target and makes new collection of them.
@@ -227,7 +227,7 @@ impl<'a> IntoParallelIterator for &'a mut Units {
 impl ParallelExtend<Unit> for Units {
 	#[inline]
 	fn par_extend<T: IntoParallelIterator<Item = Unit>>(&mut self, par_iter: T) {
-		self.0.par_extend(par_iter.into_par_iter().map(|u| (u.tag, u)));
+		self.0.par_extend(par_iter.into_par_iter().map(|u| (u.tag(), u)));
 	}
 }
 impl ParallelExtend<(u64, Unit)> for Units {
@@ -240,7 +240,7 @@ impl ParallelExtend<(u64, Unit)> for Units {
 impl FromParallelIterator<Unit> for Units {
 	#[inline]
 	fn from_par_iter<I: IntoParallelIterator<Item = Unit>>(par_iter: I) -> Self {
-		Self(par_iter.into_par_iter().map(|u| (u.tag, u)).collect())
+		Self(par_iter.into_par_iter().map(|u| (u.tag(), u)).collect())
 	}
 }
 impl FromParallelIterator<(u64, Unit)> for Units {
@@ -257,7 +257,7 @@ where
 {
 	/// Searches for unit with given tag and returns it if found.
 	fn find_tag(self, tag: u64) -> Option<Self::Item> {
-		self.find_any(|u| u.borrow().tag == tag)
+		self.find_any(|u| u.borrow().tag() == tag)
 	}
 	/// Leaves only units with given tags.
 	fn find_tags<T: Container<u64>>(self, tags: &T) -> FindTags<Self, T> {
@@ -539,7 +539,7 @@ impl<'a, I, T: Container<u64>> FindTags<'a, I, T> {
 
 	fn predicate(&self) -> impl Fn(&Unit) -> bool + 'a {
 		let tags = self.tags;
-		move |u| tags.contains(&u.tag)
+		move |u| tags.contains(&u.tag())
 	}
 }
 
@@ -567,7 +567,7 @@ impl<I> OfType<I> {
 
 	fn predicate(&self) -> impl Fn(&Unit) -> bool {
 		let unit_type = self.unit_type;
-		move |u| u.type_id == unit_type
+		move |u| u.type_id() == unit_type
 	}
 }
 impl_simple_iterator!(OfType);
@@ -585,7 +585,7 @@ impl<I> ExcludeType<I> {
 
 	fn predicate(&self) -> impl Fn(&Unit) -> bool {
 		let unit_type = self.unit_type;
-		move |u| u.type_id != unit_type
+		move |u| u.type_id() != unit_type
 	}
 }
 impl_simple_iterator!(ExcludeType);
@@ -603,7 +603,7 @@ impl<'a, I, T: Container<UnitTypeId>> OfTypes<'a, I, T> {
 
 	fn predicate(&self) -> impl Fn(&Unit) -> bool + 'a {
 		let types = self.types;
-		move |u| types.contains(&u.type_id)
+		move |u| types.contains(&u.type_id())
 	}
 }
 
@@ -631,7 +631,7 @@ impl<'a, I, T: Container<UnitTypeId>> ExcludeTypes<'a, I, T> {
 
 	fn predicate(&self) -> impl Fn(&Unit) -> bool + 'a {
 		let types = self.types;
-		move |u| !types.contains(&u.type_id)
+		move |u| !types.contains(&u.type_id())
 	}
 }
 
@@ -649,13 +649,13 @@ where
 make_simple_iterator!(
 	/// An iterator that filters ground units.
 	Ground,
-	|u| !u.is_flying
+	|u| !u.is_flying()
 );
 
 make_simple_iterator!(
 	/// An iterator that filters flying units.
 	Flying,
-	|u| u.is_flying
+	|u| u.is_flying()
 );
 
 make_simple_iterator!(

@@ -168,7 +168,7 @@ impl<'a, I, T: Container<u64>> FindTags<'a, I, T> {
 
 	fn predicate(&self) -> impl Fn(&Unit) -> bool + 'a {
 		let tags = self.tags;
-		move |u| tags.contains(&u.tag)
+		move |u| tags.contains(&u.tag())
 	}
 }
 
@@ -205,7 +205,7 @@ impl<I> OfType<I> {
 
 	fn predicate(&self) -> impl Fn(&Unit) -> bool {
 		let unit_type = self.unit_type;
-		move |u| u.type_id == unit_type
+		move |u| u.type_id() == unit_type
 	}
 }
 impl_simple_iterator!(OfType);
@@ -223,7 +223,7 @@ impl<I> ExcludeType<I> {
 
 	fn predicate(&self) -> impl Fn(&Unit) -> bool {
 		let unit_type = self.unit_type;
-		move |u| u.type_id != unit_type
+		move |u| u.type_id() != unit_type
 	}
 }
 impl_simple_iterator!(ExcludeType);
@@ -241,7 +241,7 @@ impl<'a, I, T: Container<UnitTypeId>> OfTypes<'a, I, T> {
 
 	fn predicate(&self) -> impl Fn(&Unit) -> bool + 'a {
 		let types = self.types;
-		move |u| types.contains(&u.type_id)
+		move |u| types.contains(&u.type_id())
 	}
 }
 
@@ -278,7 +278,7 @@ impl<'a, I, T: Container<UnitTypeId>> ExcludeTypes<'a, I, T> {
 
 	fn predicate(&self) -> impl Fn(&Unit) -> bool + 'a {
 		let types = self.types;
-		move |u| !types.contains(&u.type_id)
+		move |u| !types.contains(&u.type_id())
 	}
 }
 
@@ -305,13 +305,13 @@ where
 make_simple_iterator!(
 	/// An iterator that filters ground units.
 	Ground,
-	|u| !u.is_flying
+	|u| !u.is_flying()
 );
 
 make_simple_iterator!(
 	/// An iterator that filters flying units.
 	Flying,
-	|u| u.is_flying
+	|u| u.is_flying()
 );
 
 make_simple_iterator!(
@@ -444,7 +444,7 @@ where
 {
 	/// Searches for unit with given tag and returns it if found.
 	fn find_tag(mut self, tag: u64) -> Option<Self::Item> {
-		self.find(|u| u.borrow().tag == tag)
+		self.find(|u| u.borrow().tag() == tag)
 	}
 	/// Leaves only units with given tags.
 	fn find_tags<T: Container<u64>>(self, tags: &T) -> FindTags<Self, T> {
