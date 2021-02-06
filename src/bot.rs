@@ -704,44 +704,88 @@ impl Bot {
 	}
 	/// Returns actual terrain height on given position in 3D space.
 	pub fn get_z_height<P: Into<(usize, usize)>>(&self, pos: P) -> f32 {
-		self.game_info.terrain_height[pos.into()] as f32 * 32.0 / 255.0 - 16.0
+		self.game_info
+			.terrain_height
+			.get(pos.into())
+			.map_or(0.0, |h| *h as f32 * 32.0 / 255.0 - 16.0)
 	}
 	/// Returns terrain height on given position.
 	pub fn get_height<P: Into<(usize, usize)>>(&self, pos: P) -> u8 {
-		self.game_info.terrain_height[pos.into()]
+		self.game_info
+			.terrain_height
+			.get(pos.into())
+			.copied()
+			.unwrap_or(0)
 	}
 	/// Checks if it's possible to build on given position.
 	pub fn is_placeable<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
-		self.game_info.placement_grid[pos.into()].is_empty()
+		self.game_info
+			.placement_grid
+			.get(pos.into())
+			.map_or(false, |p| p.is_empty())
 	}
 	/// Checks if it's possible for ground units to walk through given position.
 	pub fn is_pathable<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
-		self.game_info.pathing_grid[pos.into()].is_empty()
+		self.game_info
+			.pathing_grid
+			.get(pos.into())
+			.map_or(false, |p| p.is_empty())
 	}
 	/// Checks if given position is hidden (weren't explored before).
 	pub fn is_hidden<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
-		self.state.observation.raw.visibility[pos.into()].is_hidden()
+		self.state
+			.observation
+			.raw
+			.visibility
+			.get(pos.into())
+			.map_or(true, |p| p.is_hidden())
 	}
 	/// Checks if given position is in fog of war (was explored before).
 	pub fn is_fogged<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
-		self.state.observation.raw.visibility[pos.into()].is_fogged()
+		self.state
+			.observation
+			.raw
+			.visibility
+			.get(pos.into())
+			.map_or(true, |p| p.is_fogged())
 	}
 	/// Checks if given position is visible now.
 	pub fn is_visible<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
-		self.state.observation.raw.visibility[pos.into()].is_visible()
+		self.state
+			.observation
+			.raw
+			.visibility
+			.get(pos.into())
+			.map_or(false, |p| p.is_visible())
 	}
 	/// Checks if given position is fully hidden
 	/// (terrain isn't visible, only darkness; only in campain and custom maps).
 	pub fn is_full_hidden<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
-		self.state.observation.raw.visibility[pos.into()].is_full_hidden()
+		self.state
+			.observation
+			.raw
+			.visibility
+			.get(pos.into())
+			.map_or(true, |p| p.is_full_hidden())
 	}
 	/// Checks if given position is not hidden (was explored before).
 	pub fn is_explored<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
-		self.state.observation.raw.visibility[pos.into()].is_explored()
+		self.state
+			.observation
+			.raw
+			.visibility
+			.get(pos.into())
+			.map_or(false, |p| p.is_explored())
 	}
 	/// Checks if given position has zerg's creep.
 	pub fn has_creep<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
-		self.state.observation.raw.creep.read_lock()[pos.into()].is_empty()
+		self.state
+			.observation
+			.raw
+			.creep
+			.read_lock()
+			.get(pos.into())
+			.map_or(false, |p| p.is_empty())
 	}
 	pub(crate) fn init_data_for_unit(&mut self) {
 		self.data_for_unit = Rs::new(DataForUnit {
