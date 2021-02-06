@@ -168,6 +168,16 @@ impl LockOwned<u32> for LockU32 {
 	}
 }
 
+#[derive(Clone)]
+pub struct Expansion {
+	pub loc: Point2,
+	pub center: Point2,
+	pub minerals: Vec<u64>,
+	pub geysers: Vec<u64>,
+	pub alliance: Alliance,
+	pub base: Option<u64>,
+}
+
 /// Additional options for [`find_placement`](Bot::find_placement).
 #[derive(Clone, Copy)]
 pub struct PlacementOptions {
@@ -428,8 +438,8 @@ pub struct Bot {
 	pub enemy_start_center: Point2,
 	techlab_tags: Rw<FxHashSet<u64>>,
 	reactor_tags: Rw<FxHashSet<u64>>,
-	/// All expansions stored in (location, resource center) pairs.
-	pub expansions: Vec<(Point2, Point2)>,
+	/// All expansions.
+	pub expansions: Vec<Expansion>,
 	max_cooldowns: Rw<FxHashMap<UnitTypeId, f32>>,
 	last_units_health: Rw<FxHashMap<u64, u32>>,
 	/// Obstacles on map which block vision of ground units, but still pathable.
@@ -859,16 +869,21 @@ impl Bot {
 			})
 			.collect::<Vec<(isize, isize)>>();
 
-		self.expansions = resource_groups
-			.iter()
+		let mut expansions = resource_groups
+			.into_iter()
 			.map(|group| {
 				let resources = all_resources.find_tags(group.iter().map(|(_, tag)| tag));
 				let center = resources.center().unwrap().floor() + 0.5;
 
-				if center.is_closer(4.0, self.start_center) {
-					(self.start_location, self.start_center)
+				let (loc, center, alliance, base) = if center.is_closer(4.0, self.start_center) {
+					(
+						self.start_location,
+						self.start_center,
+						Alliance::Own,
+						self.units.my.townhalls.first().map(|t| t.tag),
+					)
 				} else if center.is_closer(4.0, self.enemy_start_center) {
-					(self.enemy_start, self.enemy_start_center)
+					(self.enemy_start, self.enemy_start_center, Alliance::Enemy, None)
 				} else {
 					let location = offsets
 						.iter()
@@ -894,18 +909,55 @@ impl Bot {
 					(
 						location,
 						(resources.sum(|r| r.position) + location) / (resources.len() + 1) as f32,
+						Alliance::Neutral,
+						None,
 					)
+				};
+
+				let mut minerals = vec![];
+				let mut geysers = vec![];
+				for r in resources {
+					if r.is_geyser() {
+						minerals.push(r.tag);
+					} else {
+						geysers.push(r.tag);
+					}
+				}
+
+				Expansion {
+					loc,
+					center,
+					minerals,
+					geysers,
+					alliance,
+					base,
 				}
 			})
-			.collect();
+			.collect::<Vec<_>>();
+
+		// Sort expansions by distance to start location
+		let start = Target::Pos(self.start_location);
+		let paths = self
+			.query_pathing(expansions.iter().map(|exp| (start, exp.loc)).collect())
+			.unwrap();
+
+		let paths = expansions
+			.iter()
+			.zip(paths.into_iter())
+			.map(|(exp, path)| (exp.loc, path.unwrap_or(f32::INFINITY)))
+			.collect::<FxHashMap<Point2, f32>>();
+
+		expansions.sort_unstable_by(|a, b| paths[&a.loc].partial_cmp(&paths[&b.loc]).unwrap());
+
+		self.expansions = expansions;
 
 		// Calclulating ramp locations
 		let mut ramp_points = FxHashSet::default();
 
 		let area = self.game_info.playable_area;
-		iproduct!(area.x0..area.x1, area.y0..area.y1).for_each(|pos| {
+		for pos in iproduct!(area.x0..area.x1, area.y0..area.y1) {
 			if !self.is_pathable(pos) || self.is_placeable(pos) {
-				return;
+				continue;
 			}
 
 			let h = self.get_height(pos);
@@ -927,7 +979,7 @@ impl Bot {
 			} else {
 				ramp_points.insert(pos);
 			}
-		});
+		}
 
 		let ramps = dbscan(
 			&ramp_points,
@@ -1053,6 +1105,10 @@ impl Bot {
 		let mut reactor_tags = self.reactor_tags.write_lock();
 		let mut max_cooldowns = self.max_cooldowns.write_lock();
 		let mut saved_hallucinations = FxHashSet::default();
+		let mut expansions = FxHashMap::default();
+		if self.is_hidden(self.enemy_start) {
+			expansions.insert(self.enemy_start, (Alliance::Enemy, None));
+		}
 
 		techlab_tags.clear();
 		reactor_tags.clear();
@@ -1124,12 +1180,16 @@ impl Bot {
 								UnitTypeId::CommandCenter
 								| UnitTypeId::OrbitalCommand
 								| UnitTypeId::PlanetaryFortress
-								| UnitTypeId::CommandCenterFlying
-								| UnitTypeId::OrbitalCommandFlying
 								| UnitTypeId::Hatchery
 								| UnitTypeId::Lair
 								| UnitTypeId::Hive
-								| UnitTypeId::Nexus => add_to!(units.townhalls),
+								| UnitTypeId::Nexus => {
+									expansions.insert(u.position, (Alliance::Own, Some(u.tag)));
+									add_to!(units.townhalls);
+								}
+								UnitTypeId::CommandCenterFlying | UnitTypeId::OrbitalCommandFlying => {
+									add_to!(units.townhalls)
+								}
 
 								UnitTypeId::Refinery
 								| UnitTypeId::RefineryRich
@@ -1178,12 +1238,16 @@ impl Bot {
 							UnitTypeId::CommandCenter
 							| UnitTypeId::OrbitalCommand
 							| UnitTypeId::PlanetaryFortress
-							| UnitTypeId::CommandCenterFlying
-							| UnitTypeId::OrbitalCommandFlying
 							| UnitTypeId::Hatchery
 							| UnitTypeId::Lair
 							| UnitTypeId::Hive
-							| UnitTypeId::Nexus => add_to!(units.townhalls),
+							| UnitTypeId::Nexus => {
+								expansions.insert(u.position, (Alliance::Enemy, Some(u.tag)));
+								add_to!(units.townhalls);
+							}
+							UnitTypeId::CommandCenterFlying | UnitTypeId::OrbitalCommandFlying => {
+								add_to!(units.townhalls)
+							}
 
 							UnitTypeId::Refinery
 							| UnitTypeId::RefineryRich
@@ -1220,6 +1284,12 @@ impl Bot {
 			mark_hallucination(u, &mut enemies.workers);
 		}
 		self.saved_hallucinations.extend(saved_hallucinations);
+
+		for exp in &mut self.expansions {
+			let (alliance, base) = expansions.remove(&exp.loc).unwrap_or((Alliance::Neutral, None));
+			exp.alliance = alliance;
+			exp.base = base;
+		}
 
 		fn is_invisible(u: &Unit, detectors: &Units, scans: &[Effect], gap: f32) -> bool {
 			let additional = u.radius + gap;
@@ -1589,82 +1659,36 @@ impl Bot {
 
 	/// Returns next possible location from [`expansions`](Self::expansions) closest to bot's start location
 	/// or `None` if there aren't any free locations.
-	pub fn get_expansion(&self) -> Option<(Point2, Point2)> {
-		let expansions = self
-			.expansions
-			.iter()
-			.filter(|(loc, _)| {
-				self.units.my.townhalls.iter().all(|t| t.is_further(7.0, *loc))
-					&& self.units.my.placeholders.iter().all(|p| p.is_further(7.0, *loc))
-			})
-			.copied()
-			.collect::<Vec<(Point2, Point2)>>();
-		let start = Target::Pos(self.start_location);
-		let paths = self
-			.query_pathing(expansions.iter().map(|(loc, _)| (start, *loc)).collect())
-			.unwrap();
-
-		expansions
-			.into_iter()
-			.zip(paths.into_iter())
-			.filter_map(|(loc, path)| Some((loc, path?)))
-			.min_by(|(_, path1), (_, path2)| path1.partial_cmp(&path2).unwrap())
-			.map(|(loc, _)| loc)
+	pub fn get_expansion(&self) -> Option<&Expansion> {
+		self.expansions.iter().find(|exp| exp.alliance.is_neutral())
 	}
 	/// Returns next possible location from [`expansions`](Self::expansions) closest to
 	/// opponent's start location or `None` if there aren't any free locations.
-	pub fn get_enemy_expansion(&self) -> Option<(Point2, Point2)> {
-		let expansions = self
-			.expansions
-			.iter()
-			.filter(|(loc, _)| {
-				*loc != self.enemy_start && self.units.enemy.townhalls.iter().all(|t| t.is_further(7.0, *loc))
-			})
-			.copied()
-			.collect::<Vec<(Point2, Point2)>>();
+	pub fn get_enemy_expansion(&self) -> Option<&Expansion> {
+		let expansions = self.free_expansions().collect::<Vec<_>>();
 		let start = Target::Pos(self.enemy_start);
 		let paths = self
-			.query_pathing(expansions.iter().map(|(loc, _)| (start, *loc)).collect())
+			.query_pathing(expansions.iter().map(|exp| (start, exp.loc)).collect())
 			.unwrap();
 
 		expansions
 			.into_iter()
 			.zip(paths.into_iter())
-			.filter_map(|(loc, path)| Some((loc, path?)))
+			.filter_map(|(exp, path)| Some((exp, path?)))
 			.min_by(|(_, path1), (_, path2)| path1.partial_cmp(&path2).unwrap())
-			.map(|(loc, _)| loc)
+			.map(|(exp, _)| exp)
 	}
 	/// Returns all [`expansions`](Self::expansions) taken by bot.
-	pub fn owned_expansions(&self) -> Vec<(Point2, Point2)> {
-		self.expansions
-			.iter()
-			.filter(|(loc, _)| self.units.my.townhalls.iter().any(|t| t.is_closer(15.0, *loc)))
-			.copied()
-			.collect()
+	pub fn owned_expansions(&self) -> impl Iterator<Item = &Expansion> {
+		self.expansions.iter().filter(|exp| exp.alliance.is_mine())
 	}
 	/// Returns all [`expansions`](Self::expansions) taken by opponent.
-	pub fn enemy_expansions(&self) -> Vec<(Point2, Point2)> {
-		self.expansions
-			.iter()
-			.filter(|(loc, _)| self.units.enemy.townhalls.iter().any(|t| t.is_closer(15.0, *loc)))
-			.copied()
-			.collect()
+	pub fn enemy_expansions(&self) -> impl Iterator<Item = &Expansion> {
+		self.expansions.iter().filter(|exp| exp.alliance.is_enemy())
 	}
 	/// Returns all avaliable [`expansions`](Self::expansions).
-	pub fn free_expansions(&self) -> Vec<(Point2, Point2)> {
-		self.expansions
-			.iter()
-			.filter(|(loc, _)| {
-				self.units.my.townhalls.iter().all(|t| t.is_further(15.0, *loc))
-					&& self
-						.units
-						.enemy
-						.townhalls
-						.iter()
-						.all(|t| t.is_further(15.0, *loc))
-			})
-			.copied()
-			.collect()
+	pub fn free_expansions(&self) -> impl Iterator<Item = &Expansion> {
+		self.expansions.iter().filter(|exp| exp.alliance.is_neutral())
 	}
 	/// Sends pathing requests to API.
 	///

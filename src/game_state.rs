@@ -218,6 +218,9 @@ where
 		.map(|u| Unit::from_proto(Rs::clone(&bot.data_for_unit), &visibility, u))
 		.collect::<Units>();
 
+	// Set visiblity
+	bot.state.observation.raw.visibility = visibility;
+
 	// Updating units
 	bot.update_units(units);
 
@@ -272,9 +275,6 @@ where
 			bot.enemy_race = race;
 		}
 	}
-
-	// Set visiblity
-	bot.state.observation.raw.visibility = visibility;
 
 	Ok(())
 }
