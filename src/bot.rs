@@ -444,8 +444,8 @@ pub struct Bot {
 impl Bot {
 	/// Interface for interacting with SC2 API through Request/Response.
 	#[inline]
-	pub fn api(&mut self) -> &mut API {
-		self.api.as_mut().expect("API is not initialized")
+	pub fn api(&self) -> &API {
+		self.api.as_ref().expect("API is not initialized")
 	}
 	/// Sets step between every [`on_step`] iteration
 	/// (e.g. on `1` [`on_step`] will be called every frame, on `2` every second frame, ...).
@@ -1406,7 +1406,7 @@ impl Bot {
 
 	/// Simple wrapper around [`query_placement`](Self::query_placement).
 	/// Checks if it's possible to build given building on given position.
-	pub fn can_place(&mut self, building: UnitTypeId, pos: Point2) -> bool {
+	pub fn can_place(&self, building: UnitTypeId, pos: Point2) -> bool {
 		self.query_placement(
 			vec![(self.game_data.units[&building].ability.unwrap(), pos, None)],
 			false,
@@ -1415,7 +1415,7 @@ impl Bot {
 	}
 	/// Simple wrapper around [`query_placement`](Self::query_placement).
 	/// Multi-version of [`can_place`](Self::can_place).
-	pub fn can_place_some(&mut self, places: Vec<(UnitTypeId, Point2)>) -> Vec<bool> {
+	pub fn can_place_some(&self, places: Vec<(UnitTypeId, Point2)>) -> Vec<bool> {
 		self.query_placement(
 			places
 				.into_iter()
@@ -1433,7 +1433,7 @@ impl Bot {
 	/// Returns correct position where it is possible to build given `building`,
 	/// or `None` if position is not found or `building` can't be built by a worker.
 	pub fn find_placement(
-		&mut self,
+		&self,
 		building: UnitTypeId,
 		near: Point2,
 		options: PlacementOptions,
@@ -1525,7 +1525,7 @@ impl Bot {
 	/// used to find free geyser near given base.
 	///
 	/// Returns `Unit` of geyser or `None` if there're no free geysers around given base.
-	pub fn find_gas_placement(&mut self, base: Point2) -> Option<Unit> {
+	pub fn find_gas_placement(&self, base: Point2) -> Option<Unit> {
 		let ability = self.game_data.units[&self.race_values.gas].ability.unwrap();
 
 		let geysers = self.units.vespene_geysers.closer(11.0, base);
@@ -1545,7 +1545,7 @@ impl Bot {
 
 	/// Returns next possible location from [`expansions`](Self::expansions) closest to bot's start location
 	/// or `None` if there aren't any free locations.
-	pub fn get_expansion(&mut self) -> Option<(Point2, Point2)> {
+	pub fn get_expansion(&self) -> Option<(Point2, Point2)> {
 		let expansions = self
 			.expansions
 			.iter()
@@ -1569,7 +1569,7 @@ impl Bot {
 	}
 	/// Returns next possible location from [`expansions`](Self::expansions) closest to
 	/// opponent's start location or `None` if there aren't any free locations.
-	pub fn get_enemy_expansion(&mut self) -> Option<(Point2, Point2)> {
+	pub fn get_enemy_expansion(&self) -> Option<(Point2, Point2)> {
 		let expansions = self
 			.expansions
 			.iter()
@@ -1628,7 +1628,7 @@ impl Bot {
 	///
 	/// Returns `Vec` ordered by input values,
 	/// where element is distance of path from start to goal or `None` if there's no path.
-	pub fn query_pathing(&mut self, paths: Vec<(Target, Point2)>) -> SC2Result<Vec<Option<f32>>> {
+	pub fn query_pathing(&self, paths: Vec<(Target, Point2)>) -> SC2Result<Vec<Option<f32>>> {
 		let mut req = Request::new();
 		let req_pathing = req.mut_query().mut_pathing();
 
@@ -1664,7 +1664,7 @@ impl Bot {
 	///
 	/// Returns `Vec` of [`ActionResult`] ordered by input values.
 	pub fn query_placement(
-		&mut self,
+		&self,
 		places: Vec<(AbilityId, Point2, Option<u64>)>,
 		check_resources: bool,
 	) -> SC2Result<Vec<ActionResult>> {
@@ -1698,14 +1698,14 @@ impl Bot {
 	///
 	/// [`on_end`]: crate::Player::on_end
 	/// [`debug.end_game`]: Debugger::end_game
-	pub fn leave(&mut self) -> SC2Result<()> {
+	pub fn leave(&self) -> SC2Result<()> {
 		let mut req = Request::new();
 		req.mut_leave_game();
 		self.api().send_request(req)
 	}
 
 	pub(crate) fn close_client(&mut self) {
-		if let Some(api) = &mut self.api {
+		if let Some(api) = &self.api {
 			let mut req = Request::new();
 			req.mut_leave_game();
 			if let Err(e) = api.send_request(req) {
@@ -1735,7 +1735,7 @@ impl Default for Bot {
 			race: Race::Random,
 			enemy_race: Race::Random,
 			process: None,
-			api: None,
+			api: Default::default(),
 			allow_spam: Default::default(),
 			player_id: Default::default(),
 			enemy_player_id: Default::default(),

@@ -123,14 +123,14 @@ where
 		debug!("Launching SC2 process");
 		self.bot.process = Some(launch_client(&self.sc2_path, port, self.sc2_version)?);
 		debug!("Connecting to websocket");
-		self.bot.api = Some(API(connect_to_websocket(HOST, port)?));
+		self.bot.api = Some(API::new(connect_to_websocket(HOST, port)?));
 		Ok(())
 	}
 
 	/// Runs requested game.
 	pub fn run_game(&mut self) -> SC2Result<()> {
 		let settings = self.bot.get_player_settings();
-		let api = &mut self.bot.api.as_mut().unwrap();
+		let api = self.bot.api();
 
 		debug!("Sending CreateGame request");
 		let mut req = Request::new();
@@ -157,7 +157,8 @@ where
 		}
 
 		debug!("Sending JoinGame request");
-		self.bot.player_id = join_game(&settings, api, None)?;
+		let player_id = join_game(&settings, api, None)?;
+		self.bot.player_id = player_id;
 
 		set_static_data(self.bot)?;
 
@@ -246,9 +247,9 @@ where
 		self.bot.process = Some(launch_client(&self.sc2_path, port_bot, self.sc2_version)?);
 
 		debug!("Connecting to host websocket");
-		self.human.api = Some(API(connect_to_websocket(HOST, port_human)?));
+		self.human.api = Some(API::new(connect_to_websocket(HOST, port_human)?));
 		debug!("Connecting to client websocket");
-		self.bot.api = Some(API(connect_to_websocket(HOST, port_bot)?));
+		self.bot.api = Some(API::new(connect_to_websocket(HOST, port_bot)?));
 
 		Ok(())
 	}
@@ -256,7 +257,7 @@ where
 	/// Runs requested game.
 	pub fn run_game(&mut self) -> SC2Result<()> {
 		let bot_settings = self.bot.get_player_settings();
-		let human_api = &mut self.human.api.as_mut().unwrap();
+		let human_api = self.human.api.as_ref().unwrap();
 
 		debug!("Sending CreateGame request to host process");
 		let mut req = Request::new();
@@ -295,7 +296,8 @@ where
 		join_game2(&self.human_settings, human_api, Some(&ports))?;
 		join_game2(&bot_settings, self.bot.api(), Some(&ports))?;
 		let _ = wait_join(human_api)?;
-		self.bot.player_id = wait_join(self.bot.api())?;
+		let player_id = wait_join(self.bot.api())?;
+		self.bot.player_id = player_id;
 
 		set_static_data(self.bot)?;
 
@@ -426,7 +428,7 @@ where
 	debug!("Starting ladder game");
 
 	debug!("Connecting to websocket");
-	bot.api = Some(API(connect_to_websocket(&host, port.parse()?)?));
+	bot.api = Some(API::new(connect_to_websocket(&host, port.parse()?)?));
 
 	debug!("Sending JoinGame request");
 
@@ -434,7 +436,7 @@ where
 		bot.opponent_id = id.to_string();
 	}
 
-	bot.player_id = join_game(
+	let player_id = join_game(
 		&bot.get_player_settings(),
 		bot.api(),
 		Some(&Ports {
@@ -443,6 +445,7 @@ where
 			client: vec![(player_port + 4, player_port + 5)],
 		}),
 	)?;
+	bot.player_id = player_id;
 
 	set_static_data(bot)?;
 
@@ -498,13 +501,13 @@ fn get_unused_ports(n: usize) -> Vec<i32> {
 
 // Helpers
 fn set_static_data(bot: &mut Bot) -> SC2Result<()> {
-	let api = &mut bot.api.as_mut().expect("API is not initialized");
+	let api = bot.api();
 
 	debug!("Requesting GameInfo");
 	let mut req = Request::new();
 	req.mut_game_info();
 	let mut res = api.send(req)?;
-	bot.game_info = res.take_game_info().into_sc2();
+	let game_info = res.take_game_info().into_sc2();
 
 	debug!("Requesting GameData");
 	let mut req = Request::new();
@@ -515,7 +518,11 @@ fn set_static_data(bot: &mut Bot) -> SC2Result<()> {
 	req_game_data.set_buff_id(true);
 	req_game_data.set_effect_id(true);
 	let mut res = api.send(req)?;
-	bot.game_data = Rs::new(res.take_data().into_sc2());
+	let game_data = Rs::new(res.take_data().into_sc2());
+
+	bot.game_info = game_info;
+	bot.game_data = game_data;
+
 	Ok(())
 }
 
@@ -542,11 +549,11 @@ fn create_computer_setup(computer: &Computer, req_create_game: &mut RequestCreat
 	req_create_game.mut_player_setup().push(setup);
 }
 
-fn join_game(settings: &PlayerSettings, api: &mut API, ports: Option<&Ports>) -> SC2Result<u32> {
+fn join_game(settings: &PlayerSettings, api: &API, ports: Option<&Ports>) -> SC2Result<u32> {
 	join_game2(settings, api, ports)?;
 	wait_join(api)
 }
-fn join_game2(settings: &PlayerSettings, api: &mut API, ports: Option<&Ports>) -> SC2Result<()> {
+fn join_game2(settings: &PlayerSettings, api: &API, ports: Option<&Ports>) -> SC2Result<()> {
 	let mut req = Request::new();
 	let req_join_game = req.mut_join_game();
 
@@ -585,7 +592,7 @@ fn join_game2(settings: &PlayerSettings, api: &mut API, ports: Option<&Ports>) -
 	api.send_only(req)?;
 	Ok(())
 }
-fn wait_join(api: &mut API) -> SC2Result<u32> {
+fn wait_join(api: &API) -> SC2Result<u32> {
 	let res = api.wait_response()?;
 
 	let res_join_game = res.get_join_game();
@@ -675,9 +682,9 @@ where
 	if !bot_debug_commands.is_empty() {
 		let mut req = Request::new();
 		let debug_commands = req.mut_debug().mut_debug();
-		bot_debug_commands
-			.iter()
-			.for_each(|cmd| debug_commands.push(cmd.into_proto()));
+		for cmd in bot_debug_commands {
+			debug_commands.push(cmd.into_proto())
+		}
 		bot.clear_debug_commands();
 		bot.api().send_request(req)?;
 	}
@@ -689,7 +696,7 @@ where
 	Ok(true)
 }
 
-fn save_replay(api: &mut API, path: &str) -> SC2Result<()> {
+fn save_replay(api: &API, path: &str) -> SC2Result<()> {
 	let mut req = Request::new();
 	req.mut_save_replay();
 
