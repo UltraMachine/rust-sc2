@@ -562,7 +562,7 @@ impl Units {
 	where
 		F: Fn(&&Unit) -> bool,
 	{
-		Self(self.iter().filter(f).map(|u| (u.tag, u.clone())).collect())
+		Self(self.iter().filter(f).map(|u| (u.tag(), u.clone())).collect())
 	}
 	/// Leaves only units of given types and makes a new collection of them.
 	///
@@ -572,7 +572,7 @@ impl Units {
 	///
 	/// [`of_types`]: UnitsIterator::of_types
 	pub fn of_types<T: Container<UnitTypeId>>(&self, types: &T) -> Self {
-		self.filter(|u| types.contains(&u.type_id))
+		self.filter(|u| types.contains(&u.type_id()))
 	}
 
 	/// Excludes units of given types and makes a new collection of remaining units.
@@ -583,7 +583,7 @@ impl Units {
 	///
 	/// [`exclude_types`]: UnitsIterator::exclude_types
 	pub fn exclude_types<T: Container<UnitTypeId>>(&self, types: &T) -> Self {
-		self.filter(|u| !types.contains(&u.type_id))
+		self.filter(|u| !types.contains(&u.type_id()))
 	}
 
 	/// Leaves only units closer than given distance to target and makes new collection of them.
