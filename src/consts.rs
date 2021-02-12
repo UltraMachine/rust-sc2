@@ -25,6 +25,7 @@ pub const ANTI_ARMOR_TARGET: BuffId = BuffId::RavenShredderMissileTint;
 /// Units disabled by raven's interference matrix have this buff.
 pub const INTERFERENCE_MATRIX_BUFF: BuffId = BuffId::RavenScramblerMissile;
 
+#[cfg(windows)]
 pub(crate) const INHIBITOR_IDS: [UnitTypeId; 6] = [
 	UnitTypeId::InhibitorZoneSmall,
 	UnitTypeId::InhibitorZoneMedium,
@@ -32,6 +33,12 @@ pub(crate) const INHIBITOR_IDS: [UnitTypeId; 6] = [
 	UnitTypeId::InhibitorZoneFlyingSmall,
 	UnitTypeId::InhibitorZoneFlyingMedium,
 	UnitTypeId::InhibitorZoneFlyingLarge,
+];
+#[cfg(unix)]
+pub(crate) const INHIBITOR_IDS: [UnitTypeId; 3] = [
+	UnitTypeId::InhibitorZoneSmall,
+	UnitTypeId::InhibitorZoneMedium,
+	UnitTypeId::InhibitorZoneLarge,
 ];
 
 /// Structured values, specific for each race.
@@ -854,24 +861,38 @@ lazy_static! {
 		}],
 	];
 	/// Radiuses of Inhibitor Zones mapped to their ids.
-	pub static ref INHIBITOR_ZONE_RADIUS: HashMap<UnitTypeId, f32> = hashmap![
-		UnitTypeId::InhibitorZoneSmall => 4.0,
-		UnitTypeId::InhibitorZoneMedium => 5.0,
-		UnitTypeId::InhibitorZoneLarge => 6.0,
-		UnitTypeId::InhibitorZoneFlyingSmall => 4.0,
-		UnitTypeId::InhibitorZoneFlyingMedium => 5.0,
-		UnitTypeId::InhibitorZoneFlyingLarge => 6.0,
-	];
-	pub(crate) static ref SPEED_BUFFS: HashMap<BuffId, f32> = hashmap![
-		BuffId::Stimpack => 1.5,
-		BuffId::StimpackMarauder => 1.5,
-		BuffId::ChargeUp => 2.8,
-		BuffId::DutchMarauderSlow => 0.5,
-		BuffId::TimeWarpProduction => 0.5,
-		BuffId::FungalGrowth => 0.25,
-		BuffId::InhibitorZoneTemporalField => 0.65,
-		BuffId::InhibitorZoneFlyingTemporalField => 0.65,
-		BuffId::AccelerationZoneTemporalField => 1.35,
-		BuffId::AccelerationZoneFlyingTemporalField => 1.35,
-	];
+	pub static ref INHIBITOR_ZONE_RADIUS: HashMap<UnitTypeId, f32> = {
+		let mut map = hashmap![
+			UnitTypeId::InhibitorZoneSmall => 4.0,
+			UnitTypeId::InhibitorZoneMedium => 5.0,
+			UnitTypeId::InhibitorZoneLarge => 6.0,
+		];
+		#[cfg(windows)]
+		{
+			map.reserve(3);
+			map.insert(UnitTypeId::InhibitorZoneFlyingSmall, 4.0);
+			map.insert(UnitTypeId::InhibitorZoneFlyingMedium, 5.0);
+			map.insert(UnitTypeId::InhibitorZoneFlyingLarge, 6.0);
+		}
+		map
+	};
+	pub(crate) static ref SPEED_BUFFS: HashMap<BuffId, f32> = {
+		let mut map = hashmap![
+			BuffId::Stimpack => 1.5,
+			BuffId::StimpackMarauder => 1.5,
+			BuffId::ChargeUp => 2.8,
+			BuffId::DutchMarauderSlow => 0.5,
+			BuffId::TimeWarpProduction => 0.5,
+			BuffId::FungalGrowth => 0.25,
+			BuffId::InhibitorZoneTemporalField => 0.65,
+			BuffId::AccelerationZoneTemporalField => 1.35,
+		];
+		#[cfg(windows)]
+		{
+			map.reserve(2);
+			map.insert(BuffId::InhibitorZoneFlyingTemporalField, 0.65);
+			map.insert(BuffId::AccelerationZoneFlyingTemporalField, 1.35);
+		}
+		map
+	};
 }
