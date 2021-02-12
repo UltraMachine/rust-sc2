@@ -124,6 +124,17 @@ def parse_data(data, version=None):
 	# elif version is None:
 	if version is None:
 		abilities["TerranBuildRefinery"] = 320
+	elif version is "linux505":
+		units["MineralField450"] = 1961
+		units["AssimilatorRich"] = 1980
+		units["ExtractorRich"] = 1981
+		units["RefineryRich"] = 1960
+
+		abilities["TerranBuildRefinery"] = 320
+		abilities["BatteryOverchargeBatteryOvercharge"] = 3815
+		abilities["AmorphousArmorcloudAmorphousArmorcloud"] = 3817
+
+		buffs["AccelerationZoneTemporalField"] = 290
 
 	return (
 		units,
@@ -159,15 +170,13 @@ def generate():
 	enums_latest = parse_data(
 		load((Path.home() / "Documents" / "StarCraft II" / "stableid.json").open())
 	)
-	enums_4_10 = parse_data(
-		load(
-			(Path.home() / "Documents" / "StarCraft II" / "stableid_4.10.json").open()
-		),
-		version="4.10",
+	enums_linux = parse_data(
+		load((Path.home() / "Documents" / "StarCraft II" / "stableid.json").open()),
+		version="linux505",
 	)
 
 	for name, file, enum, enum_linux in zip(
-		ENUM_NAMES, FILE_NAMES, enums_latest, enums_4_10
+		ENUM_NAMES, FILE_NAMES, enums_latest, enums_linux
 	):
 		if enum == enum_linux:
 			generated = f"{HEAD}\n{gen_enum(enum, name)}"
