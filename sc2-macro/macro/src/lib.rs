@@ -55,25 +55,22 @@ pub fn bot_new(_attr: TokenStream, item: TokenStream) -> TokenStream {
 	let vis = item.vis;
 	let signature = item.sig;
 	let blocks = item.block.stmts.iter().map(|s| match s {
-		Stmt::Expr(expr) => match expr {
-			Expr::Struct(struct_expr) => {
-				let path = &struct_expr.path;
-				let rest = match &struct_expr.rest {
-					Some(expr) => quote! {#expr},
-					None => quote! {},
-				};
-				let fields = struct_expr.fields.iter();
+		Stmt::Expr(Expr::Struct(struct_expr)) => {
+			let path = &struct_expr.path;
+			let rest = match &struct_expr.rest {
+				Some(expr) => quote! {#expr},
+				None => quote! {},
+			};
+			let fields = struct_expr.fields.iter();
 
-				quote! {
-					#path {
-						_bot: Default::default(),
-						#(#fields,)*
-						..#rest
-					}
+			quote! {
+				#path {
+					_bot: Default::default(),
+					#(#fields,)*
+					..#rest
 				}
 			}
-			n => quote! {#n},
-		},
+		}
 		n => quote! {#n},
 	});
 
