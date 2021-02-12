@@ -121,7 +121,7 @@ where
 	pub fn launch(&mut self) -> SC2Result<()> {
 		let port = get_unused_port();
 		debug!("Launching SC2 process");
-		self.bot.process = Some(launch_client(&self.sc2_path, port, self.sc2_version)?);
+		self.bot.process = Some(launch_client(&self.sc2_path, port, self.sc2_version));
 		debug!("Connecting to websocket");
 		self.bot.api = Some(API::new(connect_to_websocket(HOST, port)?));
 		Ok(())
@@ -242,9 +242,9 @@ where
 		let (port_bot, port_human) = (ports[0], ports[1]);
 
 		debug!("Launching host SC2 process");
-		self.human.process = Some(launch_client(&self.sc2_path, port_human, self.sc2_version)?);
+		self.human.process = Some(launch_client(&self.sc2_path, port_human, self.sc2_version));
 		debug!("Launching client SC2 process");
-		self.bot.process = Some(launch_client(&self.sc2_path, port_bot, self.sc2_version)?);
+		self.bot.process = Some(launch_client(&self.sc2_path, port_bot, self.sc2_version));
 
 		debug!("Connecting to host websocket");
 		self.human.api = Some(API::new(connect_to_websocket(HOST, port_human)?));
@@ -711,7 +711,7 @@ fn save_replay(api: &API, path: &str) -> SC2Result<()> {
 	Ok(())
 }
 
-fn launch_client(sc2_path: &str, port: i32, sc2_version: Option<&str>) -> SC2Result<Child> {
+fn launch_client(sc2_path: &str, port: i32, sc2_version: Option<&str>) -> Child {
 	let (base_version, data_hash) = match sc2_version {
 		Some(ver) => get_version_info(ver),
 		None => (get_latest_base_version(sc2_path), ""),
@@ -733,7 +733,7 @@ fn launch_client(sc2_path: &str, port: i32, sc2_version: Option<&str>) -> SC2Res
 	if !data_hash.is_empty() {
 		process.arg("-dataVersion").arg(data_hash);
 	}
-	Ok(process.spawn().expect("Can't launch SC2 process."))
+	process.spawn().expect("Can't launch SC2 process.")
 }
 
 fn connect_to_websocket(host: &str, port: i32) -> SC2Result<WS> {

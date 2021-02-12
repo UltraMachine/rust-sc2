@@ -1,4 +1,5 @@
 //! Traits for comparing distance between points and units.
+#![allow(clippy::wrong_self_convention)]
 
 use crate::{geometry::Point2, units::iter::filter_fold};
 use std::{cmp::Ordering, vec::IntoIter};
