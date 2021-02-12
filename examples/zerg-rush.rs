@@ -19,11 +19,11 @@ impl Player for ZergRushAI {
 		}
 
 		// Splitting workers to closest mineral crystals
-		self.units.my.workers.iter().for_each(|u| {
+		for u in &self.units.my.workers {
 			if let Some(mineral) = self.units.mineral_fields.closest(u) {
-				u.gather(mineral.tag, false);
+				u.gather(mineral.tag(), false);
 			}
-		});
+		}
 
 		// Ordering drone on initial 50 minerals
 		if let Some(larva) = self.units.my.larvas.first() {
@@ -79,10 +79,11 @@ impl ZergRushAI {
 		let mut deficit_geysers = Units::new();
 
 		// Distributing mineral workers
-		let mineral_tags = mineral_fields.iter().map(|m| m.tag).collect::<Vec<u64>>();
-		bases.iter().for_each(
-			|base| match base.assigned_harvesters.cmp(&base.ideal_harvesters) {
-				Ordering::Less => (0..(base.ideal_harvesters.unwrap() - base.assigned_harvesters.unwrap()))
+		let mineral_tags = mineral_fields.iter().map(|m| m.tag()).collect::<Vec<u64>>();
+		for base in &bases {
+			match base.assigned_harvesters().cmp(&base.ideal_harvesters()) {
+				Ordering::Less => (0..(base.ideal_harvesters().unwrap()
+					- base.assigned_harvesters().unwrap()))
 					.for_each(|_| {
 						deficit_minings.push(base.clone());
 					}),
@@ -90,7 +91,7 @@ impl ZergRushAI {
 					let local_minerals = mineral_fields
 						.iter()
 						.closer(11.0, base)
-						.map(|m| m.tag)
+						.map(|m| m.tag())
 						.collect::<Vec<u64>>();
 
 					idle_workers.extend(
@@ -101,18 +102,19 @@ impl ZergRushAI {
 							.filter(|u| {
 								u.target_tag().map_or(false, |target_tag| {
 									local_minerals.contains(&target_tag)
-										|| (u.is_carrying_minerals() && target_tag == base.tag)
+										|| (u.is_carrying_minerals() && target_tag == base.tag())
 								})
 							})
 							.take(
-								(base.assigned_harvesters.unwrap() - base.ideal_harvesters.unwrap()) as usize,
+								(base.assigned_harvesters().unwrap() - base.ideal_harvesters().unwrap())
+									as usize,
 							)
 							.cloned(),
 					);
 				}
 				_ => {}
-			},
-		);
+			}
+		}
 
 		// Distributing gas workers
 		let speed_upgrade = UpgradeId::Zerglingmovementspeed;
@@ -122,15 +124,17 @@ impl ZergRushAI {
 		let target_gas_workers = Some(if has_enough_gas { 0 } else { 3 });
 
 		self.units.my.gas_buildings.iter().ready().for_each(|gas| {
-			match gas.assigned_harvesters.cmp(&target_gas_workers) {
+			match gas.assigned_harvesters().cmp(&target_gas_workers) {
 				Ordering::Less => {
 					idle_workers.extend(self.units.my.workers.filter(|u| {
 						u.target_tag()
 							.map_or(false, |target_tag| mineral_tags.contains(&target_tag))
 					}));
-					(0..(gas.ideal_harvesters.unwrap() - gas.assigned_harvesters.unwrap())).for_each(|_| {
-						deficit_geysers.push(gas.clone());
-					});
+					(0..(gas.ideal_harvesters().unwrap() - gas.assigned_harvesters().unwrap())).for_each(
+						|_| {
+							deficit_geysers.push(gas.clone());
+						},
+					);
 				}
 				Ordering::Greater => {
 					idle_workers.extend(
@@ -140,12 +144,15 @@ impl ZergRushAI {
 							.iter()
 							.filter(|u| {
 								u.target_tag().map_or(false, |target_tag| {
-									target_tag == gas.tag
+									target_tag == gas.tag()
 										|| (u.is_carrying_vespene()
-											&& target_tag == bases.closest(gas).unwrap().tag)
+											&& target_tag == bases.closest(gas).unwrap().tag())
 								})
 							})
-							.take((gas.assigned_harvesters.unwrap() - gas.ideal_harvesters.unwrap()) as usize)
+							.take(
+								(gas.assigned_harvesters().unwrap() - gas.ideal_harvesters().unwrap())
+									as usize,
+							)
 							.cloned(),
 					);
 				}
@@ -165,28 +172,28 @@ impl ZergRushAI {
 			None
 		};
 
-		idle_workers.iter().for_each(|u| {
+		for u in &idle_workers {
 			if let Some(closest) = deficit_geysers.closest(u) {
-				let tag = closest.tag;
+				let tag = closest.tag();
 				deficit_geysers.remove(tag);
 				u.gather(tag, false);
 			} else if let Some(closest) = deficit_minings.closest(u) {
 				u.gather(
 					mineral_fields
 						.closer(11.0, closest)
-						.max(|m| m.mineral_contents.unwrap_or(0))
+						.max(|m| m.mineral_contents().unwrap_or(0))
 						.unwrap()
-						.tag,
+						.tag(),
 					false,
 				);
-				let tag = closest.tag;
+				let tag = closest.tag();
 				deficit_minings.remove(tag);
 			} else if u.is_idle() {
 				if let Some(mineral) = minerals_near_base.as_ref().and_then(|ms| ms.closest(u)) {
-					u.gather(mineral.tag, false);
+					u.gather(mineral.tag(), false);
 				}
 			}
-		});
+		}
 	}
 
 	fn order_units(&mut self) {
@@ -261,7 +268,7 @@ impl ZergRushAI {
 			.units
 			.mineral_fields
 			.iter()
-			.map(|u| u.tag)
+			.map(|u| u.tag())
 			.collect::<Vec<u64>>();
 
 		let pool = UnitTypeId::SpawningPool;
@@ -279,8 +286,8 @@ impl ZergRushAI {
 		if self.counter().all().count(extractor) == 0 && self.can_afford(extractor, false) {
 			let start = self.start_location;
 			if let Some(geyser) = self.find_gas_placement(start) {
-				if let Some(builder) = self.get_builder(geyser.position, &mineral_tags) {
-					builder.build_gas(geyser.tag, false);
+				if let Some(builder) = self.get_builder(geyser.position(), &mineral_tags) {
+					builder.build_gas(geyser.tag(), false);
 					self.subtract_resources(extractor, false);
 				}
 			}
@@ -288,9 +295,9 @@ impl ZergRushAI {
 
 		let hatchery = UnitTypeId::Hatchery;
 		if self.can_afford(hatchery, false) {
-			if let Some((location, _resource_center)) = self.get_expansion() {
-				if let Some(builder) = self.get_builder(location, &mineral_tags) {
-					builder.build(hatchery, location, false);
+			if let Some(exp) = self.get_expansion() {
+				if let Some(builder) = self.get_builder(exp.loc, &mineral_tags) {
+					builder.build(hatchery, exp.loc, false);
 					self.subtract_resources(hatchery, false);
 				}
 			}
@@ -307,7 +314,7 @@ impl ZergRushAI {
 				.my
 				.structures
 				.iter()
-				.find(|s| s.type_id == UnitTypeId::SpawningPool)
+				.find(|s| s.type_id() == UnitTypeId::SpawningPool)
 			{
 				pool.research(speed_upgrade, false);
 				self.subtract_upgrade_cost(speed_upgrade);
@@ -318,7 +325,7 @@ impl ZergRushAI {
 	fn execute_micro(&self) {
 		// Injecting Larva
 		let mut queens = self.units.my.units.filter(|u| {
-			u.type_id == UnitTypeId::Queen
+			u.type_id() == UnitTypeId::Queen
 				&& !u.is_using(AbilityId::EffectInjectLarva)
 				&& u.has_ability(AbilityId::EffectInjectLarva)
 		});
@@ -329,12 +336,12 @@ impl ZergRushAI {
 				.iter()
 				.filter(|h| {
 					!h.has_buff(BuffId::QueenSpawnLarvaTimer)
-						|| h.buff_duration_remain.unwrap() * 20 > h.buff_duration_max.unwrap()
+						|| h.buff_duration_remain().unwrap() * 20 > h.buff_duration_max().unwrap()
 				})
 				.for_each(|h| {
 					if let Some(queen) = queens.closest(h) {
-						queen.command(AbilityId::EffectInjectLarva, Target::Tag(h.tag), false);
-						let tag = queen.tag;
+						queen.command(AbilityId::EffectInjectLarva, Target::Tag(h.tag()), false);
+						let tag = queen.tag();
 						queens.remove(tag);
 					}
 				});
@@ -357,28 +364,28 @@ impl ZergRushAI {
 			self.units
 				.enemy
 				.all
-				.filter(|e| !e.is_flying && self.units.my.townhalls.iter().any(|h| h.is_closer(25.0, *e)))
+				.filter(|e| !e.is_flying() && self.units.my.townhalls.iter().any(|h| h.is_closer(25.0, *e)))
 		};
 		if !targets.is_empty() {
-			zerglings.iter().for_each(|u| {
+			for u in &zerglings {
 				if let Some(target) = targets
 					.iter()
 					.in_range_of(u, 0.0)
 					.min_by_key(|t| t.hits())
 					.or_else(|| targets.closest(u))
 				{
-					u.attack(Target::Pos(target.position), false);
+					u.attack(Target::Pos(target.position()), false);
 				}
-			});
+			}
 		} else {
 			let target = if speed_upgrade_is_almost_ready {
 				self.enemy_start
 			} else {
 				self.start_location.towards(self.start_center, -8.0)
 			};
-			zerglings.iter().for_each(|u| {
+			for u in &zerglings {
 				u.move_to(Target::Pos(target), false);
-			})
+			}
 		}
 	}
 }
@@ -457,8 +464,57 @@ fn main() -> SC2Result<()> {
 	let mut bot = ZergRushAI::default();
 	bot.set_game_step(game_step);
 
-	if app.is_present("ladder_server") {
-		run_ladder_game(
+	const LADDER_MAPS: &[&str] = &[
+		"DeathauraLE",
+		"EternalEmpireLE",
+		"EverDreamLE",
+		"GoldenWallLE",
+		"IceandChromeLE",
+		"PillarsofGoldLE",
+		"SubmarineLE",
+	];
+	let mut rng = thread_rng();
+
+	match app.subcommand() {
+		("local", Some(sub)) => run_vs_computer(
+			&mut bot,
+			Computer::new(
+				sub.value_of("race").map_or(Race::Random, |race| {
+					race.parse().expect("Can't parse computer race")
+				}),
+				sub.value_of("difficulty")
+					.map_or(Difficulty::VeryEasy, |difficulty| {
+						difficulty.parse().expect("Can't parse computer difficulty")
+					}),
+				sub.value_of("ai_build")
+					.map(|ai_build| ai_build.parse().expect("Can't parse computer build")),
+			),
+			sub.value_of("map")
+				.unwrap_or_else(|| LADDER_MAPS.choose(&mut rng).unwrap()),
+			LaunchOptions {
+				sc2_version: sub.value_of("sc2_version"),
+				realtime: sub.is_present("realtime"),
+				save_replay_as: sub.value_of("save_replay"),
+			},
+		),
+		("human", Some(sub)) => run_vs_human(
+			&mut bot,
+			PlayerSettings::new(
+				sub.value_of("race")
+					.unwrap()
+					.parse()
+					.expect("Can't parse human race"),
+				sub.value_of("name"),
+			),
+			sub.value_of("map")
+				.unwrap_or_else(|| LADDER_MAPS.choose(&mut rng).unwrap()),
+			LaunchOptions {
+				sc2_version: sub.value_of("sc2_version"),
+				realtime: true,
+				save_replay_as: sub.value_of("save_replay"),
+			},
+		),
+		_ => run_ladder_game(
 			&mut bot,
 			app.value_of("ladder_server").unwrap_or("127.0.0.1"),
 			app.value_of("host_port").expect("GamePort must be specified"),
@@ -467,75 +523,6 @@ fn main() -> SC2Result<()> {
 				.parse()
 				.expect("Can't parse StartPort"),
 			app.value_of("opponent_id"),
-		)
-	} else {
-		let mut rng = thread_rng();
-
-		match app.subcommand() {
-			("local", Some(sub)) => run_vs_computer(
-				&mut bot,
-				Computer::new(
-					sub.value_of("race").map_or(Race::Random, |race| {
-						race.parse().expect("Can't parse computer race")
-					}),
-					sub.value_of("difficulty")
-						.map_or(Difficulty::VeryEasy, |difficulty| {
-							difficulty.parse().expect("Can't parse computer difficulty")
-						}),
-					sub.value_of("ai_build")
-						.map(|ai_build| ai_build.parse().expect("Can't parse computer build")),
-				),
-				sub.value_of("map").unwrap_or_else(|| {
-					[
-						"AcropolisLE",
-						"DiscoBloodbathLE",
-						"EphemeronLE",
-						"ThunderbirdLE",
-						"TritonLE",
-						"WintersGateLE",
-						"WorldofSleepersLE",
-					]
-					.choose(&mut rng)
-					.unwrap()
-				}),
-				LaunchOptions {
-					sc2_version: sub.value_of("sc2_version"),
-					realtime: sub.is_present("realtime"),
-					save_replay_as: sub.value_of("save_replay"),
-				},
-			),
-			("human", Some(sub)) => run_vs_human(
-				&mut bot,
-				PlayerSettings::new(
-					sub.value_of("race")
-						.unwrap()
-						.parse()
-						.expect("Can't parse human race"),
-					sub.value_of("name"),
-				),
-				sub.value_of("map").unwrap_or_else(|| {
-					[
-						"AcropolisLE",
-						"DiscoBloodbathLE",
-						"EphemeronLE",
-						"ThunderbirdLE",
-						"TritonLE",
-						"WintersGateLE",
-						"WorldofSleepersLE",
-					]
-					.choose(&mut rng)
-					.unwrap()
-				}),
-				LaunchOptions {
-					sc2_version: sub.value_of("sc2_version"),
-					realtime: true,
-					save_replay_as: sub.value_of("save_replay"),
-				},
-			),
-			_ => {
-				println!("Game mode is not specified! Use -h, --help to print help information.");
-				std::process::exit(0);
-			}
-		}
+		),
 	}
 }

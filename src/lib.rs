@@ -249,7 +249,7 @@ if self.counter().count(UnitTypeId::Marine) >= 15 {
         }
     } else {
         for m in marines {
-            m.attack(Target::Tag(targets.closest(m)?.tag), false);
+            m.attack(Target::Tag(targets.closest(m)?.tag()), false);
         }
     }
 } else {
@@ -260,7 +260,7 @@ if self.counter().count(UnitTypeId::Marine) >= 15 {
         }
     } else {
         for m in marines {
-            m.attack(Target::Tag(targets.closest(m)?.tag), false);
+            m.attack(Target::Tag(targets.closest(m)?.tag()), false);
         }
     }
 }

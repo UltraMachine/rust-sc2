@@ -24,11 +24,11 @@ impl Player for ReaperRushAI {
 		}
 
 		// Splitting workers to closest mineral crystals
-		self.units.my.workers.iter().for_each(|u| {
+		for u in &self.units.my.workers {
 			if let Some(mineral) = self.units.mineral_fields.closest(u) {
-				u.gather(mineral.tag, false);
+				u.gather(mineral.tag(), false);
 			}
-		});
+		}
 
 		Ok(())
 	}
@@ -77,9 +77,10 @@ impl ReaperRushAI {
 		let mut deficit_geysers = Units::new();
 
 		// Distributing mineral workers
-		bases.iter().for_each(
-			|base| match base.assigned_harvesters.cmp(&base.ideal_harvesters) {
-				Ordering::Less => (0..(base.ideal_harvesters.unwrap() - base.assigned_harvesters.unwrap()))
+		for base in &bases {
+			match base.assigned_harvesters().cmp(&base.ideal_harvesters()) {
+				Ordering::Less => (0..(base.ideal_harvesters().unwrap()
+					- base.assigned_harvesters().unwrap()))
 					.for_each(|_| {
 						deficit_minings.push(base.clone());
 					}),
@@ -87,7 +88,7 @@ impl ReaperRushAI {
 					let local_minerals = mineral_fields
 						.iter()
 						.closer(11.0, base)
-						.map(|m| m.tag)
+						.map(|m| m.tag())
 						.collect::<Vec<u64>>();
 
 					idle_workers.extend(
@@ -97,19 +98,20 @@ impl ReaperRushAI {
 							.filter(|u| {
 								u.target_tag().map_or(false, |target_tag| {
 									local_minerals.contains(&target_tag)
-										|| (u.is_carrying_minerals() && target_tag == base.tag)
+										|| (u.is_carrying_minerals() && target_tag == base.tag())
 								})
 							})
 							.iter()
 							.take(
-								(base.assigned_harvesters.unwrap() - base.ideal_harvesters.unwrap()) as usize,
+								(base.assigned_harvesters().unwrap() - base.ideal_harvesters().unwrap())
+									as usize,
 							)
 							.cloned(),
 					);
 				}
 				_ => {}
-			},
-		);
+			}
+		}
 
 		// Distributing gas workers
 		self.units
@@ -117,31 +119,37 @@ impl ReaperRushAI {
 			.gas_buildings
 			.iter()
 			.ready()
-			.filter(|g| g.vespene_contents.map_or(false, |vespene| vespene > 0))
-			.for_each(|gas| match gas.assigned_harvesters.cmp(&gas.ideal_harvesters) {
-				Ordering::Less => (0..(gas.ideal_harvesters.unwrap() - gas.assigned_harvesters.unwrap()))
-					.for_each(|_| {
-						deficit_geysers.push(gas.clone());
-					}),
-				Ordering::Greater => {
-					idle_workers.extend(
-						self.units
-							.my
-							.workers
-							.filter(|u| {
-								u.target_tag().map_or(false, |target_tag| {
-									target_tag == gas.tag
-										|| (u.is_carrying_vespene()
-											&& target_tag == bases.closest(gas).unwrap().tag)
+			.filter(|g| g.vespene_contents().map_or(false, |vespene| vespene > 0))
+			.for_each(
+				|gas| match gas.assigned_harvesters().cmp(&gas.ideal_harvesters()) {
+					Ordering::Less => (0..(gas.ideal_harvesters().unwrap()
+						- gas.assigned_harvesters().unwrap()))
+						.for_each(|_| {
+							deficit_geysers.push(gas.clone());
+						}),
+					Ordering::Greater => {
+						idle_workers.extend(
+							self.units
+								.my
+								.workers
+								.filter(|u| {
+									u.target_tag().map_or(false, |target_tag| {
+										target_tag == gas.tag()
+											|| (u.is_carrying_vespene()
+												&& target_tag == bases.closest(gas).unwrap().tag())
+									})
 								})
-							})
-							.iter()
-							.take((gas.assigned_harvesters.unwrap() - gas.ideal_harvesters.unwrap()) as usize)
-							.cloned(),
-					);
-				}
-				_ => {}
-			});
+								.iter()
+								.take(
+									(gas.assigned_harvesters().unwrap() - gas.ideal_harvesters().unwrap())
+										as usize,
+								)
+								.cloned(),
+						);
+					}
+					_ => {}
+				},
+			);
 
 		// Distributing idle workers
 		let minerals_near_base = if idle_workers.len() > deficit_minings.len() + deficit_geysers.len() {
@@ -155,28 +163,28 @@ impl ReaperRushAI {
 			None
 		};
 
-		idle_workers.iter().for_each(|u| {
+		for u in &idle_workers {
 			if let Some(closest) = deficit_geysers.closest(u) {
-				let tag = closest.tag;
+				let tag = closest.tag();
 				deficit_geysers.remove(tag);
 				u.gather(tag, false);
 			} else if let Some(closest) = deficit_minings.closest(u) {
 				u.gather(
 					mineral_fields
 						.closer(11.0, closest)
-						.max(|m| m.mineral_contents.unwrap_or(0))
+						.max(|m| m.mineral_contents().unwrap_or(0))
 						.unwrap()
-						.tag,
+						.tag(),
 					false,
 				);
-				let tag = closest.tag;
+				let tag = closest.tag();
 				deficit_minings.remove(tag);
 			} else if u.is_idle() {
 				if let Some(mineral) = minerals_near_base.as_ref().and_then(|ms| ms.closest(u)) {
-					u.gather(mineral.tag, false);
+					u.gather(mineral.tag(), false);
 				}
 			}
-		});
+		}
 	}
 
 	fn get_builder(&self, pos: Point2, mineral_tags: &[u64]) -> Option<&Unit> {
@@ -200,7 +208,7 @@ impl ReaperRushAI {
 			.units
 			.mineral_fields
 			.iter()
-			.map(|u| u.tag)
+			.map(|u| u.tag())
 			.collect::<Vec<u64>>();
 		let main_base = self.start_location.towards(self.game_info.map_center, 8.0);
 
@@ -210,8 +218,8 @@ impl ReaperRushAI {
 		{
 			let start_location = self.start_location;
 			if let Some(geyser) = self.find_gas_placement(start_location) {
-				if let Some(builder) = self.get_builder(geyser.position, &mineral_tags) {
-					builder.build_gas(geyser.tag, false);
+				if let Some(builder) = self.get_builder(geyser.position(), &mineral_tags) {
+					builder.build_gas(geyser.tag(), false);
 					self.subtract_resources(UnitTypeId::Refinery, false);
 				}
 			}
@@ -276,7 +284,7 @@ impl ReaperRushAI {
 				.my
 				.structures
 				.iter()
-				.find(|u| u.type_id == UnitTypeId::Barracks && u.is_ready() && u.is_almost_idle())
+				.find(|u| u.type_id() == UnitTypeId::Barracks && u.is_ready() && u.is_almost_idle())
 			{
 				barracks.train(UnitTypeId::Reaper, false);
 				self.subtract_resources(UnitTypeId::Reaper, true);
@@ -288,7 +296,11 @@ impl ReaperRushAI {
 		if reaper.has_ability(AbilityId::KD8ChargeKD8Charge)
 			&& reaper.in_ability_cast_range(AbilityId::KD8ChargeKD8Charge, target, 0.0)
 		{
-			reaper.command(AbilityId::KD8ChargeKD8Charge, Target::Pos(target.position), false);
+			reaper.command(
+				AbilityId::KD8ChargeKD8Charge,
+				Target::Pos(target.position()),
+				false,
+			);
 			true
 		} else {
 			false
@@ -320,14 +332,14 @@ impl ReaperRushAI {
 			}
 		};
 
-		reapers.iter().for_each(|u| {
-			let is_retreating = self.reapers_retreat.contains(&u.tag);
+		for u in &reapers {
+			let is_retreating = self.reapers_retreat.contains(&u.tag());
 			if is_retreating {
 				if u.health_percentage().unwrap() > 0.75 {
-					self.reapers_retreat.remove(&u.tag);
+					self.reapers_retreat.remove(&u.tag());
 				}
 			} else if u.health_percentage().unwrap() < 0.5 {
-				self.reapers_retreat.insert(u.tag);
+				self.reapers_retreat.insert(u.tag());
 			}
 
 			match targets.closest(u) {
@@ -343,11 +355,11 @@ impl ReaperRushAI {
 						{
 							Some(closest_attacker) => {
 								let flee_position = {
-									let pos = u.position.towards(closest_attacker.position, -u.speed());
+									let pos = u.position().towards(closest_attacker.position(), -u.speed());
 									if self.is_pathable(pos) {
 										pos
 									} else {
-										*u.position
+										*u.position()
 											.neighbors8()
 											.iter()
 											.filter(|p| self.is_pathable(**p))
@@ -359,27 +371,27 @@ impl ReaperRushAI {
 							}
 							None => {
 								if !(is_retreating || u.in_range(&closest, 0.0)) {
-									u.move_to(Target::Pos(closest.position), false);
+									u.move_to(Target::Pos(closest.position()), false);
 								}
 							}
 						}
 					} else {
 						match targets.iter().in_range_of(u, 0.0).min_by_key(|t| t.hits()) {
-							Some(target) => u.attack(Target::Tag(target.tag), false),
-							None => u.move_to(Target::Pos(closest.position), false),
+							Some(target) => u.attack(Target::Tag(target.tag()), false),
+							None => u.move_to(Target::Pos(closest.position()), false),
 						}
 					}
 				}
 				None => {
 					let pos = if is_retreating {
-						u.position
+						u.position()
 					} else {
 						self.enemy_start
 					};
 					u.move_to(Target::Pos(pos), false);
 				}
 			}
-		});
+		}
 	}
 }
 
@@ -457,8 +469,57 @@ fn main() -> SC2Result<()> {
 	let mut bot = ReaperRushAI::default();
 	bot.set_game_step(game_step);
 
-	if app.is_present("ladder_server") {
-		run_ladder_game(
+	const LADDER_MAPS: &[&str] = &[
+		"DeathauraLE",
+		"EternalEmpireLE",
+		"EverDreamLE",
+		"GoldenWallLE",
+		"IceandChromeLE",
+		"PillarsofGoldLE",
+		"SubmarineLE",
+	];
+	let mut rng = thread_rng();
+
+	match app.subcommand() {
+		("local", Some(sub)) => run_vs_computer(
+			&mut bot,
+			Computer::new(
+				sub.value_of("race").map_or(Race::Random, |race| {
+					race.parse().expect("Can't parse computer race")
+				}),
+				sub.value_of("difficulty")
+					.map_or(Difficulty::VeryEasy, |difficulty| {
+						difficulty.parse().expect("Can't parse computer difficulty")
+					}),
+				sub.value_of("ai_build")
+					.map(|ai_build| ai_build.parse().expect("Can't parse computer build")),
+			),
+			sub.value_of("map")
+				.unwrap_or_else(|| LADDER_MAPS.choose(&mut rng).unwrap()),
+			LaunchOptions {
+				sc2_version: sub.value_of("sc2_version"),
+				realtime: sub.is_present("realtime"),
+				save_replay_as: sub.value_of("save_replay"),
+			},
+		),
+		("human", Some(sub)) => run_vs_human(
+			&mut bot,
+			PlayerSettings::new(
+				sub.value_of("race")
+					.unwrap()
+					.parse()
+					.expect("Can't parse human race"),
+				sub.value_of("name"),
+			),
+			sub.value_of("map")
+				.unwrap_or_else(|| LADDER_MAPS.choose(&mut rng).unwrap()),
+			LaunchOptions {
+				sc2_version: sub.value_of("sc2_version"),
+				realtime: true,
+				save_replay_as: sub.value_of("save_replay"),
+			},
+		),
+		_ => run_ladder_game(
 			&mut bot,
 			app.value_of("ladder_server").unwrap_or("127.0.0.1"),
 			app.value_of("host_port").expect("GamePort must be specified"),
@@ -467,75 +528,6 @@ fn main() -> SC2Result<()> {
 				.parse()
 				.expect("Can't parse StartPort"),
 			app.value_of("opponent_id"),
-		)
-	} else {
-		let mut rng = thread_rng();
-
-		match app.subcommand() {
-			("local", Some(sub)) => run_vs_computer(
-				&mut bot,
-				Computer::new(
-					sub.value_of("race").map_or(Race::Random, |race| {
-						race.parse().expect("Can't parse computer race")
-					}),
-					sub.value_of("difficulty")
-						.map_or(Difficulty::VeryEasy, |difficulty| {
-							difficulty.parse().expect("Can't parse computer difficulty")
-						}),
-					sub.value_of("ai_build")
-						.map(|ai_build| ai_build.parse().expect("Can't parse computer build")),
-				),
-				sub.value_of("map").unwrap_or_else(|| {
-					[
-						"AcropolisLE",
-						"DiscoBloodbathLE",
-						"EphemeronLE",
-						"ThunderbirdLE",
-						"TritonLE",
-						"WintersGateLE",
-						"WorldofSleepersLE",
-					]
-					.choose(&mut rng)
-					.unwrap()
-				}),
-				LaunchOptions {
-					sc2_version: sub.value_of("sc2_version"),
-					realtime: sub.is_present("realtime"),
-					save_replay_as: sub.value_of("save_replay"),
-				},
-			),
-			("human", Some(sub)) => run_vs_human(
-				&mut bot,
-				PlayerSettings::new(
-					sub.value_of("race")
-						.unwrap()
-						.parse()
-						.expect("Can't parse human race"),
-					sub.value_of("name"),
-				),
-				sub.value_of("map").unwrap_or_else(|| {
-					[
-						"AcropolisLE",
-						"DiscoBloodbathLE",
-						"EphemeronLE",
-						"ThunderbirdLE",
-						"TritonLE",
-						"WintersGateLE",
-						"WorldofSleepersLE",
-					]
-					.choose(&mut rng)
-					.unwrap()
-				}),
-				LaunchOptions {
-					sc2_version: sub.value_of("sc2_version"),
-					realtime: true,
-					save_replay_as: sub.value_of("save_replay"),
-				},
-			),
-			_ => {
-				println!("Game mode is not specified! Use -h, --help to print help information.");
-				std::process::exit(0);
-			}
-		}
+		),
 	}
 }

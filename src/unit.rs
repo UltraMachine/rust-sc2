@@ -616,7 +616,7 @@ impl Unit {
 	pub fn supply_cost(&self) -> f32 {
 		self.type_data().map_or(0.0, |data| data.food_required)
 	}
-	/// Returns cost of unit
+	/// Returns cost of unit.
 	pub fn cost(&self) -> Cost {
 		self.type_data().map_or(Cost::default(), |data| data.cost())
 	}
@@ -839,22 +839,20 @@ impl Unit {
 			| UnitTypeId::ChangelingMarine
 			| UnitTypeId::ChangelingZerglingWings
 			| UnitTypeId::ChangelingZergling => &[],
-			_ => self
+			UnitTypeId::BanelingBurrowed | UnitTypeId::BanelingCocoon => {
+				&MISSED_WEAPONS[&UnitTypeId::Baneling]
+			}
+			UnitTypeId::RavagerCocoon => self
+				.data
+				.game_data
+				.units
+				.get(&UnitTypeId::Ravager)
+				.map_or(&[], |data| data.weapons.as_slice()),
+			unit_type => self
 				.type_data()
 				.map(|data| data.weapons.as_slice())
 				.filter(|weapons| !weapons.is_empty())
-				.or_else(|| match self.type_id() {
-					UnitTypeId::BanelingBurrowed | UnitTypeId::BanelingCocoon => {
-						MISSED_WEAPONS.get(&UnitTypeId::Baneling).map(|ws| ws.as_slice())
-					}
-					UnitTypeId::RavagerCocoon => self
-						.data
-						.game_data
-						.units
-						.get(&UnitTypeId::Ravager)
-						.map(|data| data.weapons.as_slice()),
-					unit_type => MISSED_WEAPONS.get(&unit_type).map(|ws| ws.as_slice()),
-				})
+				.or_else(|| MISSED_WEAPONS.get(&unit_type).map(|ws| ws.as_slice()))
 				.unwrap_or_default(),
 		}
 	}
@@ -1218,16 +1216,6 @@ impl Unit {
 	/// [`real_air_range`]: Self::real_air_range
 	#[allow(clippy::mut_range_bound)]
 	pub fn calculate_weapon_stats(&self, target: CalcTarget) -> (f32, f32) {
-		/*
-		if matches!(self.type_id, UnitTypeId::Bunker) && self.is_mine() {
-			return self
-				.passengers
-				.iter()
-				.map(|passenger| (passenger.type_id).calculate_weapon(target))
-				.sum();
-		}
-		*/
-
 		let (upgrades, target_upgrades) = {
 			let my_upgrades = self.data.upgrades.read_lock();
 			let enemy_upgrades = self.data.enemy_upgrades.read_lock();
