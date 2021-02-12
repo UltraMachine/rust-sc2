@@ -16,10 +16,13 @@ use sc2_proto::{
 	},
 	sc2api::ResponseData,
 };
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 /// All the data about different ids stored here.
 /// Can be accessed through [`game_data`](crate::bot::Bot::game_data) field.
 #[derive(Default, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct GameData {
 	/// Information about abilities mapped to `AbilityId`s.
 	pub abilities: FxHashMap<AbilityId, AbilityData>,
@@ -66,6 +69,7 @@ impl FromProto<ResponseData> for GameData {
 
 /// Cost of an item (`UnitTypeId` or `UpgradeId`) in resources, supply and time.
 #[derive(Debug, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Cost {
 	pub minerals: u32,
 	pub vespene: u32,
@@ -75,6 +79,7 @@ pub struct Cost {
 
 /// Possible target of ability, needed when giving commands to units.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum AbilityTarget {
 	None,
 	Point,
@@ -97,6 +102,7 @@ impl FromProto<AbilityData_Target> for AbilityTarget {
 /// Differents attributes of units.
 #[variant_checkers]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Attribute {
 	Light,
 	Armored,
@@ -131,6 +137,7 @@ impl FromProto<ProtoAttribute> for Attribute {
 /// Possible target of unit's weapon.
 #[variant_checkers]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum TargetType {
 	Ground,
 	Air,
@@ -148,6 +155,7 @@ impl FromProto<Weapon_TargetType> for TargetType {
 
 /// Weapon's characteristic.
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Weapon {
 	/// Possible targets.
 	pub target: TargetType,
@@ -181,6 +189,7 @@ impl FromProto<&ProtoWeapon> for Weapon {
 
 /// Information about specific ability.
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct AbilityData {
 	pub id: AbilityId,
 	pub link_name: String,
@@ -229,6 +238,7 @@ impl TryFromProto<&ProtoAbilityData> for AbilityData {
 
 /// Information about specific unit type.
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct UnitTypeData {
 	pub id: UnitTypeId,
 	pub name: String,
@@ -308,6 +318,7 @@ impl TryFromProto<&ProtoUnitTypeData> for UnitTypeData {
 
 /// Information about specific upgrade.
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct UpgradeData {
 	pub id: UpgradeId,
 	/// Ability used to research the upgrade.
@@ -342,6 +353,7 @@ impl TryFromProto<&ProtoUpgradeData> for UpgradeData {
 
 /// Information about specific buff.
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BuffData {
 	pub id: BuffId,
 	pub name: String,
@@ -357,6 +369,7 @@ impl TryFromProto<&ProtoBuffData> for BuffData {
 
 /// Information about specific effect.
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct EffectData {
 	pub id: EffectId,
 	pub name: String,
