@@ -125,16 +125,26 @@ def parse_data(data, version=None):
 	if version is None:
 		abilities["TerranBuildRefinery"] = 320
 	elif version is "linux505":
-		units["MineralField450"] = 1961
 		units["AssimilatorRich"] = 1980
 		units["ExtractorRich"] = 1981
-		units["RefineryRich"] = 1960
+		units["AccelerationZoneSmall"] = 1985
+		units["AccelerationZoneMedium"] = 1986
+		units["AccelerationZoneLarge"] = 1987
 
-		abilities["TerranBuildRefinery"] = 320
+		upgrades["TempestGroundAttackUpgrade"] = 296
+		upgrades["EnhancedShockwaves"] = 297
+
+		abilities["FleetBeaconResearchVoidRaySpeedUpgrade"] = 48
+		abilities["FleetBeaconResearchTempestResearchGroundAttackUpgrade"] = 49
+		abilities["FleetBeaconResearchTempestResearchGroundAttackUpgrade"] = 49
+		abilities["GhostAcademyResearchEnhancedShockwaves"] = 822
+		abilities["LurkerDenResearchLurkerRange"] = 3710
 		abilities["BatteryOverchargeBatteryOvercharge"] = 3815
 		abilities["AmorphousArmorcloudAmorphousArmorcloud"] = 3817
 
 		buffs["AccelerationZoneTemporalField"] = 290
+		buffs["AmorphousArmorcloud"] = 296
+		buffs["BatteryOvercharge"] = 298
 
 	return (
 		units,
@@ -171,7 +181,9 @@ def generate():
 		load((Path.home() / "Documents" / "StarCraft II" / "stableid.json").open())
 	)
 	enums_linux = parse_data(
-		load((Path.home() / "Documents" / "StarCraft II" / "stableid.json").open()),
+		load(
+			(Path.home() / "Documents" / "StarCraft II" / "stableid_4.10.json").open()
+		),
 		version="linux505",
 	)
 
