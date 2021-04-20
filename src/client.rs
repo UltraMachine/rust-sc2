@@ -153,7 +153,7 @@ where
 				res_create_game.get_error_details()
 			);
 			error!("{}", err);
-			panic!(err);
+			panic!("{}", err);
 		}
 
 		debug!("Sending JoinGame request");
@@ -279,7 +279,7 @@ where
 				res_create_game.get_error_details()
 			);
 			error!("{}", err);
-			panic!(err);
+			panic!("{}", err);
 		}
 
 		debug!("Sending JoinGame request to both processes");
