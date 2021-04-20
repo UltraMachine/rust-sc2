@@ -125,7 +125,7 @@ impl Ramp {
 
 			let center = (p1 + p2) / 2.0;
 
-			return Some(center.circle_intersection(self.depot_in_middle()?, 2.236_068)?); // 5_f32.sqrt()
+			return center.circle_intersection(self.depot_in_middle()?, 5_f32.sqrt());
 		}
 		None
 	}
@@ -141,7 +141,7 @@ impl Ramp {
 			let (x, y) = ps[1];
 			let p2 = Point2::new(x as f32 + 0.5, y as f32 + 0.5);
 
-			let intersects = p1.circle_intersection(p2, 2.236_068)?; // 5_f32.sqrt()
+			let intersects = p1.circle_intersection(p2, 5_f32.sqrt())?;
 			let (x, y) = *self.lower().first()?;
 			let lower = Point2::new(x as f32, y as f32);
 
