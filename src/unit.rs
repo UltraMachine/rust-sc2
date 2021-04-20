@@ -456,7 +456,7 @@ impl Unit {
 				| UnitTypeId::Raven
 				| UnitTypeId::Overseer
 				| UnitTypeId::OverseerSiegeMode
-		) || (self.is_ready()
+		) || (self.is_almost_ready()
 			&& (matches!(
 				self.type_id(),
 				UnitTypeId::MissileTurret | UnitTypeId::SporeCrawler
@@ -465,6 +465,10 @@ impl Unit {
 	/// Building construction is complete.
 	pub fn is_ready(&self) -> bool {
 		(self.build_progress() - 1.0).abs() < f32::EPSILON
+	}
+	/// Building construction is more than 95% complete.
+	pub fn is_almost_ready(&self) -> bool {
+		self.build_progress() >= 0.95
 	}
 	/// Terran building has addon.
 	pub fn has_addon(&self) -> bool {
@@ -839,7 +843,7 @@ impl Unit {
 			| UnitTypeId::ChangelingMarine
 			| UnitTypeId::ChangelingZerglingWings
 			| UnitTypeId::ChangelingZergling => &[],
-			UnitTypeId::BanelingBurrowed | UnitTypeId::BanelingCocoon => {
+			UnitTypeId::Baneling | UnitTypeId::BanelingBurrowed | UnitTypeId::BanelingCocoon => {
 				&MISSED_WEAPONS[&UnitTypeId::Baneling]
 			}
 			UnitTypeId::RavagerCocoon => self
@@ -1475,12 +1479,11 @@ impl Unit {
 				range
 			}
 		};
-		let total_range = self.radius() + target.radius() + range + gap;
 		let distance = self.distance_squared(target);
 
 		// Takes into account that Sieged Tank has a minimum range of 2
 		(self.type_id() != UnitTypeId::SiegeTankSieged || distance > 4.0)
-			&& distance <= total_range * total_range
+			&& distance <= (self.radius() + target.radius() + range + gap).powi(2)
 	}
 	/// Checks if unit is close enough to be attacked by given threat.
 	/// This `unit.in_range_of(threat, gap)` is equivalent to `threat.in_range(unit, gap)`.
@@ -1497,13 +1500,11 @@ impl Unit {
 		if range < f32::EPSILON {
 			return false;
 		}
-
-		let total_range = self.radius() + target.radius() + range + gap;
 		let distance = self.distance_squared(target);
 
 		// Takes into account that Sieged Tank has a minimum range of 2
 		(self.type_id() != UnitTypeId::SiegeTankSieged || distance > 4.0)
-			&& distance <= total_range * total_range
+			&& distance <= (self.radius() + target.radius() + range + gap).powi(2)
 	}
 	/// Checks if unit is close enough to be attacked by given threat.
 	/// This `unit.in_real_range_of(threat, gap)` is equivalent to `threat.in_real_range(unit, gap)`.
@@ -1611,15 +1612,13 @@ impl Unit {
 	/// Doesn't work with enemies.
 	#[rustfmt::skip::macros(matches)]
 	pub fn is_attacking(&self) -> bool {
-		!self.is_idle()
-			&& matches!(
-				self.orders()[0].ability,
-				AbilityId::Attack
-					| AbilityId::AttackAttack
-					| AbilityId::AttackAttackTowards
-					| AbilityId::AttackAttackBarrage
-					| AbilityId::ScanMove
-			)
+		self.is_using_any(&vec![
+			AbilityId::Attack,
+			AbilityId::AttackAttack,
+			AbilityId::AttackAttackTowards,
+			AbilityId::AttackAttackBarrage,
+			AbilityId::ScanMove,
+		])
 	}
 	/// Checks if unit is currently moving.
 	///
@@ -1637,78 +1636,104 @@ impl Unit {
 	///
 	/// Doesn't work with enemies.
 	pub fn is_repairing(&self) -> bool {
-		!self.is_idle()
-			&& matches!(
-				self.orders()[0].ability,
-				AbilityId::EffectRepair | AbilityId::EffectRepairSCV | AbilityId::EffectRepairMule
-			)
+		self.is_using_any(&vec![AbilityId::EffectRepairSCV, AbilityId::EffectRepairMule])
 	}
 	/// Checks if worker is currently gathering resource.
 	///
 	/// Doesn't work with enemies.
 	pub fn is_gathering(&self) -> bool {
-		self.is_using(AbilityId::HarvestGather)
+		self.is_using_any(&vec![
+			AbilityId::HarvestGatherSCV,
+			AbilityId::HarvestGatherMule,
+			AbilityId::HarvestGatherDrone,
+			AbilityId::HarvestGatherProbe,
+		])
 	}
 	/// Checks if worker is currently returning resource closest base.
 	///
 	/// Doesn't work with enemies.
 	pub fn is_returning(&self) -> bool {
-		self.is_using(AbilityId::HarvestReturn)
+		self.is_using_any(&vec![
+			AbilityId::HarvestReturnSCV,
+			AbilityId::HarvestReturnMule,
+			AbilityId::HarvestReturnDrone,
+			AbilityId::HarvestReturnProbe,
+		])
 	}
 	/// Checks if worker is currently gathering or returning resources.
 	///
 	/// Doesn't work with enemies.
 	pub fn is_collecting(&self) -> bool {
-		!self.is_idle()
-			&& matches!(
-				self.orders()[0].ability,
-				AbilityId::HarvestGather | AbilityId::HarvestReturn
-			)
+		self.orders().first().map_or(false, |order| match self.type_id() {
+			UnitTypeId::SCV => matches!(
+				order.ability,
+				AbilityId::HarvestGatherSCV | AbilityId::HarvestReturnSCV
+			),
+			UnitTypeId::MULE => matches!(
+				order.ability,
+				AbilityId::HarvestGatherMule | AbilityId::HarvestReturnMule
+			),
+			UnitTypeId::Drone => matches!(
+				order.ability,
+				AbilityId::HarvestGatherDrone | AbilityId::HarvestReturnDrone
+			),
+			UnitTypeId::Probe => matches!(
+				order.ability,
+				AbilityId::HarvestGatherProbe | AbilityId::HarvestReturnProbe
+			),
+			_ => false,
+		})
 	}
 	/// Checks if worker is currently constructing a building.
 	///
 	/// Doesn't work with enemies.
 	pub fn is_constructing(&self) -> bool {
-		!self.is_idle() && self.orders()[0].ability.is_constructing()
+		self.orders().first().map_or(false, |order| match self.type_id() {
+			UnitTypeId::SCV => order.ability.is_constructing_scv(),
+			UnitTypeId::Drone => order.ability.is_constructing_drone(),
+			UnitTypeId::Probe => order.ability.is_constructing_probe(),
+			_ => false,
+		})
 	}
 	/// Checks if terran building is currently making addon.
 	///
 	/// Doesn't work with enemies.
 	pub fn is_making_addon(&self) -> bool {
-		!self.is_idle()
-			&& matches!(
-				self.orders()[0].ability,
-				AbilityId::BuildTechLabBarracks
-					| AbilityId::BuildReactorBarracks
-					| AbilityId::BuildTechLabFactory
-					| AbilityId::BuildReactorFactory
-					| AbilityId::BuildTechLabStarport
-					| AbilityId::BuildReactorStarport
-			)
+		self.orders().first().map_or(false, |order| match self.type_id() {
+			UnitTypeId::Barracks => matches!(
+				order.ability,
+				AbilityId::BuildTechLabBarracks | AbilityId::BuildReactorBarracks
+			),
+			UnitTypeId::Factory => matches!(
+				order.ability,
+				AbilityId::BuildTechLabFactory | AbilityId::BuildReactorFactory
+			),
+			UnitTypeId::Starport => matches!(
+				order.ability,
+				AbilityId::BuildTechLabStarport | AbilityId::BuildReactorStarport
+			),
+			_ => false,
+		})
 	}
 	/// Checks if terran building is currently building techlab.
 	///
 	/// Doesn't work with enemies.
 	pub fn is_making_techlab(&self) -> bool {
-		!self.is_idle()
-			&& matches!(
-				self.orders()[0].ability,
-				AbilityId::BuildTechLabBarracks
-					| AbilityId::BuildTechLabFactory
-					| AbilityId::BuildTechLabStarport
-			)
+		self.is_using_any(&vec![
+			AbilityId::BuildTechLabBarracks,
+			AbilityId::BuildTechLabFactory,
+			AbilityId::BuildTechLabStarport,
+		])
 	}
 	/// Checks if terran building is currently building reactor.
 	///
 	/// Doesn't work with enemies.
 	pub fn is_making_reactor(&self) -> bool {
-		!self.is_idle()
-			&& matches!(
-				self.orders()[0].ability,
-				AbilityId::BuildReactorBarracks
-					| AbilityId::BuildReactorFactory
-					| AbilityId::BuildReactorStarport
-			)
+		self.is_using_any(&vec![
+			AbilityId::BuildReactorBarracks,
+			AbilityId::BuildReactorFactory,
+			AbilityId::BuildReactorStarport,
+		])
 	}
 
 	// Actions

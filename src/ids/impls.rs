@@ -289,4 +289,65 @@ impl AbilityId {
 			| AbilityId::ZergBuildSporeCrawler
 		)
 	}
+	#[inline]
+	pub fn is_constructing_scv(self) -> bool {
+		matches!(
+			self,
+			AbilityId::TerranBuildCommandCenter
+			| AbilityId::TerranBuildSupplyDepot
+			| AbilityId::TerranBuildRefinery
+			| AbilityId::TerranBuildBarracks
+			| AbilityId::TerranBuildEngineeringBay
+			| AbilityId::TerranBuildMissileTurret
+			| AbilityId::TerranBuildBunker
+			| AbilityId::TerranBuildSensorTower
+			| AbilityId::TerranBuildGhostAcademy
+			| AbilityId::TerranBuildFactory
+			| AbilityId::TerranBuildStarport
+			| AbilityId::TerranBuildArmory
+			| AbilityId::TerranBuildFusionCore
+		)
+	}
+	#[inline]
+	pub fn is_constructing_drone(self) -> bool {
+		matches!(
+			self,
+			AbilityId::ZergBuildHatchery
+			| AbilityId::ZergBuildCreepTumor
+			| AbilityId::ZergBuildExtractor
+			| AbilityId::ZergBuildSpawningPool
+			| AbilityId::ZergBuildEvolutionChamber
+			| AbilityId::ZergBuildHydraliskDen
+			| AbilityId::ZergBuildSpire
+			| AbilityId::ZergBuildUltraliskCavern
+			| AbilityId::ZergBuildInfestationPit
+			| AbilityId::ZergBuildNydusNetwork
+			| AbilityId::ZergBuildBanelingNest
+			| AbilityId::BuildLurkerDen
+			| AbilityId::ZergBuildRoachWarren
+			| AbilityId::ZergBuildSpineCrawler
+			| AbilityId::ZergBuildSporeCrawler
+		)
+	}
+	#[inline]
+	pub fn is_constructing_probe(self) -> bool {
+		matches!(
+			self,
+			AbilityId::ProtossBuildNexus
+			| AbilityId::ProtossBuildPylon
+			| AbilityId::ProtossBuildAssimilator
+			| AbilityId::ProtossBuildGateway
+			| AbilityId::ProtossBuildForge
+			| AbilityId::ProtossBuildFleetBeacon
+			| AbilityId::ProtossBuildTwilightCouncil
+			| AbilityId::ProtossBuildPhotonCannon
+			| AbilityId::ProtossBuildStargate
+			| AbilityId::ProtossBuildTemplarArchive
+			| AbilityId::ProtossBuildDarkShrine
+			| AbilityId::ProtossBuildRoboticsBay
+			| AbilityId::ProtossBuildRoboticsFacility
+			| AbilityId::ProtossBuildCyberneticsCore
+			| AbilityId::BuildShieldBattery
+		)
+	}
 }
