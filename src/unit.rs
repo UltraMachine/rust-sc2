@@ -462,7 +462,7 @@ impl Unit {
 				UnitTypeId::MissileTurret | UnitTypeId::SporeCrawler
 			) || (matches!(self.type_id(), UnitTypeId::PhotonCannon) && self.is_powered())))
 	}
-	/// Building construction complete.
+	/// Building construction is complete.
 	pub fn is_ready(&self) -> bool {
 		(self.build_progress() - 1.0).abs() < f32::EPSILON
 	}
@@ -498,14 +498,14 @@ impl Unit {
 	}
 	/// Abilities available for unit to use.
 	///
-	/// Ability won't be avaliable if it's on cooldown, unit
+	/// Ability won't be available if it's on cooldown, unit
 	/// is out of energy or bot doesn't have enough resources.
 	pub fn abilities(&self) -> Option<FxHashSet<AbilityId>> {
 		self.data.abilities_units.read_lock().get(&self.tag()).cloned()
 	}
 	/// Checks if ability is available for unit.
 	///
-	/// Ability won't be avaliable if it's on cooldown, unit
+	/// Ability won't be available if it's on cooldown, unit
 	/// is out of energy or bot doesn't have enough resources.
 	pub fn has_ability(&self, ability: AbilityId) -> bool {
 		self.data

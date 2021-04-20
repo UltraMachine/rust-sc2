@@ -21,7 +21,7 @@ use crate::{
 	FromProto, IntoProto,
 };
 use num_traits::ToPrimitive;
-use rand::prelude::{thread_rng, SliceRandom};
+use rand::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use sc2_proto::{
 	query::{RequestQueryBuildingPlacement, RequestQueryPathing},
@@ -168,13 +168,21 @@ impl LockOwned<u32> for LockU32 {
 	}
 }
 
+/// Information about an expansion location.
 #[derive(Clone)]
 pub struct Expansion {
+	/// Placement position for townhall.
 	pub loc: Point2,
+	/// Center of resources.
 	pub center: Point2,
-	pub minerals: Vec<u64>,
-	pub geysers: Vec<u64>,
+	/// Tags of minaral fields belonging to the expansion.
+	pub minerals: FxHashSet<u64>,
+	/// Tags of vespene geysers belonging to the expansion.
+	pub geysers: FxHashSet<u64>,
+	/// `Neutral` if expansion is free.
+	/// `Own` or `Enemy` when taken by you or opponent.
 	pub alliance: Alliance,
+	/// Tag of townhall placed on the expansion. (Only for occupied ones)
 	pub base: Option<u64>,
 }
 
@@ -741,7 +749,7 @@ impl Bot {
 			.get(pos.into())
 			.map_or(false, |p| p.is_empty())
 	}
-	/// Checks if given position is hidden (weren't explored before).
+	/// Checks if given position is hidden (wasn't explored before).
 	pub fn is_hidden<P: Into<(usize, usize)>>(&self, pos: P) -> bool {
 		self.state
 			.observation
@@ -914,13 +922,13 @@ impl Bot {
 					)
 				};
 
-				let mut minerals = vec![];
-				let mut geysers = vec![];
+				let mut minerals = FxHashSet::default();
+				let mut geysers = FxHashSet::default();
 				for r in resources {
 					if r.is_geyser() {
-						minerals.push(r.tag());
+						minerals.insert(r.tag());
 					} else {
-						geysers.push(r.tag());
+						geysers.insert(r.tag());
 					}
 				}
 
@@ -1274,7 +1282,7 @@ impl Bot {
 
 		let enemies = &mut self.units.enemy;
 		for &u in &self.saved_hallucinations {
-			if let Some(u) = enemies.all.get_mut(u) {
+			if let Some(u) = enemies.all.get(u) {
 				u.base.is_hallucination.set_locked(true);
 			}
 		}
@@ -1403,7 +1411,7 @@ impl Bot {
 			}
 
 			for u in cloaked {
-				if let Some(u) = cache.all.get_mut(u) {
+				if let Some(u) = cache.all.get(u) {
 					let u = &u.base;
 					*u.display_type.write_lock() = DisplayType::Hidden;
 					u.is_cloaked.set_locked(true);
@@ -1412,7 +1420,7 @@ impl Bot {
 			}
 
 			for u in burrowed {
-				if let Some(u) = cache.all.get_mut(u) {
+				if let Some(u) = cache.all.get(u) {
 					if let Some(burrowed_id) = BURROWED_IDS.get(&u.type_id()) {
 						let u = &u.base;
 						*u.display_type.write_lock() = DisplayType::Hidden;
@@ -1425,7 +1433,7 @@ impl Bot {
 			}
 
 			for u in hidden {
-				if let Some(u) = cache.all.get_mut(u) {
+				if let Some(u) = cache.all.get(u) {
 					*u.base.display_type.write_lock() = DisplayType::Hidden;
 				}
 			}
@@ -1473,19 +1481,10 @@ impl Bot {
 			.effects
 			.iter()
 			.filter(|e| e.id == EffectId::ScannerSweep && e.alliance.is_enemy())
-			.cloned()
-			.collect::<Vec<Effect>>();
-
-		let mut revealed = Vec::<u64>::new();
+			.collect::<Vec<_>>();
 
 		for u in &self.units.my.all {
 			if !(u.is_revealed() || is_invisible(u, &enemy_detectors, &enemy_scans, 1.0)) {
-				revealed.push(u.tag());
-			}
-		}
-
-		for u in revealed {
-			if let Some(u) = self.units.my.all.get_mut(u) {
 				u.base.is_revealed.set_locked(true);
 			}
 		}
@@ -1659,7 +1658,7 @@ impl Bot {
 	pub fn enemy_expansions(&self) -> impl Iterator<Item = &Expansion> {
 		self.expansions.iter().filter(|exp| exp.alliance.is_enemy())
 	}
-	/// Returns all avaliable [`expansions`](Self::expansions).
+	/// Returns all available [`expansions`](Self::expansions).
 	pub fn free_expansions(&self) -> impl Iterator<Item = &Expansion> {
 		self.expansions.iter().filter(|exp| exp.alliance.is_neutral())
 	}
