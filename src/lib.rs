@@ -26,7 +26,7 @@ rust-sc2 = { git = "https://github.com/UltraMachine/rust-sc2" }
 
 Making bots with `rust-sc2` is pretty easy:
 ```
-use::rust_sc2::prelude::*;
+use rust_sc2::prelude::*;
 
 #[bot]
 #[derive(Default)]
@@ -332,7 +332,7 @@ extern crate maplit;
 extern crate log;
 
 /// The most frequent used items and various traits here.
-/// Prefered usage: `use::rust_sc2::prelude::*;`.
+/// Prefered usage: `use rust_sc2::prelude::*;`.
 pub mod prelude {
 	#[cfg(feature = "rayon")]
 	pub use crate::distance::rayon::{ParCenter, ParDistanceIterator, ParDistanceSlice};
@@ -381,6 +381,7 @@ pub mod unit;
 pub mod units;
 pub mod utils;
 
+use game_state::Alliance;
 use player::{GameResult, Race};
 
 /**

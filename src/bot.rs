@@ -4,7 +4,7 @@ use crate::{
 	action::{Action, ActionResult, Commander, Target},
 	api::API,
 	client::SC2Result,
-	consts::{RaceValues, INHIBITOR_IDS, RACE_VALUES, TECH_ALIAS, UNIT_ALIAS},
+	consts::{RaceValues, FRAMES_PER_SECOND, INHIBITOR_IDS, RACE_VALUES, TECH_ALIAS, UNIT_ALIAS},
 	debug::{DebugCommand, Debugger},
 	distance::*,
 	game_data::{Cost, GameData},
@@ -457,7 +457,7 @@ pub struct Bot {
 	enemy_upgrades: Rw<FxHashSet<UpgradeId>>,
 	pub(crate) owned_tags: FxHashSet<u64>,
 	pub(crate) under_construction: FxHashSet<u64>,
-	available_frames: Rw<FxHashMap<u64, u32>>,
+	pub(crate) available_frames: Rw<FxHashMap<u64, u32>>,
 }
 
 impl Bot {
@@ -1056,7 +1056,7 @@ impl Bot {
 	}
 	pub(crate) fn prepare_step(&mut self) {
 		let observation = &self.state.observation;
-		self.time = (observation.game_loop as f32) / 22.4;
+		self.time = (observation.game_loop() as f32) / FRAMES_PER_SECOND;
 		let common = &observation.common;
 		self.minerals = common.minerals;
 		self.vespene = common.vespene;
@@ -1297,7 +1297,7 @@ impl Bot {
 			exp.base = base;
 		}
 
-		fn is_invisible(u: &Unit, detectors: &Units, scans: &[Effect], gap: f32) -> bool {
+		fn is_invisible(u: &Unit, detectors: &Units, scans: &[&Effect], gap: f32) -> bool {
 			let additional = u.radius() + gap;
 
 			for d in detectors {
@@ -1349,8 +1349,7 @@ impl Bot {
 				.effects
 				.iter()
 				.filter(|e| e.id == EffectId::ScannerSweep && e.alliance.is_mine())
-				.cloned()
-				.collect::<Vec<Effect>>();
+				.collect::<Vec<_>>();
 
 			let current = &self.units.enemy.all;
 			for u in &self.units.cached.all {

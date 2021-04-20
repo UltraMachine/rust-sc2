@@ -1,6 +1,6 @@
 [package]
 name = "rust-sc2"
-version = "1.0.0"
+version = "1.1.0"
 authors = ["Armageddon <lunyx1337@gmail.com>"]
 edition = "2018"
 description = "Rust implementation of StarCraft II API"

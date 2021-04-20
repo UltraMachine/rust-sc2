@@ -59,7 +59,7 @@ impl ZergRushAI {
 		let bases = self.units.my.townhalls.ready();
 
 		// Check distribution delay if there aren't any idle workers
-		let game_loop = self.state.observation.game_loop;
+		let game_loop = self.state.observation.game_loop();
 		let last_loop = &mut self.last_loop_distributed;
 		if idle_workers.is_empty() && *last_loop + Self::DISTRIBUTION_DELAY + bases.len() as u32 > game_loop {
 			return;

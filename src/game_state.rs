@@ -138,7 +138,7 @@ where
 
 	for u in &dead_units {
 		let alliance = if bot.owned_tags.remove(u) {
-			bot.commander.write_lock().available_frames.remove(u);
+			bot.available_frames.write_lock().remove(u);
 			bot.under_construction.remove(u);
 			Some(Alliance::Own)
 		} else {

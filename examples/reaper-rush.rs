@@ -56,7 +56,7 @@ impl ReaperRushAI {
 		let mut idle_workers = self.units.my.workers.idle();
 
 		// Check distribution delay if there aren't any idle workers
-		let game_loop = self.state.observation.game_loop;
+		let game_loop = self.state.observation.game_loop();
 		let last_loop = &mut self.last_loop_distributed;
 		if idle_workers.is_empty() && *last_loop + Self::DISTRIBUTION_DELAY > game_loop {
 			return;

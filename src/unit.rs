@@ -41,7 +41,7 @@ pub(crate) struct DataForUnit {
 	pub game_step: Rs<LockU32>,
 	pub game_loop: Rs<LockU32>,
 	pub allow_spam: Rs<LockBool>,
-	pub available_frames: Rw<FxHashSet<u64>>,
+	pub available_frames: Rw<FxHashMap<u64, u32>>,
 }
 
 pub(crate) struct UnitBase {
@@ -1748,8 +1748,8 @@ impl Unit {
 		self.data
 			.available_frames
 			.read_lock()
-			.get(self.tag())
-			.map_or(false, |frame| self.data.game_loop.get_locked() < frame)
+			.get(&self.tag())
+			.map_or(false, |frame| self.data.game_loop.get_locked() < *frame)
 	}
 	/// Makes unit ignore all your commands for given amount of frames.
 	///
