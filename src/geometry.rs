@@ -94,9 +94,13 @@ impl Point2 {
 		])
 	}
 
+	/// Returns squared length of the vector.
+	pub fn len_squared(self) -> f32 {
+		self.x.powi(2) + self.y.powi(2)
+	}
 	/// Returns length of the vector.
 	pub fn len(self) -> f32 {
-		(self.x.powi(2) + self.y.powi(2)).sqrt()
+		self.len_squared().sqrt()
 	}
 	/// Normalizes the vector.
 	pub fn normalize(self) -> Self {
@@ -119,6 +123,10 @@ impl Point2 {
 			Self::new(-self.y, self.x)
 		}
 	}
+	/// Dot product.
+	pub fn dot(self, other: Self) -> f32 {
+		self.x * other.x + self.y * other.y
+	}
 
 	/// Returns rounded point.
 	pub fn round(self) -> Self {
@@ -137,8 +145,8 @@ impl Point2 {
 	/// Returns point rounded to closest greater integer.
 	pub fn ceil(self) -> Self {
 		Self {
-			x: (self.x + 1.0) as i32 as f32,
-			y: (self.y + 1.0) as i32 as f32,
+			x: (self.x + 0.999999) as i32 as f32,
+			y: (self.y + 0.999999) as i32 as f32,
 		}
 	}
 	/// Returns point with absolute coordinates.
