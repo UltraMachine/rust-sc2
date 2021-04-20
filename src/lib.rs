@@ -347,6 +347,7 @@ pub mod prelude {
 		},
 		consts::{ALL_PRODUCERS, PRODUCERS, RESEARCHERS, TECH_REQUIREMENTS},
 		distance::{Center, Distance, DistanceIterator, DistanceSlice},
+		game_state::Alliance,
 		geometry::Point2,
 		ids::*,
 		player::{AIBuild, Computer, Difficulty, GameResult, Race},
@@ -664,7 +665,7 @@ impl PlayerSettings {
 /// Passed to [`on_event`](Player::on_event).
 pub enum Event {
 	/// Unit died or structure destroyed (all units: your, enemy, neutral).
-	UnitDestroyed(u64),
+	UnitDestroyed(u64, Option<Alliance>),
 	/// Unit finished training (your only).
 	UnitCreated(u64),
 	/// Worker started to build a structure (your only).

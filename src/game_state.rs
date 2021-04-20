@@ -134,37 +134,39 @@ where
 	let dead_units = res_raw.get_event().get_dead_units().to_vec();
 
 	#[cfg(feature = "enemies_cache")]
-	{
-		let enemy_is_terran = bot.enemy_race.is_terran();
+	let enemy_is_terran = bot.enemy_race.is_terran();
 
-		for u in &dead_units {
-			if bot.owned_tags.remove(u) {
-				bot.under_construction.remove(u);
-			} else {
-				let cache = &mut bot.units.cached;
-				cache.all.remove(*u);
-				cache.units.remove(*u);
-				cache.workers.remove(*u);
-				if enemy_is_terran {
-					cache.structures.remove(*u);
-					cache.townhalls.remove(*u);
-				}
-
-				bot.saved_hallucinations.remove(u);
-			}
-
-			bot.on_event(Event::UnitDestroyed(*u))?;
-		}
-	}
-	#[cfg(not(feature = "enemies_cache"))]
 	for u in &dead_units {
-		if bot.owned_tags.remove(u) {
+		let alliance = if bot.owned_tags.remove(u) {
 			bot.under_construction.remove(u);
+			Some(Alliance::Own)
 		} else {
-			bot.saved_hallucinations.remove(u);
-		}
+			let removed = bot.saved_hallucinations.remove(u);
 
-		bot.on_event(Event::UnitDestroyed(*u))?;
+			#[cfg(feature = "enemies_cache")]
+			let removed = {
+				let cache = &mut bot.units.cached;
+				removed
+					| cache.all.remove(*u).is_some()
+					| cache.units.remove(*u).is_some()
+					| cache.workers.remove(*u).is_some()
+					| if enemy_is_terran {
+						cache.structures.remove(*u).is_some() | cache.townhalls.remove(*u).is_some()
+					} else {
+						false
+					}
+			};
+
+			if removed {
+				Some(Alliance::Enemy)
+			} else if bot.expansions.iter_mut().any(|exp| exp.minerals.remove(u)) {
+				Some(Alliance::Neutral)
+			} else {
+				None
+			}
+		};
+
+		bot.on_event(Event::UnitDestroyed(*u, alliance))?;
 	}
 
 	let raw = &mut bot.state.observation.raw;

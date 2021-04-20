@@ -13,7 +13,14 @@ impl Player for EmptyBot {
 	// Use it like here
 	fn on_event(&mut self, event: Event) -> SC2Result<()> {
 		match event {
-			Event::UnitDestroyed(tag) => { /* your code here */ }
+			Event::UnitDestroyed(tag, alliance) => {
+				match alliance {
+					Some(Alliance::Own) => { /* your code here */ }
+					Some(Alliance::Neutral) => { /* your code here */ }
+					// Enemy
+					_ => { /* your code here */ }
+				}
+			}
 			Event::UnitCreated(tag) => {
 				if let Some(u) = self.units.my.units.get(tag) { /* your code here */ }
 			}
