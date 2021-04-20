@@ -316,6 +316,7 @@ Because of version differences ids are conditionally compiled for windows and li
 */
 // #![warn(missing_docs)]
 #![deny(broken_intra_doc_links)]
+#![allow(clippy::upper_case_acronyms)]
 
 #[macro_use]
 extern crate num_derive;
