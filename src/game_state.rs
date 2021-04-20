@@ -2,7 +2,7 @@
 
 use crate::{
 	action::{Action, ActionError},
-	bot::{Bot, Locked, Rs, Rw},
+	bot::{Bot, LockOwned, LockU32, Locked, Rs, Rw},
 	geometry::Point2,
 	ids::*,
 	pixel_map::{PixelMap, VisibilityMap},
@@ -67,7 +67,7 @@ where
 	let obs = &mut state.observation;
 	let res_obs = response_observation.get_observation();
 
-	obs.game_loop = res_obs.get_game_loop();
+	obs.game_loop.set_locked(res_obs.get_game_loop());
 	obs.alerts = res_obs
 		.get_alerts()
 		.iter()
@@ -138,6 +138,7 @@ where
 
 	for u in &dead_units {
 		let alliance = if bot.owned_tags.remove(u) {
+			bot.commander.write_lock().available_frames.remove(u);
 			bot.under_construction.remove(u);
 			Some(Alliance::Own)
 		} else {
@@ -294,8 +295,7 @@ pub struct ChatMessage {
 /// Can be accessed through [`state.observation`](GameState::observation).
 #[derive(Default, Clone)]
 pub struct Observation {
-	/// Current game tick (frame).
-	pub game_loop: u32,
+	pub(crate) game_loop: Rs<LockU32>,
 	/// Common information from the observation.
 	pub common: Common,
 	/// Alerts appearing when some kind of things happen.
@@ -305,6 +305,12 @@ pub struct Observation {
 	pub score: Score,
 	/// Data of raw interface.
 	pub raw: RawData,
+}
+impl Observation {
+	/// Current game tick (frame).
+	pub fn game_loop(&self) -> u32 {
+		self.game_loop.get_locked()
+	}
 }
 
 /// Bot's observation stored here.

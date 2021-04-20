@@ -457,6 +457,7 @@ pub struct Bot {
 	enemy_upgrades: Rw<FxHashSet<UpgradeId>>,
 	pub(crate) owned_tags: FxHashSet<u64>,
 	pub(crate) under_construction: FxHashSet<u64>,
+	available_frames: Rw<FxHashMap<u64, u32>>,
 }
 
 impl Bot {
@@ -819,7 +820,9 @@ impl Bot {
 			upgrades: Rs::clone(&self.state.observation.raw.upgrades),
 			creep: Rs::clone(&self.state.observation.raw.creep),
 			game_step: Rs::clone(&self.game_step),
+			game_loop: Rs::clone(&self.state.observation.game_loop),
 			allow_spam: Rs::clone(&self.allow_spam),
+			available_frames: Rs::clone(&self.available_frames),
 		});
 	}
 	pub(crate) fn prepare_start(&mut self) {
@@ -1817,6 +1820,7 @@ impl Default for Bot {
 			enemies_ordered: Default::default(),
 			enemies_current: Default::default(),
 			saved_hallucinations: Default::default(),
+			available_frames: Default::default(),
 		}
 	}
 }

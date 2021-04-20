@@ -39,7 +39,9 @@ pub(crate) struct DataForUnit {
 	pub enemy_upgrades: Rw<FxHashSet<UpgradeId>>,
 	pub creep: Rw<PixelMap>,
 	pub game_step: Rs<LockU32>,
+	pub game_loop: Rs<LockU32>,
 	pub allow_spam: Rs<LockBool>,
+	pub available_frames: Rw<FxHashSet<u64>>,
 }
 
 pub(crate) struct UnitBase {
@@ -1736,6 +1738,30 @@ impl Unit {
 		])
 	}
 
+	/// Checks if unit is doing something important
+	/// and it's bad idea to interrupt it,
+	/// so you can skip evaluating it anyway.
+	///
+	/// Use with [`sleep`](Self::sleep)
+	/// to skip evaluating units executing durable commands.
+	pub fn is_sleeping(&self) -> bool {
+		self.data
+			.available_frames
+			.read_lock()
+			.get(self.tag())
+			.map_or(false, |frame| self.data.game_loop.get_locked() < frame)
+	}
+	/// Makes unit ignore all your commands for given amount of frames.
+	///
+	/// Use with [`is_sleeping`](Self::is_sleeping)
+	/// to skip evaluating units executing durable commands.
+	pub fn sleep(&self, duration: u32) {
+		self.data
+			.available_frames
+			.write_lock()
+			.insert(self.tag(), self.data.game_loop.get_locked() + duration);
+	}
+
 	// Actions
 
 	/// Toggles autocast on given ability.
@@ -1755,6 +1781,8 @@ impl Unit {
 			if ability == last_order.ability && target == last_order.target {
 				return;
 			}
+		} else if self.is_sleeping() {
+			return;
 		}
 
 		self.data
