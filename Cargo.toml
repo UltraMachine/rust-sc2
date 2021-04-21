@@ -6,7 +6,7 @@ edition = "2018"
 description = "Rust implementation of StarCraft II API"
 repository = "https://github.com/UltraMachine/rust-sc2"
 readme = "README.md"
-license-file = "LICENSE"
+license = "MIT"
 
 [dependencies]
 sc2-proto = "0.2.3"

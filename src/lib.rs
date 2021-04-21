@@ -14,7 +14,7 @@ error: could not compile `rust-sc2`.
 Add to dependencies in Cargo.toml:
 ```toml
 [dependencies]
-rust-sc2 = "1"
+rust-sc2 = "1.1.0"
 ```
 Or if you want developer version directly from github:
 ```toml
