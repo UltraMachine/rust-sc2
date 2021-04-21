@@ -44,7 +44,7 @@ impl Player for ZergRushAI {
 	}
 
 	fn get_player_settings(&self) -> PlayerSettings {
-		PlayerSettings::new(Race::Zerg, Some("RustyLings"))
+		PlayerSettings::new(Race::Zerg).with_name("RustyLings")
 	}
 }
 
@@ -499,13 +499,15 @@ fn main() -> SC2Result<()> {
 		),
 		("human", Some(sub)) => run_vs_human(
 			&mut bot,
-			PlayerSettings::new(
-				sub.value_of("race")
+			PlayerSettings {
+				race: sub
+					.value_of("race")
 					.unwrap()
 					.parse()
 					.expect("Can't parse human race"),
-				sub.value_of("name"),
-			),
+				name: sub.value_of("name"),
+				..Default::default()
+			},
 			sub.value_of("map")
 				.unwrap_or_else(|| LADDER_MAPS.choose(&mut rng).unwrap()),
 			LaunchOptions {

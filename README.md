@@ -39,10 +39,10 @@ use rust_sc2::prelude::*;
 struct WorkerRush;
 impl Player for WorkerRush {
     fn get_player_settings(&self) -> PlayerSettings {
-        PlayerSettings::new(Race::Protoss, None)
+        PlayerSettings::new(Race::Protoss)
     }
     fn on_start(&mut self) -> SC2Result<()> {
-        for worker in self.units.my.workers.iter() {
+        for worker in &self.units.my.workers {
             worker.attack(Target::Pos(self.enemy_start), false);
         }
         Ok(())
@@ -89,8 +89,7 @@ impl Player for MyBot {
     // Must be implemented
     fn get_player_settings(&self) -> PlayerSettings {
         // Race can be Terran, Zerg, Protoss or Random
-        // If bot name is None, it'll be shown as "foo(whatever)" in game
-        PlayerSettings::new(Race::Random, Some("Bot Name"))
+        PlayerSettings::new(Race::Random)
     }
 
     // Methods below aren't necessary to implement (Empty by default)

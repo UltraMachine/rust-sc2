@@ -200,7 +200,7 @@ where
 	sc2_path: String,
 	sc2_version: Option<&'a str>,
 	/// Configuration of human opponent.
-	pub human_settings: PlayerSettings,
+	pub human_settings: PlayerSettings<'a>,
 	map_path: String,
 	/// Play games in real time mode or not.
 	pub realtime: bool,
@@ -215,7 +215,7 @@ where
 	/// Constructs new multi player runner.
 	pub fn new(
 		bot: &'a mut B,
-		human_settings: PlayerSettings,
+		human_settings: PlayerSettings<'a>,
 		map: &str,
 		sc2_version: Option<&'a str>,
 	) -> Self {

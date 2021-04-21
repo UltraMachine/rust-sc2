@@ -7,7 +7,7 @@ use rust_sc2::prelude::*;
 struct EmptyBot;
 impl Player for EmptyBot {
 	fn get_player_settings(&self) -> PlayerSettings {
-		PlayerSettings::new(Race::Random, None)
+		PlayerSettings::new(Race::Random)
 	}
 
 	// Use it like here

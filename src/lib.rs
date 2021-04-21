@@ -277,6 +277,7 @@ Both use the same kind of system. In order to get your bot ready for ladder, mak
 - `--OpponentId` - Id of the opponent on ladder.
 - `--GamePort` - Port.
 - `--StartPort` - Yet another port.
+- `--RealTime` - Notifies that game is running in realtime mode. (Only for human vs bot games)
 
 If you're too lazy to add argparser yourself, see [`examples`] folder,
 some examples already have fully functional parser.
@@ -623,41 +624,57 @@ let response = self.api().send(request)?;
 pub use sc2_proto::sc2api::Request;
 
 /// Settings that must be provided by a player when joining a game.
-pub struct PlayerSettings {
-	race: Race,
-	name: Option<String>,
-	raw_affects_selection: bool,
-	raw_crop_to_playable_area: bool,
+///
+/// if name is `None`, it'll be shown as "foo(whatever)" in game.
+///
+/// if `raw_affects_selection` is `true`, bot will select units to which it gives orders.
+///
+/// if `raw_crop_to_playable_area` is `true`, maps will be crooped to the size of
+/// [`self.game_info.playable_area`](game_info::GameInfo::playable_area).
+///
+/// Defaults:
+/// `name`: `None`
+/// `raw_affects_selection`: `false`
+/// `raw_crop_to_playable_area`: `false`
+pub struct PlayerSettings<'a> {
+	pub race: Race,
+	pub name: Option<&'a str>,
+	pub raw_affects_selection: bool,
+	pub raw_crop_to_playable_area: bool,
 }
-impl PlayerSettings {
-	/// Constructs new settings with given `Race` and name.
-	/// `raw_affects_selection` and `raw_crop_to_playable_area` are `false` by default.
-	pub fn new(race: Race, name: Option<&str>) -> Self {
+impl<'a> PlayerSettings<'a> {
+	/// Constructs new settings with given `Race`.
+	pub fn new(race: Race) -> Self {
 		Self {
 			race,
-			name: name.map(|n| n.to_string()),
+			name: None,
 			raw_affects_selection: false,
 			raw_crop_to_playable_area: false,
 		}
 	}
-	/// Constructs new settings with more options given.
-	///
-	/// `raw_affects_selection`: Bot will select units to which it gives orders.
-	///
-	/// `raw_crop_to_playable_area`: Maps and all coordinates will be crooped to playable area.
-	/// That means map will start from (0, 0)
-	/// and finsh on (playable area length by `x`, playable area length by `y`).
-	pub fn configured(
-		race: Race,
-		name: Option<&str>,
-		raw_affects_selection: bool,
-		raw_crop_to_playable_area: bool,
-	) -> Self {
+	/// Sets name of the player.
+	pub fn with_name(mut self, name: &'a str) -> Self {
+		self.name = Some(name);
+		self
+	}
+	/// Sets `raw_affects_selection` to a given value.
+	pub fn raw_affects_selection(mut self, val: bool) -> Self {
+		self.raw_affects_selection = val;
+		self
+	}
+	/// Sets `raw_crop_to_playable_area` to a given value.
+	pub fn raw_crop_to_playable_area(mut self, val: bool) -> Self {
+		self.raw_crop_to_playable_area = val;
+		self
+	}
+}
+impl Default for PlayerSettings<'_> {
+	fn default() -> Self {
 		Self {
-			race,
-			name: name.map(|n| n.to_string()),
-			raw_affects_selection,
-			raw_crop_to_playable_area,
+			race: Race::Random,
+			name: None,
+			raw_affects_selection: false,
+			raw_crop_to_playable_area: false,
 		}
 	}
 }

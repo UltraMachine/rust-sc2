@@ -5,7 +5,7 @@ use rust_sc2::prelude::*;
 struct EmptyBot;
 impl Player for EmptyBot {
 	fn get_player_settings(&self) -> PlayerSettings {
-		PlayerSettings::new(Race::Random, None)
+		PlayerSettings::new(Race::Random)
 	}
 }
 
@@ -65,14 +65,14 @@ fn main() -> SC2Result<()> {
 	// 1. Initialize runner
 	let mut runner = RunnerMulti::new(
 		&mut bot,
-		PlayerSettings::new(Race::Random, Some("Name")),
+		PlayerSettings::new(Race::Random).with_name("Name"),
 		"PillarsofGoldLE",
 		None,
 	);
 
 	// 2. Configure runner
 	runner.set_map("PillarsofGoldLE");
-	runner.human_settings = PlayerSettings::new(Race::Random, Some("Name"));
+	runner.human_settings = PlayerSettings::new(Race::Random).with_name("Name");
 	runner.realtime = false;
 	runner.save_replay_as = None;
 
