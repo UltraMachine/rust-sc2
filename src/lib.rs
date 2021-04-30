@@ -34,7 +34,10 @@ struct MyBot;
 impl Player for MyBot {
     // This settings are used to connect bot to the game.
     fn get_player_settings(&self) -> PlayerSettings {
-        PlayerSettings::new(Race::Random, Some("BotName"))
+        PlayerSettings::new(Race::Random)
+            .with_name("BotName")
+            .raw_affects_selection(false)
+            .raw_crop_to_playable_area(true)
     }
     // This method will be called automatically each game step.
     // Main bot's logic should be here.
@@ -219,7 +222,7 @@ if self.can_afford(UnitTypeId::CommandCenter, false)
     && self.counter().ordered().count(UnitTypeId::CommandCenter) == 0
 {
     // Getting next closest expansion
-    if let Some((location, _resource_center)) = self.get_expansion() {
+    if let Some(expansion) = self.get_expansion() {
         if let Some(builder) = self.units
             // Finding workers which are not already building.
             .my.workers.iter().filter(|w| !w.is_constructing())
@@ -227,7 +230,7 @@ if self.can_afford(UnitTypeId::CommandCenter, false)
             .closest(location)
         {
             // Ordering scv to build new base.
-            builder.build(UnitTypeId::CommandCenter, location, false);
+            builder.build(UnitTypeId::CommandCenter, expansion.loc, false);
             // Subtracting resources used to build CC.
             self.subtract_resources(UnitTypeId::CommandCenter, false);
         }
