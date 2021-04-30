@@ -929,9 +929,9 @@ impl Bot {
 				let mut geysers = FxHashSet::default();
 				for r in resources {
 					if r.is_geyser() {
-						minerals.insert(r.tag());
-					} else {
 						geysers.insert(r.tag());
+					} else {
+						minerals.insert(r.tag());
 					}
 				}
 
