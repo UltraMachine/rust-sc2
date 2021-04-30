@@ -20,14 +20,17 @@ use crate::{
 	utils::{dbscan, range_query},
 	FromProto, IntoProto,
 };
+use indexmap::IndexSet;
 use num_traits::ToPrimitive;
 use rand::prelude::*;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use sc2_proto::{
 	query::{RequestQueryBuildingPlacement, RequestQueryPathing},
 	sc2api::Request,
 };
-use std::{fmt, process::Child};
+use std::{fmt, hash::BuildHasherDefault, process::Child};
+
+type FxIndexSet<T> = IndexSet<T, BuildHasherDefault<FxHasher>>;
 
 #[cfg(feature = "enemies_cache")]
 use crate::{consts::BURROWED_IDS, unit::DisplayType};
@@ -176,7 +179,8 @@ pub struct Expansion {
 	/// Center of resources.
 	pub center: Point2,
 	/// Tags of minaral fields belonging to the expansion.
-	pub minerals: FxHashSet<u64>,
+	/// Sorted by distance to townhall in ascending order.
+	pub minerals: FxIndexSet<u64>,
 	/// Tags of vespene geysers belonging to the expansion.
 	pub geysers: FxHashSet<u64>,
 	/// `Neutral` if expansion is free.
@@ -925,15 +929,19 @@ impl Bot {
 					)
 				};
 
-				let mut minerals = FxHashSet::default();
+				let mut minerals = FxIndexSet::default();
 				let mut geysers = FxHashSet::default();
-				for r in resources {
+				for r in &resources {
 					if r.is_geyser() {
 						geysers.insert(r.tag());
 					} else {
 						minerals.insert(r.tag());
 					}
 				}
+				minerals.sort_by(|a, b| {
+					let dist = |t: &u64| resources[*t].position().distance_squared(loc);
+					dist(a).partial_cmp(&dist(b)).unwrap()
+				});
 
 				Expansion {
 					loc,
