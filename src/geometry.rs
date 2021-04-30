@@ -203,7 +203,8 @@ impl Point2 {
 
 impl PartialEq for Point2 {
 	fn eq(&self, other: &Self) -> bool {
-		(self.x - other.x).abs() < f32::EPSILON && (self.y - other.y).abs() < f32::EPSILON
+		// (self.x - other.x).abs() < f32::EPSILON && (self.y - other.y).abs() < f32::EPSILON
+		(self.x + 0.5) as i32 == (other.x + 0.5) as i32 && (self.y + 0.5) as i32 == (other.y + 0.5) as i32
 	}
 }
 impl Eq for Point2 {}
