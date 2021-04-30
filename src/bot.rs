@@ -172,7 +172,7 @@ impl LockOwned<u32> for LockU32 {
 }
 
 /// Information about an expansion location.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Expansion {
 	/// Placement position for townhall.
 	pub loc: Point2,
@@ -841,7 +841,9 @@ impl Bot {
 		if let Some(townhall) = self.units.my.townhalls.first() {
 			self.start_location = townhall.position();
 		}
-		self.enemy_start = self.game_info.start_locations[0];
+		if let Some(pos) = self.game_info.start_locations.first() {
+			self.enemy_start = *pos;
+		}
 
 		let resources = self.units.resources.closer(11.0, self.start_location);
 		self.start_center =
@@ -1493,9 +1495,11 @@ impl Bot {
 			.filter(|e| e.id == EffectId::ScannerSweep && e.alliance.is_enemy())
 			.collect::<Vec<_>>();
 
-		for u in &self.units.my.all {
-			if !(u.is_revealed() || is_invisible(u, &enemy_detectors, &enemy_scans, 1.0)) {
-				u.base.is_revealed.set_locked(true);
+		if !(enemy_detectors.is_empty() && enemy_scans.is_empty()) {
+			for u in &self.units.my.all {
+				if !(u.is_revealed() || is_invisible(u, &enemy_detectors, &enemy_scans, 1.0)) {
+					u.base.is_revealed.set_locked(true);
+				}
 			}
 		}
 	}

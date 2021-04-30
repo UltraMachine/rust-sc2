@@ -790,7 +790,7 @@ lazy_static! {
 			damage: 20,
 			damage_bonus: vec![(Attribute::Light, 15), (Attribute::Structure, 60)],
 			attacks: 1,
-			range: 2.2,
+			range: 2.2 - 0.375,
 			speed: 1.0,
 		}],
 		UnitTypeId::Battlecruiser => vec![

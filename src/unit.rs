@@ -1532,8 +1532,8 @@ impl Unit {
 	pub fn damage_bonus(&self) -> Option<(Attribute, u32)> {
 		self.weapons()
 			.iter()
-			.find(|w| !w.damage_bonus.is_empty())
-			.map(|w| w.damage_bonus[0])
+			.find_map(|w| w.damage_bonus.first())
+			.copied()
 	}
 	/// Returns (ability, target, progress) of the current unit order or `None` if it's idle.
 	pub fn order(&self) -> Option<(AbilityId, Target, f32)> {
@@ -1543,11 +1543,7 @@ impl Unit {
 	}
 	/// Returns target of first unit's order.
 	pub fn target(&self) -> Target {
-		if self.is_idle() {
-			Target::None
-		} else {
-			self.orders()[0].target
-		}
+		self.orders().first().map_or(Target::None, |order| order.target)
 	}
 	/// Returns target point of unit's order if any.
 	pub fn target_pos(&self) -> Option<Point2> {
@@ -1565,11 +1561,7 @@ impl Unit {
 	}
 	/// Returns ability of first unit's order.
 	pub fn ordered_ability(&self) -> Option<AbilityId> {
-		if self.is_idle() {
-			None
-		} else {
-			Some(self.orders()[0].ability)
-		}
+		self.orders().first().map(|order| order.ability)
 	}
 	/// Checks if unit don't have any orders currently.
 	pub fn is_idle(&self) -> bool {
@@ -1601,13 +1593,13 @@ impl Unit {
 	///
 	/// Doesn't work with enemies.
 	pub fn is_using(&self, ability: AbilityId) -> bool {
-		!self.is_idle() && self.orders()[0].ability == ability
+		self.ordered_ability() == Some(ability)
 	}
 	/// Checks if unit is using any of given abilities.
 	///
 	/// Doesn't work with enemies.
 	pub fn is_using_any<A: Container<AbilityId>>(&self, abilities: &A) -> bool {
-		!self.is_idle() && abilities.contains(&self.orders()[0].ability)
+		self.ordered_ability().map_or(false, |a| abilities.contains(&a))
 	}
 	/// Checks if unit is currently attacking.
 	///
@@ -1927,7 +1919,10 @@ impl Unit {
 	pub(crate) fn from_proto(data: SharedUnitData, visibility: &VisibilityMap, u: &ProtoUnit) -> Self {
 		let pos = u.get_pos();
 		let position = Point2::from_proto(pos);
-		let type_id = UnitTypeId::from_u32(u.get_unit_type()).unwrap();
+		let type_id = {
+			let id = u.get_unit_type();
+			UnitTypeId::from_u32(id).unwrap_or_else(|| panic!("There's no `UnitTypeId` with value {}", id))
+		};
 		let is_burrowed = u.get_is_burrowed();
 		let (is_cloaked, is_revealed) = if is_burrowed {
 			(true, false)
@@ -1943,7 +1938,10 @@ impl Unit {
 			base: Rs::new(UnitBase {
 				display_type: Rl::new(match DisplayType::from_proto(u.get_display_type()) {
 					DisplayType::Visible => {
-						if visibility[position].is_visible() {
+						if visibility
+							.get(<(usize, usize)>::from(position))
+							.map_or(false, |p| p.is_visible())
+						{
 							DisplayType::Visible
 						} else {
 							DisplayType::Snapshot
@@ -1965,7 +1963,9 @@ impl Unit {
 				buffs: u
 					.get_buff_ids()
 					.iter()
-					.map(|b| BuffId::from_u32(*b).unwrap())
+					.map(|b| {
+						BuffId::from_u32(*b).unwrap_or_else(|| panic!("There's no `BuffId` with value {}", b))
+					})
 					.collect(),
 				detect_range: match type_id {
 					UnitTypeId::Observer => 11.0,
@@ -1998,7 +1998,11 @@ impl Unit {
 					.get_orders()
 					.iter()
 					.map(|order| UnitOrder {
-						ability: AbilityId::from_u32(order.get_ability_id()).unwrap(),
+						ability: {
+							let id = order.get_ability_id();
+							AbilityId::from_u32(id)
+								.unwrap_or_else(|| panic!("There's no `AbilityId` with value {}", id))
+						},
 						target: match &order.target {
 							Some(ProtoTarget::target_world_space_pos(pos)) => {
 								Target::Pos(Point2::from_proto(pos))
@@ -2021,7 +2025,11 @@ impl Unit {
 						shield_max: p.get_shield_max(),
 						energy: p.get_energy(),
 						energy_max: p.get_energy_max(),
-						type_id: UnitTypeId::from_u32(p.get_unit_type()).unwrap(),
+						type_id: {
+							let id = p.get_unit_type();
+							UnitTypeId::from_u32(id)
+								.unwrap_or_else(|| panic!("There's no `UnitTypeId` with value {}", id))
+						},
 					})
 					.collect(),
 				cargo_space_taken: u.cargo_space_taken.map(|x| x as u32),

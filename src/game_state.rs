@@ -77,7 +77,10 @@ where
 		.get_abilities()
 		.iter()
 		.map(|a| AvailableAbility {
-			id: AbilityId::from_i32(a.get_ability_id()).unwrap(),
+			id: {
+				let id = a.get_ability_id();
+				AbilityId::from_i32(id).unwrap_or_else(|| panic!("There's no `AbilityId` with value {}", id))
+			},
 			requires_point: a.get_requires_point(),
 		})
 		.collect();
@@ -114,7 +117,10 @@ where
 		.get_effects()
 		.iter()
 		.map(|e| Effect {
-			id: EffectId::from_u32(e.get_effect_id()).unwrap(),
+			id: {
+				let id = e.get_effect_id();
+				EffectId::from_u32(id).unwrap_or_else(|| panic!("There's no `EffectId` with value {}", id))
+			},
 			positions: e.get_pos().iter().map(Point2::from_proto).collect(),
 			alliance: Alliance::from_proto(e.get_alliance()),
 			owner: e.get_owner() as u32,
@@ -177,7 +183,7 @@ where
 	*raw.upgrades.write_lock() = raw_player
 		.get_upgrade_ids()
 		.iter()
-		.map(|u| UpgradeId::from_u32(*u).unwrap())
+		.map(|u| UpgradeId::from_u32(*u).unwrap_or_else(|| panic!("There's no `UpgradeId` with value {}", u)))
 		.collect::<FxHashSet<_>>();
 
 	// Map

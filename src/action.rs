@@ -85,15 +85,17 @@ impl FromProto<&ProtoAction> for Option<Action> {
 		if action.has_action_raw() {
 			match &action.get_action_raw().action {
 				Some(ProtoRawAction::unit_command(unit_command)) => Some(Action::UnitCommand(
-					AbilityId::from_i32(unit_command.get_ability_id()).unwrap(),
 					{
-						match &unit_command.target {
-							Some(ProtoTarget::target_world_space_pos(pos)) => {
-								Target::Pos(Point2::from_proto(pos))
-							}
-							Some(ProtoTarget::target_unit_tag(tag)) => Target::Tag(*tag),
-							None => Target::None,
+						let id = unit_command.get_ability_id();
+						AbilityId::from_i32(id)
+							.unwrap_or_else(|| panic!("There's no `AbilityId` with value {}", id))
+					},
+					match &unit_command.target {
+						Some(ProtoTarget::target_world_space_pos(pos)) => {
+							Target::Pos(Point2::from_proto(pos))
 						}
+						Some(ProtoTarget::target_unit_tag(tag)) => Target::Tag(*tag),
+						None => Target::None,
 					},
 					unit_command.get_unit_tags().to_vec(),
 					unit_command.get_queue_command(),
@@ -102,7 +104,11 @@ impl FromProto<&ProtoAction> for Option<Action> {
 					Point3::from_proto(camera_move.get_center_world_space()),
 				)),
 				Some(ProtoRawAction::toggle_autocast(toggle_autocast)) => Some(Action::ToggleAutocast(
-					AbilityId::from_i32(toggle_autocast.get_ability_id()).unwrap(),
+					{
+						let id = toggle_autocast.get_ability_id();
+						AbilityId::from_i32(id)
+							.unwrap_or_else(|| panic!("There's no `AbilityId` with value {}", id))
+					},
 					toggle_autocast.get_unit_tags().to_vec(),
 				)),
 				None => unreachable!(),
@@ -136,7 +142,10 @@ impl FromProto<&ProtoActionError> for ActionError {
 	fn from_proto(e: &ProtoActionError) -> Self {
 		Self {
 			unit: e.get_unit_tag(),
-			ability: AbilityId::from_u64(e.get_ability_id()).unwrap(),
+			ability: {
+				let id = e.get_ability_id();
+				AbilityId::from_u64(id).unwrap_or_else(|| panic!("There's no `AbilityId` with value {}", id))
+			},
 			result: ActionResult::from_proto(e.get_result()),
 		}
 	}
