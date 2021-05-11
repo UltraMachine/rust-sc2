@@ -180,12 +180,13 @@ def generate():
 	enums_latest = parse_data(
 		load((Path.home() / "Documents" / "StarCraft II" / "stableid.json").open())
 	)
-	enums_linux = parse_data(
-		load(
-			(Path.home() / "Documents" / "StarCraft II" / "stableid_4.10.json").open()
-		),
-		version="linux505",
-	)
+	enums_linux = enums_latest
+	# parse_data(
+	# 	load(
+	# 		(Path.home() / "Documents" / "StarCraft II" / "stableid_4.10.json").open()
+	# 	),
+	# 	version="linux505",
+	# )
 
 	for name, file, enum, enum_linux in zip(
 		ENUM_NAMES, FILE_NAMES, enums_latest, enums_linux
