@@ -811,6 +811,14 @@ impl Bot {
 			.map_or(false, |p| p.is_empty())
 	}
 	pub(crate) fn init_data_for_unit(&mut self) {
+		self.race = self.game_info.players[&self.player_id].race_actual.unwrap();
+		if self.game_info.players.len() == 2 {
+			let enemy_player_id = 3 - self.player_id;
+			self.enemy_race = self.game_info.players[&enemy_player_id].race_requested;
+			self.enemy_player_id = enemy_player_id;
+		}
+		self.race_values = Rs::new(RACE_VALUES[&self.race].clone());
+
 		self.data_for_unit = Rs::new(DataForUnit {
 			commander: Rs::clone(&self.commander),
 			game_data: Rs::clone(&self.game_data),
@@ -830,14 +838,6 @@ impl Bot {
 		});
 	}
 	pub(crate) fn prepare_start(&mut self) {
-		self.race = self.game_info.players[&self.player_id].race_actual.unwrap();
-		if self.game_info.players.len() == 2 {
-			let enemy_player_id = 3 - self.player_id;
-			self.enemy_race = self.game_info.players[&enemy_player_id].race_requested;
-			self.enemy_player_id = enemy_player_id;
-		}
-		self.race_values = Rs::new(RACE_VALUES[&self.race].clone());
-
 		if let Some(townhall) = self.units.my.townhalls.first() {
 			self.start_location = townhall.position();
 		}
