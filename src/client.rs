@@ -614,9 +614,13 @@ where
 	let res = bot.api().send(req)?;
 
 	bot.init_data_for_unit();
-	update_state(bot, res.get_observation())?;
+	let events = update_state(bot, res.get_observation())?;
 	bot.prepare_start();
+	bot.prepare_step();
 
+	for e in events {
+		bot.on_event(e)?;
+	}
 	bot.on_start()?;
 
 	let bot_actions = bot.get_actions();
@@ -654,9 +658,12 @@ where
 		return Ok(false);
 	}
 
-	update_state(bot, res.get_observation())?;
+	let events = update_state(bot, res.get_observation())?;
 	bot.prepare_step();
 
+	for e in events {
+		bot.on_event(e)?;
+	}
 	bot.on_step(iteration)?;
 
 	let bot_actions = bot.get_actions();

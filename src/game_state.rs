@@ -36,7 +36,10 @@ pub struct GameState {
 	pub chat: Vec<ChatMessage>,
 }
 
-pub(crate) fn update_state<B>(bot: &mut B, response_observation: &ResponseObservation) -> SC2Result<()>
+pub(crate) fn update_state<B>(
+	bot: &mut B,
+	response_observation: &ResponseObservation,
+) -> SC2Result<Vec<Event>>
 where
 	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
 {
@@ -136,6 +139,7 @@ where
 		})
 		.collect();
 
+	let mut events = vec![];
 	// Dead units
 	let dead_units = res_raw.get_event().get_dead_units().to_vec();
 
@@ -173,7 +177,7 @@ where
 			}
 		};
 
-		bot.on_event(Event::UnitDestroyed(*u, alliance))?;
+		events.push(Event::UnitDestroyed(*u, alliance));
 	}
 
 	let raw = &mut bot.state.observation.raw;
@@ -234,7 +238,6 @@ where
 	bot.update_units(units);
 
 	// Events
-	let mut events = vec![];
 	let mut owned_tags = vec![];
 	let mut under_construction = vec![];
 	let mut construction_complete = vec![];
@@ -258,9 +261,6 @@ where
 			events.push(Event::ConstructionComplete(*tag));
 		}
 	}
-	for e in events {
-		bot.on_event(e)?;
-	}
 	for tag in owned_tags {
 		bot.owned_tags.insert(tag);
 	}
@@ -280,12 +280,12 @@ where
 			.map(|u| u.race())
 			.find(|r| !r.is_random())
 		{
-			bot.on_event(Event::RandomRaceDetected(race))?;
+			events.push(Event::RandomRaceDetected(race));
 			bot.enemy_race = race;
 		}
 	}
 
-	Ok(())
+	Ok(events)
 }
 
 /// Messege in game chat.
