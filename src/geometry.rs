@@ -204,14 +204,14 @@ impl Point2 {
 impl PartialEq for Point2 {
 	fn eq(&self, other: &Self) -> bool {
 		// (self.x - other.x).abs() < f32::EPSILON && (self.y - other.y).abs() < f32::EPSILON
-		(self.x + 0.5) as i32 == (other.x + 0.5) as i32 && (self.y + 0.5) as i32 == (other.y + 0.5) as i32
+		self.x as i32 == other.x as i32 && self.y as i32 == other.y as i32
 	}
 }
 impl Eq for Point2 {}
 impl Hash for Point2 {
 	fn hash<H: Hasher>(&self, state: &mut H) {
-		((self.x + 0.5) as i32).hash(state);
-		((self.y + 0.5) as i32).hash(state);
+		(self.x as i32).hash(state);
+		(self.y as i32).hash(state);
 	}
 }
 
@@ -224,7 +224,7 @@ impl From<&Point2> for Point2 {
 impl From<Point2> for (usize, usize) {
 	#[inline]
 	fn from(p: Point2) -> Self {
-		((p.x + 0.5) as usize, (p.y + 0.5) as usize)
+		(p.x as usize, p.y as usize)
 	}
 }
 impl From<(usize, usize)> for Point2 {

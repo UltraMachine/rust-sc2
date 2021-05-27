@@ -1029,7 +1029,7 @@ impl Bot {
 		.collect::<Vec<Ramp>>();
 
 		let get_closest_ramp = |loc: Point2| {
-			let (loc_x, loc_y) = ((loc.x + 0.5) as usize, (loc.y + 0.5) as usize);
+			let (loc_x, loc_y) = <(usize, usize)>::from(loc);
 			let cmp = |r: &&Ramp| {
 				let (x, y) = r.top_center().unwrap();
 				let dx = loc_x.checked_sub(x).unwrap_or_else(|| x - loc_x);

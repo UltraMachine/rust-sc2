@@ -118,13 +118,10 @@ impl Ramp {
 	/// Returns correct positions to build corner supplies in terran wall.
 	pub fn corner_depots(&self) -> Option<[Point2; 2]> {
 		if let Some(ps) = self.upper2_for_ramp_wall() {
-			let (x, y) = ps[0];
-			let p1 = Point2::new(x as f32 + 0.5, y as f32 + 0.5);
-			let (x, y) = ps[1];
-			let p2 = Point2::new(x as f32 + 0.5, y as f32 + 0.5);
+			let p1 = Point2::from(ps[0]);
+			let p2 = Point2::from(ps[1]);
 
 			let center = (p1 + p2) / 2.0;
-
 			return center.circle_intersection(self.depot_in_middle()?, 5_f32.sqrt());
 		}
 		None
@@ -136,10 +133,8 @@ impl Ramp {
 			return None;
 		}
 		if let Some(ps) = self.upper2_for_ramp_wall() {
-			let (x, y) = ps[0];
-			let p1 = Point2::new(x as f32 + 0.5, y as f32 + 0.5);
-			let (x, y) = ps[1];
-			let p2 = Point2::new(x as f32 + 0.5, y as f32 + 0.5);
+			let p1 = Point2::from(ps[0]);
+			let p2 = Point2::from(ps[1]);
 
 			let intersects = p1.circle_intersection(p2, 5_f32.sqrt())?;
 			let (x, y) = *self.lower().first()?;
@@ -169,10 +164,8 @@ impl Ramp {
 			return None;
 		}
 		if let Some(ps) = self.upper2_for_ramp_wall() {
-			let (x, y) = ps[0];
-			let p1 = Point2::new(x as f32 + 0.5, y as f32 + 0.5);
-			let (x, y) = ps[1];
-			let p2 = Point2::new(x as f32 + 0.5, y as f32 + 0.5);
+			let p1 = Point2::from(ps[0]);
+			let p2 = Point2::from(ps[1]);
 
 			let intersects = p1.circle_intersection(p2, 1.581_138_8)?; // 2.5_f32.sqrt()
 			let (x, y) = *self.lower().first()?;
