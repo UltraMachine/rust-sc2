@@ -131,22 +131,22 @@ impl Point2 {
 	/// Returns rounded point.
 	pub fn round(self) -> Self {
 		Self {
-			x: (self.x + 0.5) as i32 as f32,
-			y: (self.y + 0.5) as i32 as f32,
+			x: self.x.round(),
+			y: self.y.round(),
 		}
 	}
 	/// Returns point rounded to closest lower integer.
 	pub fn floor(self) -> Self {
 		Self {
-			x: self.x as i32 as f32,
-			y: self.y as i32 as f32,
+			x: self.x.floor(),
+			y: self.y.floor(),
 		}
 	}
 	/// Returns point rounded to closest greater integer.
 	pub fn ceil(self) -> Self {
 		Self {
-			x: (self.x + 0.999999) as i32 as f32,
-			y: (self.y + 0.999999) as i32 as f32,
+			x: self.x.ceil(),
+			y: self.y.ceil(),
 		}
 	}
 	/// Returns point with absolute coordinates.
