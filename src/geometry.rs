@@ -131,22 +131,22 @@ impl Point2 {
 	/// Returns rounded point.
 	pub fn round(self) -> Self {
 		Self {
-			x: (self.x + 0.5) as i32 as f32,
-			y: (self.y + 0.5) as i32 as f32,
+			x: self.x.round(),
+			y: self.y.round(),
 		}
 	}
 	/// Returns point rounded to closest lower integer.
 	pub fn floor(self) -> Self {
 		Self {
-			x: self.x as i32 as f32,
-			y: self.y as i32 as f32,
+			x: self.x.floor(),
+			y: self.y.floor(),
 		}
 	}
 	/// Returns point rounded to closest greater integer.
 	pub fn ceil(self) -> Self {
 		Self {
-			x: (self.x + 0.999999) as i32 as f32,
-			y: (self.y + 0.999999) as i32 as f32,
+			x: self.x.ceil(),
+			y: self.y.ceil(),
 		}
 	}
 	/// Returns point with absolute coordinates.
@@ -230,6 +230,21 @@ impl From<Point2> for (usize, usize) {
 impl From<(usize, usize)> for Point2 {
 	#[inline]
 	fn from((x, y): (usize, usize)) -> Self {
+		Self {
+			x: x as f32 + 0.5,
+			y: y as f32 + 0.5,
+		}
+	}
+}
+impl From<Point2> for (isize, isize) {
+	#[inline]
+	fn from(p: Point2) -> Self {
+		(p.x as isize, p.y as isize)
+	}
+}
+impl From<(isize, isize)> for Point2{
+	#[inline]
+	fn from((x, y): (isize, isize)) -> Self {
 		Self {
 			x: x as f32 + 0.5,
 			y: y as f32 + 0.5,
