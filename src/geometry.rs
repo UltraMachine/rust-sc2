@@ -242,7 +242,7 @@ impl From<Point2> for (isize, isize) {
 		(p.x as isize, p.y as isize)
 	}
 }
-impl From<(isize, isize)> for Point2{
+impl From<(isize, isize)> for Point2 {
 	#[inline]
 	fn from((x, y): (isize, isize)) -> Self {
 		Self {
