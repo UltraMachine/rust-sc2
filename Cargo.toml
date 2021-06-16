@@ -38,6 +38,6 @@ clap = "^2.33.2"
 protoc = ["sc2-proto/protoc-rust"]
 enemies_cache = []
 
-# hack: change when will be found better solution
-[target.'cfg(feature = "rayon")']
-features = ["indexmap/rayon", "ndarray/rayon", "parking_lot"]
+[target.'cfg(feature = "rayon")'.dependencies]
+indexmap.features = ["rayon"]
+ndarray.features = ["rayon"]
