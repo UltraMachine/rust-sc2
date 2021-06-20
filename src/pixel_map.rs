@@ -32,14 +32,9 @@ impl<T> IndexMut<Point2> for Array2<T> {
 	}
 }
 
-fn to_binary(n: u8) -> Vec<Pixel> {
+fn to_binary(n: u8) -> impl Iterator<Item = Pixel> {
 	match n {
-		0 => vec![Pixel::Set; 8],
-		255 => vec![Pixel::Empty; 8],
-		_ => (0..8)
-			.rev()
-			.map(|x| Pixel::from_u8((n >> x) & 1).unwrap())
-			.collect(),
+		_ => (0..8).rev().map(move |x| Pixel::from_u8((n >> x) & 1).unwrap()),
 	}
 }
 
