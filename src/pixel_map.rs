@@ -33,9 +33,7 @@ impl<T> IndexMut<Point2> for Array2<T> {
 }
 
 fn to_binary(n: u8) -> impl Iterator<Item = Pixel> {
-	match n {
-		_ => (0..8).rev().map(move |x| Pixel::from_u8((n >> x) & 1).unwrap()),
-	}
+	(0..8).rev().map(move |x| Pixel::from_u8((n >> x) & 1).unwrap())
 }
 
 impl FromProto<&ImageData> for PixelMap {
