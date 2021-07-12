@@ -2,12 +2,8 @@
 #![allow(clippy::wrong_self_convention)]
 
 use crate::{geometry::Point2, units::iter::filter_fold, utils::CacheMap};
-use std::{cmp::Ordering, vec::IntoIter};
-
-#[cfg(feature = "rayon")]
 use once_cell::sync::Lazy;
-#[cfg(not(feature = "rayon"))]
-use once_cell::unsync::Lazy;
+use std::{cmp::Ordering, vec::IntoIter};
 
 static DISTANCE_CACHE: Lazy<CacheMap<(Point2, Point2, bool), f32>> = Lazy::new(Default::default);
 fn get_cache(a: Point2, b: Point2, sqrt: bool) -> f32 {

@@ -21,16 +21,12 @@ use crate::{
 };
 use lazy_init::Lazy as LazyInit;
 use num_traits::FromPrimitive;
+use once_cell::sync::Lazy;
 use rustc_hash::{FxHashMap, FxHashSet};
 use sc2_proto::raw::{
 	CloakState as ProtoCloakState, DisplayType as ProtoDisplayType, Unit as ProtoUnit,
 	UnitOrder_oneof_target as ProtoTarget,
 };
-
-#[cfg(feature = "rayon")]
-use once_cell::sync::Lazy;
-#[cfg(not(feature = "rayon"))]
-use once_cell::unsync::Lazy;
 
 #[derive(Default, Clone)]
 pub(crate) struct DataForUnit {
