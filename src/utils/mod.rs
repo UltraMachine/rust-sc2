@@ -1,6 +1,6 @@
 //! Different utilites useful (or useless) in bot development.
 
-use crate::bot::{Locked, Rl};
+use crate::bot::Locked;
 use indexmap::IndexSet;
 use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use std::hash::{BuildHasherDefault, Hash};
@@ -81,8 +81,13 @@ where
 	}
 }
 
+#[cfg(feature = "parking_lot")]
+use parking_lot::RwLock;
+#[cfg(not(feature = "parking_lot"))]
+use std::sync::RwLock;
+
 #[derive(Default)]
-pub struct CacheMap<K, V>(Rl<FxHashMap<K, V>>);
+pub struct CacheMap<K, V>(RwLock<FxHashMap<K, V>>);
 impl<K, V> CacheMap<K, V>
 where
 	K: Copy + Eq + Hash,
