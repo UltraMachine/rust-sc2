@@ -419,10 +419,14 @@ pub struct Bot {
 	/// Structured collection of units.
 	pub units: AllUnits,
 	pub(crate) abilities_units: Rw<FxHashMap<u64, FxHashSet<AbilityId>>>,
-	orders: FxHashMap<AbilityId, usize>,
-	current_units: FxHashMap<UnitTypeId, usize>,
-	enemies_ordered: FxHashMap<UnitTypeId, usize>,
-	enemies_current: FxHashMap<UnitTypeId, usize>,
+	/// Orders of owned units counted by ability.
+	pub orders: FxHashMap<AbilityId, usize>,
+	/// Ready owned units counted by unit type.
+	pub current_units: FxHashMap<UnitTypeId, usize>,
+	/// In-progress enemy units counted by unit type.
+	pub enemies_ordered: FxHashMap<UnitTypeId, usize>,
+	/// Ready enemy units counted by unit type.
+	pub enemies_current: FxHashMap<UnitTypeId, usize>,
 	pub(crate) saved_hallucinations: FxHashSet<u64>,
 	/// In-game time in seconds.
 	pub time: f32,
