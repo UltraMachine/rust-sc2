@@ -1,6 +1,5 @@
 //! Different utilites useful (or useless) in bot development.
 
-use crate::bot::Locked;
 use indexmap::IndexSet;
 use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use std::hash::{BuildHasherDefault, Hash};
@@ -82,9 +81,18 @@ where
 }
 
 #[cfg(feature = "parking_lot")]
-use parking_lot::RwLock;
+use parking_lot::{RwLock, RwLockReadGuard};
 #[cfg(not(feature = "parking_lot"))]
-use std::sync::RwLock;
+use std::sync::{RwLock, RwLockReadGuard};
+
+fn read<T>(lock: &RwLock<T>) -> RwLockReadGuard<T> {
+	#[cfg(feature = "parking_lot")]
+	let reader = lock.read();
+	#[cfg(not(feature = "parking_lot"))]
+	let reader = lock.read().unwrap();
+
+	reader
+}
 
 #[derive(Default)]
 pub struct CacheMap<K, V>(RwLock<FxHashMap<K, V>>);
@@ -97,15 +105,23 @@ where
 	where
 		F: FnOnce() -> V,
 	{
-		if let Some(res) = self.0.read_lock().get(k) {
+		let lock = read(&self.0);
+		if let Some(res) = lock.get(k) {
 			*res
 		} else {
+			drop(lock);
+
+			#[cfg(feature = "parking_lot")]
+			let mut lock = self.0.write();
+			#[cfg(not(feature = "parking_lot"))]
+			let mut lock = self.0.write().unwrap();
+
 			let res = f();
-			self.0.write_lock().insert(*k, res);
+			lock.insert(*k, res);
 			res
 		}
 	}
 	pub fn get(&self, k: &K) -> Option<V> {
-		self.0.read_lock().get(k).copied()
+		read(&self.0).get(k).copied()
 	}
 }
