@@ -610,7 +610,7 @@ where
 	B: Player + DerefMut<Target = Bot> + Deref<Target = Bot>,
 {
 	let mut req = Request::new();
-	req.mut_observation().set_disable_fog(bot.disable_fog);
+	req.mut_observation().set_disable_fog(true);
 	let res = bot.api().send(req)?;
 
 	bot.init_data_for_unit();
