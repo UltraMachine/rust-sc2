@@ -16,14 +16,21 @@ use crate::{
 	pixel_map::{PixelMap, VisibilityMap},
 	player::Race,
 	units::Container,
+	utils::CacheMap,
 	FromProto,
 };
+use lazy_init::Lazy as LazyInit;
 use num_traits::FromPrimitive;
 use rustc_hash::{FxHashMap, FxHashSet};
 use sc2_proto::raw::{
 	CloakState as ProtoCloakState, DisplayType as ProtoDisplayType, Unit as ProtoUnit,
 	UnitOrder_oneof_target as ProtoTarget,
 };
+
+#[cfg(feature = "rayon")]
+use once_cell::sync::Lazy;
+#[cfg(not(feature = "rayon"))]
+use once_cell::unsync::Lazy;
 
 #[derive(Default, Clone)]
 pub(crate) struct DataForUnit {
@@ -91,6 +98,10 @@ pub(crate) struct UnitBase {
 	pub buff_duration_remain: Option<u32>,
 	pub buff_duration_max: Option<u32>,
 	pub rally_targets: Vec<RallyTarget>,
+
+	// cache
+	real_speed: LazyInit<f32>,
+	real_weapon_vs: Lazy<CacheMap<u64, (f32, f32)>>,
 }
 
 /// Weapon target used in [`calculate_weapon_stats`](Unit::calculate_weapon_stats).
@@ -698,50 +709,52 @@ impl Unit {
 	}
 	/// Returns actual speed of the unit calculated including buffs and upgrades.
 	pub fn real_speed(&self) -> f32 {
-		let mut speed = self.speed();
-		let unit_type = self.type_id();
+		*self.base.real_speed.get_or_create(|| {
+			let mut speed = self.speed();
+			let unit_type = self.type_id();
 
-		// ---- Buffs ----
-		// Ultralisk has passive ability "Frenzied" which makes it immune to speed altering buffs
-		if unit_type != UnitTypeId::Ultralisk {
-			for buff in self.buffs() {
-				match buff {
-					BuffId::MedivacSpeedBoost => return speed * 1.7,
-					BuffId::VoidRaySwarmDamageBoost => return speed * 0.75,
-					_ => {
-						if let Some(increase) = SPEED_BUFFS.get(&buff) {
-							speed *= increase;
+			// ---- Buffs ----
+			// Ultralisk has passive ability "Frenzied" which makes it immune to speed altering buffs
+			if unit_type != UnitTypeId::Ultralisk {
+				for buff in self.buffs() {
+					match buff {
+						BuffId::MedivacSpeedBoost => return speed * 1.7,
+						BuffId::VoidRaySwarmDamageBoost => return speed * 0.75,
+						_ => {
+							if let Some(increase) = SPEED_BUFFS.get(&buff) {
+								speed *= increase;
+							}
 						}
 					}
 				}
 			}
-		}
 
-		// ---- Upgrades ----
-		let upgrades = self.upgrades();
-		if let Some((upgrade_id, increase)) = SPEED_UPGRADES.get(&unit_type) {
-			if upgrades.contains(upgrade_id) {
-				speed *= increase;
-			}
-		}
-
-		// ---- Creep ----
-		// On creep
-		if self.data.creep.read_lock()[self.position()].is_set() {
-			if let Some(increase) = SPEED_ON_CREEP.get(&unit_type) {
-				speed *= increase;
-			}
-		}
-		// Off creep upgrades
-		if !upgrades.is_empty() {
-			if let Some((upgrade_id, increase)) = OFF_CREEP_SPEED_UPGRADES.get(&unit_type) {
+			// ---- Upgrades ----
+			let upgrades = self.upgrades();
+			if let Some((upgrade_id, increase)) = SPEED_UPGRADES.get(&unit_type) {
 				if upgrades.contains(upgrade_id) {
 					speed *= increase;
 				}
 			}
-		}
 
-		speed
+			// ---- Creep ----
+			// On creep
+			if self.data.creep.read_lock()[self.position()].is_set() {
+				if let Some(increase) = SPEED_ON_CREEP.get(&unit_type) {
+					speed *= increase;
+				}
+			}
+			// Off creep upgrades
+			if !upgrades.is_empty() {
+				if let Some((upgrade_id, increase)) = OFF_CREEP_SPEED_UPGRADES.get(&unit_type) {
+					if upgrades.contains(upgrade_id) {
+						speed *= increase;
+					}
+				}
+			}
+
+			speed
+		})
 	}
 	/// Distance unit can travel per one step.
 	pub fn distance_per_step(&self) -> f32 {
@@ -1194,7 +1207,9 @@ impl Unit {
 	/// If you need to get only real range of unit, use [`real_range_vs`](Self::real_range_vs)
 	/// instead, because it's generally faster.
 	pub fn real_weapon_vs(&self, target: &Unit) -> (f32, f32) {
-		self.calculate_weapon_stats(CalcTarget::Unit(target))
+		self.base.real_weapon_vs.get_or_create(&target.tag(), || {
+			self.calculate_weapon_stats(CalcTarget::Unit(target))
+		})
 	}
 
 	/// Returns (dps, range) of unit's weapon vs given abstract target
@@ -2048,6 +2063,10 @@ impl Unit {
 						tag: t.tag,
 					})
 					.collect(),
+
+				// cache
+				real_speed: Default::default(),
+				real_weapon_vs: Default::default(),
 			}),
 		}
 	}

@@ -1,7 +1,8 @@
 //! Different utilites useful (or useless) in bot development.
 
+use crate::bot::{Locked, Rl};
 use indexmap::IndexSet;
-use rustc_hash::{FxHashSet, FxHasher};
+use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use std::hash::{BuildHasherDefault, Hash};
 
 type FxIndexSet<T> = IndexSet<T, BuildHasherDefault<FxHasher>>;
@@ -77,5 +78,29 @@ where
 			.filter(|p| distance(q, &p) <= epsilon)
 			.cloned()
 			.collect()
+	}
+}
+
+#[derive(Default)]
+pub struct CacheMap<K, V>(Rl<FxHashMap<K, V>>);
+impl<K, V> CacheMap<K, V>
+where
+	K: Copy + Eq + Hash,
+	V: Copy,
+{
+	pub fn get_or_create<F>(&self, k: &K, f: F) -> V
+	where
+		F: FnOnce() -> V,
+	{
+		if let Some(res) = self.0.read_lock().get(k) {
+			*res
+		} else {
+			let res = f();
+			self.0.write_lock().insert(*k, res);
+			res
+		}
+	}
+	pub fn get(&self, k: &K) -> Option<V> {
+		self.0.read_lock().get(k).copied()
 	}
 }

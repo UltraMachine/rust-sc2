@@ -1,8 +1,29 @@
 //! Traits for comparing distance between points and units.
 #![allow(clippy::wrong_self_convention)]
 
-use crate::{geometry::Point2, units::iter::filter_fold};
+use crate::{geometry::Point2, units::iter::filter_fold, utils::CacheMap};
 use std::{cmp::Ordering, vec::IntoIter};
+
+#[cfg(feature = "rayon")]
+use once_cell::sync::Lazy;
+#[cfg(not(feature = "rayon"))]
+use once_cell::unsync::Lazy;
+
+static DISTANCE_CACHE: Lazy<CacheMap<(Point2, Point2, bool), f32>> = Lazy::new(Default::default);
+fn get_cache(a: Point2, b: Point2, sqrt: bool) -> f32 {
+	DISTANCE_CACHE.get(&(a, b, sqrt)).unwrap_or_else(|| {
+		DISTANCE_CACHE.get_or_create(&(b, a, sqrt), || {
+			if sqrt {
+				get_cache(a, b, false).sqrt()
+			} else {
+				let dx = a.x - b.x;
+				let dy = a.y - b.y;
+
+				dx * dx + dy * dy
+			}
+		})
+	})
+}
 
 #[cfg(feature = "rayon")]
 pub mod rayon;
@@ -13,17 +34,15 @@ pub trait Distance: Into<Point2> {
 	fn distance_squared<P: Into<Point2>>(self, other: P) -> f32 {
 		let a = self.into();
 		let b = other.into();
-
-		let dx = a.x - b.x;
-		let dy = a.y - b.y;
-
-		dx * dx + dy * dy
+		get_cache(a, b, false)
 	}
 
 	/// Calculates euclidean distance from `self` to `other`.
 	#[inline]
 	fn distance<P: Into<Point2>>(self, other: P) -> f32 {
-		self.distance_squared(other).sqrt()
+		let a = self.into();
+		let b = other.into();
+		get_cache(a, b, true)
 	}
 	/// Checks if distance between `self` and `other` is less than given `distance`.
 	#[inline]
