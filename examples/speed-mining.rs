@@ -170,8 +170,9 @@ impl LightningMcQueen {
 						if u.is_further(u.radius() + mineral.radius() + u.distance_per_step(), mineral)
 							&& !is_collides()
 						{
+							let base = &self.units.my.townhalls[*base_tag];
 							u.move_to(
-								Target::Pos(mineral.position().towards(u.position(), mineral.radius())),
+								Target::Pos(mineral.position().towards(base.position(), mineral.radius())),
 								false,
 							);
 						// otherwise keep gathering
