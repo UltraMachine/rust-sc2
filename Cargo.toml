@@ -12,7 +12,7 @@ license = "MIT"
 sc2-proto = "0.2.3"
 # sc2-proto = { path = "../sc2-proto-rs" }
 sc2-macro = { path = "sc2-macro", version = "1" }
-tungstenite = { version = "^0.14.0", default-features = false }
+tungstenite = { version = "^0.16.0", default-features = false }
 url = "^2.1.1"
 protobuf = "^2.17.0"
 ndarray = "^0.15.1"
