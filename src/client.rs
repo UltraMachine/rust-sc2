@@ -726,20 +726,15 @@ fn launch_client(sc2_path: &str, port: i32, sc2_version: Option<&str>) -> Child 
 		Some(ver) => get_version_info(ver),
 		None => (get_latest_base_version(sc2_path), ""),
 	};
+	let sc2_full_path = format!("{}/Versions/Base{}/{}", sc2_path, base_version, SC2_BINARY);
 
 	let mut process = if cfg!(feature = "wine_sc2") {
-		let wine = std::env::var("WINE").unwrap_or(format!("wine"));
+		let wine = std::env::var("WINE").unwrap_or_else(|_| "wine".to_string());
 		let mut command = Command::new(wine);
-		command.arg(format!(
-			"{}/Versions/Base{}/{}",
-			sc2_path, base_version, SC2_BINARY
-		));
+		command.arg(sc2_full_path);
 		command
 	} else {
-		Command::new(format!(
-			"{}/Versions/Base{}/{}",
-			sc2_path, base_version, SC2_BINARY
-		))
+		Command::new(sc2_full_path)
 	};
 	process
 		.current_dir(format!("{}/{}", sc2_path, SC2_SUPPORT))

@@ -61,7 +61,7 @@ pub fn get_map_path(sc2_path: &str, map_name: &str) -> String {
 		path_cmd
 			// Specify that we have a windows path
 			.arg("-w")
-			.arg(map_path.clone());
+			.arg(map_path);
 		let output = path_cmd.output().expect("Failed to run winepath");
 		assert!(output.status.success());
 		std::str::from_utf8(&output.stdout).unwrap().trim().to_string()
