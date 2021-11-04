@@ -17,14 +17,14 @@ use std::{
 	fmt,
 	fs::File,
 	io::Write,
-	net::TcpListener,
+	net::{TcpListener, TcpStream},
 	ops::{Deref, DerefMut},
 	process::{Child, Command},
 };
-use tungstenite::{client::AutoStream, connect, WebSocket};
+use tungstenite::{connect, stream::MaybeTlsStream, WebSocket};
 use url::Url;
 
-pub(crate) type WS = WebSocket<AutoStream>;
+pub(crate) type WS = WebSocket<MaybeTlsStream<TcpStream>>;
 pub type SC2Result<T> = Result<T, Box<dyn Error>>;
 
 const HOST: &str = "127.0.0.1";
