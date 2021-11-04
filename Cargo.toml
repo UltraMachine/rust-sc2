@@ -39,6 +39,7 @@ clap = "^2.33.2"
 [features]
 protoc = ["sc2-proto/protoc-rust"]
 enemies_cache = []
+wine_sc2 = []
 
 [target.'cfg(feature = "rayon")'.dependencies]
 indexmap.features = ["rayon"]
