@@ -370,7 +370,7 @@ impl ReaperRushAI {
 								u.move_to(Target::Pos(flee_position), false);
 							}
 							None => {
-								if !(is_retreating || u.in_range(&closest, 0.0)) {
+								if !(is_retreating || u.in_range(closest, 0.0)) {
 									u.move_to(Target::Pos(closest.position()), false);
 								}
 							}

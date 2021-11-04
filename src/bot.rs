@@ -1665,7 +1665,7 @@ impl Bot {
 			.into_iter()
 			.zip(paths.into_iter())
 			.filter_map(|(exp, path)| Some((exp, path?)))
-			.min_by(|(_, path1), (_, path2)| path1.partial_cmp(&path2).unwrap())
+			.min_by(|(_, path1), (_, path2)| path1.partial_cmp(path2).unwrap())
 			.map(|(exp, _)| exp)
 	}
 	/// Returns all [`expansions`](Self::expansions) taken by bot.

@@ -717,7 +717,7 @@ impl Unit {
 						BuffId::MedivacSpeedBoost => return speed * 1.7,
 						BuffId::VoidRaySwarmDamageBoost => return speed * 0.75,
 						_ => {
-							if let Some(increase) = SPEED_BUFFS.get(&buff) {
+							if let Some(increase) = SPEED_BUFFS.get(buff) {
 								speed *= increase;
 							}
 						}
@@ -819,7 +819,7 @@ impl Unit {
 	}
 	/// Checks if unit has any from given buffs.
 	pub fn has_any_buff<'a, B: IntoIterator<Item = &'a BuffId>>(&self, buffs: B) -> bool {
-		buffs.into_iter().any(|b| self.buffs().contains(&b))
+		buffs.into_iter().any(|b| self.buffs().contains(b))
 	}
 	/// Checks if worker is carrying minerals.
 	pub fn is_carrying_minerals(&self) -> bool {

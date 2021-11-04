@@ -171,7 +171,7 @@ where
 		debug!("Game finished");
 
 		if let Some(path) = &self.save_replay_as {
-			save_replay(self.bot.api(), &path)?;
+			save_replay(self.bot.api(), path)?;
 		}
 		Ok(())
 	}
@@ -310,7 +310,7 @@ where
 		debug!("Game finished");
 
 		if let Some(path) = &self.save_replay_as {
-			save_replay(self.bot.api(), &path)?;
+			save_replay(self.bot.api(), path)?;
 		}
 		Ok(())
 	}
@@ -428,7 +428,7 @@ where
 	debug!("Starting ladder game");
 
 	debug!("Connecting to websocket");
-	bot.api = Some(API::new(connect_to_websocket(&host, port.parse()?)?));
+	bot.api = Some(API::new(connect_to_websocket(host, port.parse()?)?));
 
 	debug!("Sending JoinGame request");
 

@@ -522,7 +522,7 @@ use std::cmp::Ordering;
 
 #[inline]
 fn cmp<T: PartialOrd>(a: &T, b: &T) -> Ordering {
-	a.partial_cmp(&b).unwrap()
+	a.partial_cmp(b).unwrap()
 }
 
 #[cfg(not(feature = "rayon"))]

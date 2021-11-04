@@ -34,7 +34,7 @@ impl Ramp {
 	pub(crate) fn new(points: Vec<Pos>, height: &Rs<ByteMap>, start_location: Point2) -> Self {
 		Self {
 			points,
-			height: Rs::clone(&height),
+			height: Rs::clone(height),
 			start_location,
 		}
 	}
