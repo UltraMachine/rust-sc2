@@ -39,6 +39,19 @@ pub fn get_path_to_sc2() -> String {
 	}
 }
 
+fn find_map_in_dir(sc2_maps_path: &str, map_name: &str) -> Option<String> {
+	let map_file_name = format!("{}.SC2Map", map_name);
+	for dir_ent in walkdir::WalkDir::new(sc2_maps_path).into_iter().flatten() {
+		let path = dir_ent.path();
+		if let Some(file_name) = path.file_name().map(|f| f.to_str()).flatten() {
+			if !path.is_dir() && file_name == map_file_name {
+				return path.to_str().map(|p| p.to_owned());
+			}
+		}
+	}
+	None
+}
+
 pub fn get_map_path(sc2_path: &str, map_name: &str) -> String {
 	let maps = {
 		let path = format!("{}/Maps", sc2_path);
@@ -53,8 +66,8 @@ pub fn get_map_path(sc2_path: &str, map_name: &str) -> String {
 			}
 		}
 	};
-	let map_path = format!("{}/{}.SC2Map", maps, map_name);
-	fs::metadata(&map_path).unwrap_or_else(|_| panic!("Map doesn't exists: {}", map_path));
+	let map_path =
+		find_map_in_dir(&maps, map_name).unwrap_or_else(|| panic!("Map doesn't exist in {}", maps));
 	if cfg!(feature = "wine_sc2") {
 		// Normalize the path using winepath
 		let mut path_cmd = std::process::Command::new("winepath");
