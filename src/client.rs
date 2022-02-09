@@ -22,7 +22,6 @@ use std::{
 	process::{Child, Command},
 };
 use tungstenite::{client::AutoStream, connect, WebSocket};
-use url::Url;
 
 pub(crate) type WS = WebSocket<AutoStream>;
 pub type SC2Result<T> = Result<T, Box<dyn Error>>;
@@ -744,7 +743,7 @@ fn launch_client(sc2_path: &str, port: i32, sc2_version: Option<&str>) -> Child 
 }
 
 fn connect_to_websocket(host: &str, port: i32) -> SC2Result<WS> {
-	let url = Url::parse(&format!("ws://{}:{}/sc2api", host, port))?;
+	let url = format!("ws://{}:{}/sc2api", host, port);
 	let (ws, _rs) = loop {
 		if let Ok(result) = connect(&url) {
 			break result;

@@ -1,5 +1,8 @@
+#[cfg(windows)]
 use dirs::home_dir;
+#[cfg(windows)]
 use regex::Regex;
+
 use std::{env, fs, path::Path};
 
 const DEFAULT_SC2_PATH: &str = {
@@ -21,7 +24,8 @@ pub fn get_path_to_sc2() -> String {
 	match env::var_os("SC2PATH") {
 		Some(path) => path.to_str().unwrap().to_string(),
 		None => {
-			if cfg!(target_os = "windows") {
+			#[cfg(windows)]
+			{
 				let file = fs::read_to_string(format!(
 					"{}/Documents/StarCraft II/ExecuteInfo.txt",
 					home_dir().unwrap().to_str().unwrap(),
