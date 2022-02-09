@@ -311,7 +311,7 @@ impl TryFromProto<&ProtoUnitTypeData> for UnitTypeData {
 				.collect(),
 			movement_speed: u.get_movement_speed(),
 			armor: u.get_armor() as i32,
-			weapons: u.get_weapons().iter().map(|w| Weapon::from_proto(w)).collect(),
+			weapons: u.get_weapons().iter().map(Weapon::from_proto).collect(),
 		})
 	}
 }

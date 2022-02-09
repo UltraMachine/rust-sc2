@@ -50,12 +50,12 @@ where
 	state.actions = response_observation
 		.get_actions()
 		.iter()
-		.filter_map(|a| Option::<Action>::from_proto(a))
+		.filter_map(Option::<Action>::from_proto)
 		.collect();
 	state.action_errors = response_observation
 		.get_action_errors()
 		.iter()
-		.map(|e| ActionError::from_proto(e))
+		.map(ActionError::from_proto)
 		.collect();
 	state.chat = response_observation
 		.get_chat()
@@ -113,7 +113,7 @@ where
 	raw.psionic_matrix = raw_player
 		.get_power_sources()
 		.iter()
-		.map(|ps| PsionicMatrix::from_proto(ps))
+		.map(PsionicMatrix::from_proto)
 		.collect();
 	raw.camera = Point2::from_proto(raw_player.get_camera());
 	raw.effects = res_raw
