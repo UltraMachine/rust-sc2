@@ -41,7 +41,7 @@ impl<T: Into<Point2>> Distance for T {}
 
 #[inline]
 fn cmp<T: PartialOrd>(a: &T, b: &T) -> Ordering {
-	a.partial_cmp(&b).unwrap()
+	a.partial_cmp(b).unwrap()
 }
 
 #[inline]

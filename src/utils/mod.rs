@@ -25,12 +25,12 @@ where
 	let mut noise = FxHashSet::<P>::default();
 	let mut solved = FxHashSet::<P>::default();
 	for p in data {
-		if solved.contains(&p) {
+		if solved.contains(p) {
 			continue;
 		}
 		solved.insert(p.clone());
 
-		let neighbors = range_query(&p);
+		let neighbors = range_query(p);
 		if neighbors.len() < min_points {
 			noise.insert(p.clone());
 		} else {
@@ -74,7 +74,7 @@ where
 	move |q: &P| {
 		data.clone()
 			.into_iter()
-			.filter(|p| distance(q, &p) <= epsilon)
+			.filter(|p| distance(q, p) <= epsilon)
 			.cloned()
 			.collect()
 	}

@@ -42,7 +42,7 @@ impl Player for WorkerRushAI {
 					} else {
 						u.gather(self.mineral_back, false);
 					}
-				} else if u.in_range_of(&closest, 2.0) {
+				} else if u.in_range_of(closest, 2.0) {
 					u.gather(self.mineral_back, false);
 				} else {
 					u.gather(self.mineral_forward, false);

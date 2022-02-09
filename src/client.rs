@@ -17,18 +17,21 @@ use std::{
 	fmt,
 	fs::File,
 	io::Write,
-	net::TcpListener,
+	net::{TcpListener, TcpStream},
 	ops::{Deref, DerefMut},
 	process::{Child, Command},
 };
-use tungstenite::{client::AutoStream, connect, WebSocket};
+use tungstenite::{connect, stream::MaybeTlsStream, WebSocket};
 
-pub(crate) type WS = WebSocket<AutoStream>;
+pub(crate) type WS = WebSocket<MaybeTlsStream<TcpStream>>;
 pub type SC2Result<T> = Result<T, Box<dyn Error>>;
+
+#[cfg(all(feature = "wine_sc2", not(target_os = "linux")))]
+compile_error!("Wine is only supported on linux");
 
 const HOST: &str = "127.0.0.1";
 const SC2_BINARY: &str = {
-	#[cfg(target_os = "windows")]
+	#[cfg(any(target_os = "windows", feature = "wine_sc2"))]
 	{
 		#[cfg(target_arch = "x86_64")]
 		{
@@ -43,7 +46,7 @@ const SC2_BINARY: &str = {
 			compile_error!("Unsupported Arch");
 		}
 	}
-	#[cfg(target_os = "linux")]
+	#[cfg(all(target_os = "linux", not(feature = "wine_sc2")))]
 	{
 		#[cfg(target_arch = "x86_64")]
 		{
@@ -170,7 +173,7 @@ where
 		debug!("Game finished");
 
 		if let Some(path) = &self.save_replay_as {
-			save_replay(self.bot.api(), &path)?;
+			save_replay(self.bot.api(), path)?;
 		}
 		Ok(())
 	}
@@ -309,7 +312,7 @@ where
 		debug!("Game finished");
 
 		if let Some(path) = &self.save_replay_as {
-			save_replay(self.bot.api(), &path)?;
+			save_replay(self.bot.api(), path)?;
 		}
 		Ok(())
 	}
@@ -427,7 +430,7 @@ where
 	debug!("Starting ladder game");
 
 	debug!("Connecting to websocket");
-	bot.api = Some(API::new(connect_to_websocket(&host, port.parse()?)?));
+	bot.api = Some(API::new(connect_to_websocket(host, port.parse()?)?));
 
 	debug!("Sending JoinGame request");
 
@@ -722,11 +725,16 @@ fn launch_client(sc2_path: &str, port: i32, sc2_version: Option<&str>) -> Child 
 		Some(ver) => get_version_info(ver),
 		None => (get_latest_base_version(sc2_path), ""),
 	};
+	let sc2_full_path = format!("{}/Versions/Base{}/{}", sc2_path, base_version, SC2_BINARY);
 
-	let mut process = Command::new(format!(
-		"{}/Versions/Base{}/{}",
-		sc2_path, base_version, SC2_BINARY
-	));
+	let mut process = if cfg!(feature = "wine_sc2") {
+		let wine = std::env::var("WINE").unwrap_or_else(|_| "wine".to_string());
+		let mut command = Command::new(wine);
+		command.arg(sc2_full_path);
+		command
+	} else {
+		Command::new(sc2_full_path)
+	};
 	process
 		.current_dir(format!("{}/{}", sc2_path, SC2_SUPPORT))
 		.arg("-listen")

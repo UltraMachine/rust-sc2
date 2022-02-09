@@ -2,7 +2,7 @@
 name = "rust-sc2"
 version = "1.1.2"
 authors = ["Armageddon <lunyx1337@gmail.com>"]
-edition = "2018"
+edition = "2021"
 description = "Rust implementation of StarCraft II API"
 repository = "https://github.com/UltraMachine/rust-sc2"
 readme = "README.md"
@@ -12,7 +12,7 @@ license = "MIT"
 sc2-proto = "0.2.3"
 # sc2-proto = { path = "../sc2-proto-rs" }
 sc2-macro = { path = "sc2-macro", version = "1" }
-tungstenite = { version = "^0.14.0", default-features = false }
+tungstenite = { version = "^0.16.0", default-features = false }
 protobuf = "^2.17.0"
 ndarray = "^0.15.1"
 num-traits = "^0.2.12"
@@ -40,6 +40,7 @@ clap = "^2.33.2"
 [features]
 protoc = ["sc2-proto/protoc-rust"]
 enemies_cache = []
+wine_sc2 = []
 
 [target.'cfg(feature = "rayon")'.dependencies]
 indexmap.features = ["rayon"]

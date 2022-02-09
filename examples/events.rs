@@ -13,7 +13,7 @@ impl Player for EmptyBot {
 	// Use it like here
 	fn on_event(&mut self, event: Event) -> SC2Result<()> {
 		match event {
-			Event::UnitDestroyed(tag, alliance) => {
+			Event::UnitDestroyed(_tag, alliance) => {
 				match alliance {
 					Some(Alliance::Own) => { /* your code here */ }
 					Some(Alliance::Neutral) => { /* your code here */ }
@@ -22,15 +22,15 @@ impl Player for EmptyBot {
 				}
 			}
 			Event::UnitCreated(tag) => {
-				if let Some(u) = self.units.my.units.get(tag) { /* your code here */ }
+				if let Some(_u) = self.units.my.units.get(tag) { /* your code here */ }
 			}
 			Event::ConstructionStarted(tag) => {
-				if let Some(u) = self.units.my.structures.get(tag) { /* your code here */ }
+				if let Some(_u) = self.units.my.structures.get(tag) { /* your code here */ }
 			}
 			Event::ConstructionComplete(tag) => {
-				if let Some(u) = self.units.my.structures.get(tag) { /* your code here */ }
+				if let Some(_u) = self.units.my.structures.get(tag) { /* your code here */ }
 			}
-			Event::RandomRaceDetected(race) => { /* your code here */ }
+			Event::RandomRaceDetected(_race) => { /* your code here */ }
 		}
 		Ok(())
 	}

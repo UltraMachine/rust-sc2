@@ -59,7 +59,19 @@ pub fn get_map_path(sc2_path: &str, map_name: &str) -> String {
 	};
 	let map_path = format!("{}/{}.SC2Map", maps, map_name);
 	fs::metadata(&map_path).unwrap_or_else(|_| panic!("Map doesn't exists: {}", map_path));
-	map_path
+	if cfg!(feature = "wine_sc2") {
+		// Normalize the path using winepath
+		let mut path_cmd = std::process::Command::new("winepath");
+		path_cmd
+			// Specify that we have a windows path
+			.arg("-w")
+			.arg(map_path);
+		let output = path_cmd.output().expect("Failed to run winepath");
+		assert!(output.status.success());
+		std::str::from_utf8(&output.stdout).unwrap().trim().to_string()
+	} else {
+		map_path
+	}
 }
 
 pub fn get_latest_base_version(sc2_path: &str) -> u32 {
