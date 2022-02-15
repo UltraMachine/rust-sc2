@@ -420,7 +420,7 @@ where
 pub fn run_ladder_game<B>(
 	bot: &mut B,
 	host: &str,
-	port: &str,
+	port: i32,
 	player_port: i32,
 	opponent_id: Option<&str>,
 ) -> SC2Result<()>
@@ -430,7 +430,7 @@ where
 	debug!("Starting ladder game");
 
 	debug!("Connecting to websocket");
-	bot.api = Some(API::new(connect_to_websocket(host, port.parse()?)?));
+	bot.api = Some(API::new(connect_to_websocket(host, port)?));
 
 	debug!("Sending JoinGame request");
 

@@ -519,7 +519,10 @@ fn main() -> SC2Result<()> {
 		_ => run_ladder_game(
 			&mut bot,
 			app.value_of("ladder_server").unwrap_or("127.0.0.1"),
-			app.value_of("host_port").expect("GamePort must be specified"),
+			app.value_of("host_port")
+				.expect("GamePort must be specified")
+				.parse()
+				.expect("Can't parse GamePort"),
 			app.value_of("player_port")
 				.expect("StartPort must be specified")
 				.parse()
