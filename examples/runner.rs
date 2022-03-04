@@ -39,7 +39,7 @@ fn main() -> SC2Result<()> {
 	const RACES: &[Race] = &[Race::Zerg, Race::Terran, Race::Protoss];
 	const DIFFICULTIES: &[Difficulty] = &[Difficulty::Easy, Difficulty::Medium, Difficulty::Hard];
 
-	// Run multiply times
+	// Run multiple times
 	for i in 0..3 {
 		// Configuration can be changed between games
 		runner.set_map(MAPS[i]);
