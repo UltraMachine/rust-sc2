@@ -362,7 +362,7 @@ impl FromProto<&ProtoPowerSource> for PsionicMatrix {
 }
 
 /// There are different effects in SC2, some of them can harm your units,
-/// so take them into account then microing.
+/// so take them into account when microing.
 ///
 /// All effects stored in [state.observation.raw.effects](RawData::effects).
 #[derive(Clone)]
