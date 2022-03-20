@@ -43,7 +43,6 @@ pub(crate) struct DataForUnit {
 	pub creep: Rw<PixelMap>,
 	pub game_step: Rs<LockU32>,
 	pub game_loop: Rs<LockU32>,
-	pub allow_spam: Rs<LockBool>,
 	pub available_frames: Rw<FxHashMap<u64, u32>>,
 }
 
@@ -1779,15 +1778,6 @@ impl Unit {
 	}
 	/// Orders unit to execute given command.
 	pub fn command(&self, ability: AbilityId, target: Target, queue: bool) {
-		if !(queue || self.is_idle() || self.data.allow_spam.get_locked()) {
-			let last_order = &self.orders()[0];
-			if ability == last_order.ability && target == last_order.target {
-				return;
-			}
-		} else if self.is_sleeping() {
-			return;
-		}
-
 		self.data
 			.commander
 			.write_lock()

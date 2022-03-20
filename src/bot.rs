@@ -390,7 +390,6 @@ pub struct Bot {
 	pub(crate) process: Option<Child>,
 	pub(crate) api: Option<API>,
 	pub(crate) game_step: Rs<LockU32>,
-	pub(crate) allow_spam: Rs<LockBool>,
 	#[doc(hidden)]
 	pub disable_fog: bool,
 	/// Actual race of your bot.
@@ -485,14 +484,6 @@ impl Bot {
 	/// Returns current game step.
 	pub fn game_step(&self) -> u32 {
 		self.game_step.get_locked()
-	}
-	/// Sets to `true`, allows units to forcibly execute commands, ignoring spam filter.
-	pub fn set_allow_spam(&self, val: bool) {
-		self.allow_spam.set_locked(val);
-	}
-	/// Returns `true` if units allowed to spam commands, `false` otherwise.
-	pub fn allow_spam(&self) -> bool {
-		self.allow_spam.get_locked()
 	}
 	/// Constructs new [`CountOptions`], used to count units fast and easy.
 	///
@@ -837,7 +828,6 @@ impl Bot {
 			creep: Rs::clone(&self.state.observation.raw.creep),
 			game_step: Rs::clone(&self.game_step),
 			game_loop: Rs::clone(&self.state.observation.game_loop),
-			allow_spam: Rs::clone(&self.allow_spam),
 			available_frames: Rs::clone(&self.available_frames),
 		});
 	}
@@ -1794,7 +1784,6 @@ impl Default for Bot {
 			enemy_race: Race::Random,
 			process: None,
 			api: Default::default(),
-			allow_spam: Default::default(),
 			player_id: Default::default(),
 			enemy_player_id: Default::default(),
 			opponent_id: Default::default(),
