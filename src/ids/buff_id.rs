@@ -305,4 +305,9 @@ pub enum BuffId {
 	AmorphousArmorcloud = 296,
 	RavenShredderMissileArmorReductionUISubtruct = 297,
 	BatteryOvercharge = 298,
+	SunderingImpact = 299,
+	AmplifiedShielding = 300,
+	PsionicAmplifiers = 301,
+	SecretedCoating = 302,
+	OnCreepVisible = 303,
 }
