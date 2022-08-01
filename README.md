@@ -10,6 +10,29 @@ Feel free to ask questions in `#rust` channel of these Discord servers:
 - [Starcraft 2 AI](https://discord.gg/Emm5Ztz)
 - [AI Arena](https://discord.gg/yDBzbtC)
 
+<!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
+**Table of Contents**
+
+- [rust-sc2](#rust-sc2)
+- [Getting started](#getting-started)
+	- [Rust](#rust)
+	- [StarCraft II](#starcraft-ii)
+		- [Windows and macOS](#windows-and-macos)
+		- [Linux](#linux)
+			- [Lutris and Wine](#lutris-and-wine)
+			- [Headless (no graphics)](#headless-no-graphics)
+- [Bug Workarounds (as of 7/31/22)](#bug-workarounds-as-of-73122)
+- [Example](#example)
+	- [Running Example](#running-example)
+		- [Lutris](#lutris)
+		- [Headless](#headless)
+	- [Optional features](#optional-features)
+	- [Making bot step by step](#making-bot-step-by-step)
+
+<!-- markdown-toc end -->
+
+
+
 # Getting started
 ## Rust
 [Install Rust](https://www.rust-lang.org/tools/install) >= 1.42.0
