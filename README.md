@@ -12,7 +12,7 @@ Feel free to ask questions in `#rust` channel of these Discord servers:
 
 # Getting started
 ## Rust
-Install Rust >= 1.42.0
+[Install Rust](https://www.rust-lang.org/tools/install) >= 1.42.0
 
 Create your project
 
