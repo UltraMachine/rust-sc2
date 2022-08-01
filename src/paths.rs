@@ -1,24 +1,8 @@
 #[cfg(windows)]
-use dirs::home_dir;
-#[cfg(windows)]
 use regex::Regex;
 
+use dirs::home_dir;
 use std::{env, fs, path::Path};
-
-const DEFAULT_SC2_PATH: &str = {
-	#[cfg(target_os = "windows")]
-	{
-		"C:/Program Files (x86)/StarCraft II"
-	}
-	#[cfg(target_os = "linux")]
-	{
-		"~/StarCraftII"
-	}
-	#[cfg(not(any(target_os = "windows", target_os = "linux")))]
-	{
-		compile_error!("Unsupported OS");
-	}
-};
 
 pub fn get_path_to_sc2() -> String {
 	match env::var_os("SC2PATH") {
@@ -37,8 +21,13 @@ pub fn get_path_to_sc2() -> String {
 				if path.exists() {
 					return path.to_str().unwrap().replace("\\", "/");
 				}
+
+				"C:/Program Files (x86)/StarCraft II".to_string()
 			}
-			DEFAULT_SC2_PATH.to_string()
+			#[cfg(unix)]
+			{
+				format!("{}/StarCraftII", home_dir().unwrap().to_str().unwrap())
+			}
 		}
 	}
 }

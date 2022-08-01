@@ -124,7 +124,7 @@ def parse_data(data, version=None):
 	# elif version is None:
 	if version is None:
 		abilities["TerranBuildRefinery"] = 320
-	elif version is "linux505":
+	elif version == "linux505":
 		units["AssimilatorRich"] = 1980
 		units["ExtractorRich"] = 1981
 		units["AccelerationZoneSmall"] = 1985
