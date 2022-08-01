@@ -105,8 +105,8 @@ impl Ramp {
 		match upper.len().cmp(&2) {
 			Ordering::Greater => self.bottom_center().and_then(|(center_x, center_y)| {
 				upper.sort_unstable_by_key(|(x, y)| {
-					let dx = x.checked_sub(center_x).unwrap_or_else(|| center_x - x);
-					let dy = y.checked_sub(center_y).unwrap_or_else(|| center_y - y);
+					let dx = x.abs_diff(center_x);
+					let dy = y.abs_diff(center_y);
 					Reverse(dx * dx + dy * dy)
 				});
 				upper[..2].try_into().ok()

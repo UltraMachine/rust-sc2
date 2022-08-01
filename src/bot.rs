@@ -1026,8 +1026,8 @@ impl Bot {
 			let (loc_x, loc_y) = <(usize, usize)>::from(loc);
 			let cmp = |r: &&Ramp| {
 				let (x, y) = r.top_center().unwrap();
-				let dx = loc_x.checked_sub(x).unwrap_or(x - loc_x);
-				let dy = loc_y.checked_sub(y).unwrap_or(y - loc_y);
+				let dx = loc_x.abs_diff(x);
+				let dy = loc_y.abs_diff(y);
 				dx * dx + dy * dy
 			};
 			ramps
