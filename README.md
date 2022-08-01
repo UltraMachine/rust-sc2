@@ -1,15 +1,3 @@
-# rust-sc2
-[![crates.io](https://img.shields.io/crates/v/rust-sc2.svg)](https://crates.io/crates/rust-sc2)
-[![Documentation](https://docs.rs/rust-sc2/badge.svg)](https://docs.rs/rust-sc2)
-
-Rust implementation of StarCraft II API
-
-The library aims to be simple and easy to use, being very fast and functional at the same time. However, it provides both high and low level abstractions. This lib is inspired by [python-sc2](https://github.com/BurnySc2/python-sc2) lib, so people might find it easy to switch to rust-sc2. It was originally created because other rust libs were old, not functional and low level.
-
-Feel free to ask questions in `#rust` channel of these Discord servers:
-- [Starcraft 2 AI](https://discord.gg/Emm5Ztz)
-- [AI Arena](https://discord.gg/yDBzbtC)
-
 <!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
 **Table of Contents**
 
@@ -31,6 +19,18 @@ Feel free to ask questions in `#rust` channel of these Discord servers:
 
 <!-- markdown-toc end -->
 
+
+# rust-sc2
+[![crates.io](https://img.shields.io/crates/v/rust-sc2.svg)](https://crates.io/crates/rust-sc2)
+[![Documentation](https://docs.rs/rust-sc2/badge.svg)](https://docs.rs/rust-sc2)
+
+Rust implementation of StarCraft II API
+
+The library aims to be simple and easy to use, being very fast and functional at the same time. However, it provides both high and low level abstractions. This lib is inspired by [python-sc2](https://github.com/BurnySc2/python-sc2) lib, so people might find it easy to switch to rust-sc2. It was originally created because other rust libs were old, not functional and low level.
+
+Feel free to ask questions in `#rust` channel of these Discord servers:
+- [Starcraft 2 AI](https://discord.gg/Emm5Ztz)
+- [AI Arena](https://discord.gg/yDBzbtC)
 
 
 # Getting started
