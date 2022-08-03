@@ -6,7 +6,10 @@ use std::{env, fs, path::Path};
 
 pub fn get_path_to_sc2() -> String {
 	match env::var_os("SC2PATH") {
-		Some(path) => path.to_str().unwrap().to_string(),
+		Some(path) => path
+			.to_str()
+			.unwrap()
+			.replace('~', home_dir().unwrap().to_str().unwrap()),
 		None => {
 			#[cfg(windows)]
 			{
