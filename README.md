@@ -58,40 +58,38 @@ Or if you want developer version directly from github:
 rust-sc2 = { git = "https://github.com/UltraMachine/rust-sc2" }
 ```
 
-
+Or if you want to use a local version:
+```toml
+[dependencies]
+rust-sc2 = { path = "/path/to/rust-sc2" }
+```
 
 ## StarCraft II
 
-### Windows and macOS
+### Installation
+#### Windows and macOS
 
 Install SC2 through [Battle.net](https://www.blizzard.com/en-us/apps/battle.net/desktop).
 
-### Linux
-
-#### Lutris and Wine
+#### Linux
+##### Headfull (Lutris and Wine)
 
 1. Install Lutris from your package manager
 2. [Install Battle.net dependencies](https://github.com/lutris/docs/blob/master/Battle.Net.md). (Wine and Vulkan drivers)
 3. [Install SC2 through Lutris](https://lutris.net/games/starcraft-ii/)
 
-#### Headless (no graphics)
+##### Headless (no graphics)
 
 1. Download most recent [Linux Package](https://github.com/Blizzard/s2client-proto#linux-packages) (Maps will come with the zip)
-
 2. Unzip to ~/StarCraftII (you'll need the End User License Agreement Password above the Linux Packages link)
 
-# Bug Workarounds (as of 7/31/22)
+
+# Bug Workarounds For Linux (as of 7/31/22)
 
 These solutions will (hopefully) help you run the bot example...
 
-1. The current solution of expanding `~` doesn't work. [I guess it's not that easy](https://stackoverflow.com/questions/54267608/expand-tilde-in-rust-path-idiomatically). So `export SC2PATH=/home/<user>/StarCraftII` is required before running your bot.
-
+1. The current solution of expanding `~` doesn't work. [I guess it's not that easy](https://stackoverflow.com/questions/54267608/expand-tilde-in-rust-path-idiomatically). So explicitly use the absolute path: `export SC2PATH=/abs/path/to/StarCraftII`.
 2. `rust-sc2` doesn't recurse down `Maps` child directories, so you will need to copy whatever `.SC2Map` from the season's to the parent `Maps` directory. (Make sure you update your map in the bot example below)
-
-3. Create an empty directory `mkdir ~/StarCraftII/Support64`.
-
-4. When you run the example (and I guess any bot), it will crash. [See this Discord thread for more context](https://discord.com/channels/350289306763657218/593190548165099524/1003452454492442664)
-
 
 
 # Example
@@ -104,43 +102,51 @@ use rust_sc2::prelude::*;
 struct WorkerRush;
 impl Player for WorkerRush {
 	fn get_player_settings(&self) -> PlayerSettings {
-	PlayerSettings::new(Race::Protoss)
+		PlayerSettings::new(Race::Protoss)
 	}
 	fn on_start(&mut self) -> SC2Result<()> {
-	for worker in &self.units.my.workers {
-		worker.attack(Target::Pos(self.enemy_start), false);
-	}
-	Ok(())
+		for worker in &self.units.my.workers {
+			worker.attack(Target::Pos(self.enemy_start), false);
+		}
+		Ok(())
 	}
 }
 
 fn main() -> SC2Result<()> {
 	let mut bot = WorkerRush::default();
 	run_vs_computer(
-	&mut bot,
-	Computer::new(Race::Random, Difficulty::Medium, None),
-	"EternalEmpireLE",
-	Default::default(),
+		&mut bot,
+		Computer::new(Race::Random, Difficulty::Medium, None),
+		"EternalEmpireLE",
+		Default::default(),
 	)
 }
 ```
+Note: The linux client doesn't have the map `EternalEmpireLE` so you'll need to reference another map from the LadderXXXXSeasonX directories.
 
 ## Running Example
-### Lutris
-As of 7/31/22, neither of these options have been tested, but hopefully one of them will work.
-1. You can try [burnysc2](https://github.com/BurnySc2/python-sc2/blob/develop/README.md#wine-and-lutris)'s solution.
-2. Or, try this from @ccapitalK [discord](https://discord.com/channels/350289306763657218/593190548165099524/1003476239308292138)
+### Headfull
+As of 8/2/22 this works on Arch Linux, but you need to revert the changes in [this commit](https://github.com/UltraMachine/rust-sc2/commit/321a5e7c768d89f523d8447c4f3f9f161c6dd461) (current HEAD fails to find `icuu52.dll`)
+
+1. `export SC2PATH="/home/<user>/Games/starcraft-ii/drive_c/Program Files (x86)/StarCraft II"`
+2. Make sure you have this snippet in your project's **Cargo.toml**:
+```toml
+[features]
+wine_sc2 = ["rust-sc2/wine_sc2"]
+
+```
+3. `cargo run --features wine_sc2`
 
 ### Headless
-In your project directory:
-`cargo run`
-
+1. `export SC2PATH=/abs/path/to/StarCraftII`
+2. `cargo run`
 
 For more advanced examples see [`examples`](https://github.com/UltraMachine/rust-sc2/tree/master/examples) folder.
 
 ## Optional features
 - `"rayon"` - enables parallelism and makes all types threadsafe
 - `"serde"` - adds implementation of `Serialize`, `Deserialize` to ids, Race, GameResult, ...
+- `"wine_sc2"` - allows you to run headful SC2 through Lutris and Wine
 
 ## Making bot step by step
 First of all, import rust-sc2 lib:
@@ -164,31 +170,31 @@ Then implement `Player` trait for your bot:
 impl Player for MyBot {
 	// Must be implemented
 	fn get_player_settings(&self) -> PlayerSettings {
-	// Race can be Terran, Zerg, Protoss or Random
-	PlayerSettings::new(Race::Random)
+		// Race can be Terran, Zerg, Protoss or Random
+		PlayerSettings::new(Race::Random)
 	}
 
 	// Methods below aren't necessary to implement (Empty by default)
 
 	// Called once on first step
 	fn on_start(&mut self) -> SC2Result<()> {
-	/* your awesome code here */
+		/* your awesome code here */
 	}
 
 	// Called on every game step
 	fn on_step(&mut self, iteration: usize) -> SC2Result<()> {
-	/* your awesome code here */
+		/* your awesome code here */
 	}
 
 	// Called once on last step
 	// "result" says if your bot won or lost game
 	fn on_end(&self, result: GameResult) -> SC2Result<()> {
-	/* your awesome code here */
+		/* your awesome code here */
 	}
 
 	// Called on different events, see more in `examples/events.rs`
 	fn on_event(&mut self, event: Event) -> SC2Result<()> {
-	/* your awesome code here */
+		/* your awesome code here */
 	}
 }
 ```
@@ -198,9 +204,9 @@ impl MyBot {
 	// It's necessary to have #[bot_new] here
 	#[bot_new]
 	fn new() -> Self {
-	Self {
-		/* initializing fields */
-	}
+		Self {
+			/* initializing fields */
+		}
 	}
 }
 ```
@@ -209,10 +215,10 @@ If your bot implements `Default` you can simply call `MyBot::default()`, but if 
 impl MyBot {
 	// You don't need #[bot_new] here, because of "..Default::default()"
 	fn new() -> Self {
-	Self {
-		/* initializing fields */
-		..Default::default()
-	}
+		Self {
+			/* initializing fields */
+			..Default::default()
+		}
 	}
 }
 ```
@@ -221,14 +227,14 @@ The rest is to run it:
 fn main() -> SC2Result<()> {
 	let mut bot = MyBot::new();
 	run_vs_computer(
-	&mut bot,
-	Computer::new(
-		Race::Random,
-		Difficulty::VeryEasy,
-		None,              // AI Build (random here)
-	),
-	"EternalEmpireLE", // Map name
-	LaunchOptions::default(),
+		&mut bot,
+		Computer::new(
+			Race::Random,
+			Difficulty::VeryEasy,
+			None,              // AI Build (random here)
+		),
+		"EternalEmpireLE", // Map name
+		LaunchOptions::default(),
 	)
 }
 ```
