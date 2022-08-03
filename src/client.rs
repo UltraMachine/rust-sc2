@@ -722,7 +722,7 @@ fn launch_client(sc2_path: &str, port: i32, sc2_version: Option<&str>) -> Child 
 		Command::new(sc2_full_path)
 	};
 	let cwd = {
-		#[cfg(windows)]
+		#[cfg(any(target_os = "windows", feature = "wine_sc2"))]
 		{
 			#[cfg(target_arch = "x86_64")]
 			{
@@ -733,7 +733,7 @@ fn launch_client(sc2_path: &str, port: i32, sc2_version: Option<&str>) -> Child 
 				format!("{}/Support", sc2_path)
 			}
 		}
-		#[cfg(unix)]
+		#[cfg(all(target_os = "linux", not(feature = "wine_sc2")))]
 		{
 			sc2_path
 		}
