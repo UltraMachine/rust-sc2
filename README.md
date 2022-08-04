@@ -10,7 +10,6 @@
 			- [Linux](#linux)
 				- [Headfull (Lutris and Wine)](#headfull-lutris-and-wine)
 				- [Headless (no graphics)](#headless-no-graphics)
-- [Bug Workarounds For Linux (as of 7/31/22)](#bug-workarounds-for-linux-as-of-73122)
 - [Example](#example)
 	- [Running Example](#running-example)
 		- [Headfull](#headfull)
@@ -38,15 +37,15 @@ Feel free to ask questions in `#rust` channel of these Discord servers:
 ## Rust
 [Install Rust](https://www.rust-lang.org/tools/install) >= 1.42.0
 
-Create your project
-
-`cargo add <name_of_project>`
-
 Warning: Compilation is broken in rustc 1.45.0 - 1.46.0, you'll get following error:
 ```
 thread 'rustc' has overflowed its stack
 error: could not compile `rust-sc2`.
 ```
+
+Create your project
+
+`cargo add <name_of_project>`
 
 Add to dependencies in Cargo.toml:
 ```toml
@@ -83,14 +82,7 @@ Install SC2 through [Battle.net](https://www.blizzard.com/en-us/apps/battle.net/
 
 1. Download most recent [Linux Package](https://github.com/Blizzard/s2client-proto#linux-packages) (Maps will come with the zip)
 2. Unzip to ~/StarCraftII (you'll need the End User License Agreement Password above the Linux Packages link)
-
-
-# Bug Workarounds For Linux (as of 7/31/22)
-
-These solutions will (hopefully) help you run the bot example...
-
-1. The current solution of expanding `~` doesn't work. [I guess it's not that easy](https://stackoverflow.com/questions/54267608/expand-tilde-in-rust-path-idiomatically). So explicitly use the absolute path: `export SC2PATH=/abs/path/to/StarCraftII`.
-2. `rust-sc2` doesn't recurse down `Maps` child directories, so you will need to copy whatever `.SC2Map` from the season's to the parent `Maps` directory. (Make sure you update your map in the bot example below)
+3. Move your `.SC2Map` files up out of their `LadderXXXXSeasonX` directory to `Maps` directory. (Since there are multiple versions of the same map, there is no way of knowing which one you want.)
 
 
 # Example
@@ -123,11 +115,11 @@ fn main() -> SC2Result<()> {
 	)
 }
 ```
-Note: The linux client doesn't have the map `EternalEmpireLE` so you'll need to reference another map from the LadderXXXXSeasonX directories.
+Note: The Linux client doesn't have the map `EternalEmpireLE` so you'll need to download it, or reference another map from the `LadderXXXXSeasonX` directories. (This might be the same case for Windows and macOS. Untested)
 
 ## Running Example
 ### Headfull
-As of 8/2/22 this works on Arch Linux, but you need to revert the changes in [this commit](https://github.com/UltraMachine/rust-sc2/commit/321a5e7c768d89f523d8447c4f3f9f161c6dd461) (current HEAD fails to find `icuu52.dll`)
+As of 8/2/22 this works on Arch Linux:
 
 1. `export SC2PATH="/home/<user>/Games/starcraft-ii/drive_c/Program Files (x86)/StarCraft II"`
 2. Make sure you have this snippet in your project's **Cargo.toml**:
