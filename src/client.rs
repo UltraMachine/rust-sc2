@@ -66,20 +66,6 @@ const SC2_BINARY: &str = {
 		compile_error!("Unsupported OS");
 	}
 };
-const SC2_SUPPORT: &str = {
-	#[cfg(target_arch = "x86_64")]
-	{
-		"Support64"
-	}
-	#[cfg(target_arch = "x86")]
-	{
-		"Support"
-	}
-	#[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
-	{
-		compile_error!("Unsupported Arch");
-	}
-};
 
 /// Runner for games vs built-in AI.
 pub struct RunnerSingle<'a, B>
@@ -735,8 +721,25 @@ fn launch_client(sc2_path: &str, port: i32, sc2_version: Option<&str>) -> Child 
 	} else {
 		Command::new(sc2_full_path)
 	};
+	let cwd = {
+		#[cfg(any(target_os = "windows", feature = "wine_sc2"))]
+		{
+			#[cfg(target_arch = "x86_64")]
+			{
+				format!("{}/Support64", sc2_path)
+			}
+			#[cfg(target_arch = "x86")]
+			{
+				format!("{}/Support", sc2_path)
+			}
+		}
+		#[cfg(all(target_os = "linux", not(feature = "wine_sc2")))]
+		{
+			sc2_path
+		}
+	};
 	process
-		.current_dir(format!("{}/{}", sc2_path, SC2_SUPPORT))
+		.current_dir(cwd)
 		.arg("-listen")
 		.arg(HOST)
 		.arg("-port")
