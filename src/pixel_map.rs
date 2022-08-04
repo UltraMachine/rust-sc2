@@ -53,8 +53,6 @@ impl FromProto<&ImageData> for ByteMap {
 		Array2::from_shape_vec(
 			(size.get_y() as usize, size.get_x() as usize),
 			grid.get_data().iter().copied().collect(),
-			// below causes sc2 to fail
-			// grid.get_data().to_vec(),
 		)
 		.expect("Can't create ByteMap")
 		.reversed_axes()
