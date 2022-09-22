@@ -24,6 +24,7 @@ where
 			(about: "Runs local game vs Computer")
 			(@arg map: -m --map
 				+takes_value
+				"Sets map from the \"Starcraft II/Maps\" folder (no subfolders)"
 			)
 			(@arg race: -r --race
 				+takes_value
@@ -51,6 +52,7 @@ where
 			(about: "Runs game Human vs Bot")
 			(@arg map: -m --map
 				+takes_value
+				"Sets map from the \"Starcraft II/Maps\" folder (no subfolders)"
 			)
 			(@arg race: -r --race *
 				+takes_value
