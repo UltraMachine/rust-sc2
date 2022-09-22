@@ -134,7 +134,17 @@ wine_sc2 = ["rust-sc2/wine_sc2"]
 1. `export SC2PATH=/abs/path/to/StarCraftII`
 2. `cargo run`
 
-For more advanced examples see [`examples`](https://github.com/UltraMachine/rust-sc2/tree/master/examples) folder.
+## Running the advanced examples
+There are more advanced examples in the [`examples`](https://github.com/UltraMachine/rust-sc2/tree/master/examples) folder. To run one of these examples on your own machine, say the Reaper Rush one, clone this repository, navigate to the root folder and run the command
+```
+cargo run --example reaper-rush -- local
+```
+In addition to `local` (or `human` if you want to play against your own bot), these examples take several arguments. For a full list in either case, run the commands
+```
+cargo run --example reaper-rush -- local --help
+cargo run --example reaper-rush -- human --help
+```
+
 
 ## Optional features
 - `"rayon"` - enables parallelism and makes all types threadsafe
