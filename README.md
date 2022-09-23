@@ -14,6 +14,7 @@
 	- [Running Example](#running-example)
 		- [Headfull](#headfull)
 		- [Headless](#headless)
+	- [Runnint the advanced examples](#running-the-advanced-examples)
 	- [Optional features](#optional-features)
 	- [Making bot step by step](#making-bot-step-by-step)
 
