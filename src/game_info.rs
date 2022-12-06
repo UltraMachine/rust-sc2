@@ -57,7 +57,7 @@ impl FromProto<ResponseGameInfo> for GameInfo {
 			mod_names: game_info.get_mod_names().to_vec(),
 			map_name_path: Path::new(&local_map_path)
 				.file_stem()
-				.unwrap_or(&std::ffi::OsStr::new(""))
+				.unwrap_or_default()
 				.to_str()
 				.unwrap()
 				.to_string(),

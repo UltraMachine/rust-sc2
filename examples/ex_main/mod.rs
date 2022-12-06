@@ -1,13 +1,10 @@
-extern crate clap;
-use crate::*;
 use clap::*;
+use rand::prelude::*;
+use rust_sc2::bot::Bot;
+use rust_sc2::prelude::*;
+use std::ops::{Deref, DerefMut};
 
-pub(crate) fn main<P>(mut bot: P) -> Result<(), Box<dyn std::error::Error>>
-where
-	P: rust_sc2::Player
-		+ core::ops::DerefMut<Target = rust_sc2::bot::Bot>
-		+ core::ops::Deref<Target = rust_sc2::bot::Bot>,
-{
+pub(crate) fn main(mut bot: impl Player + DerefMut<Target = Bot> + Deref<Target = Bot>) -> SC2Result<()> {
 	let app = clap_app!(RustyReapers =>
 		(version: crate_version!())
 		(author: crate_authors!())
