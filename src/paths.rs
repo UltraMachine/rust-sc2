@@ -22,7 +22,7 @@ pub fn get_path_to_sc2() -> String {
 
 				let path = Path::new(&re[1]);
 				if path.exists() {
-					return path.to_str().unwrap().replace("\\", "/");
+					return path.to_str().unwrap().replace('\\', "/");
 				}
 
 				"C:/Program Files (x86)/StarCraft II".to_string()
