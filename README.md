@@ -3,20 +3,20 @@
 
 - [rust-sc2](#rust-sc2)
 - [Getting started](#getting-started)
-	- [Rust](#rust)
-	- [StarCraft II](#starcraft-ii)
-		- [Installation](#installation)
-			- [Windows and macOS](#windows-and-macos)
-			- [Linux](#linux)
-				- [Headfull (Lutris and Wine)](#headfull-lutris-and-wine)
-				- [Headless (no graphics)](#headless-no-graphics)
+    - [Rust](#rust)
+    - [StarCraft II](#starcraft-ii)
+        - [Installation](#installation)
+            - [Windows and macOS](#windows-and-macos)
+            - [Linux](#linux)
+                - [Headfull (Lutris and Wine)](#headfull-lutris-and-wine)
+                - [Headless (no graphics)](#headless-no-graphics)
 - [Example](#example)
-	- [Running Example](#running-example)
-		- [Headfull](#headfull)
-		- [Headless](#headless)
-	- [Runnint the advanced examples](#running-the-advanced-examples)
-	- [Optional features](#optional-features)
-	- [Making bot step by step](#making-bot-step-by-step)
+    - [Running Example](#running-example)
+        - [Headfull](#headfull)
+        - [Headless](#headless)
+    - [Runnint the advanced examples](#running-the-advanced-examples)
+    - [Optional features](#optional-features)
+    - [Making bot step by step](#making-bot-step-by-step)
 
 <!-- markdown-toc end -->
 
@@ -29,29 +29,21 @@ Rust implementation of StarCraft II API
 
 The library aims to be simple and easy to use, being very fast and functional at the same time. However, it provides both high and low level abstractions. This lib is inspired by [python-sc2](https://github.com/BurnySc2/python-sc2) lib, so people might find it easy to switch to rust-sc2. It was originally created because other rust libs were old, not functional and low level.
 
-Feel free to ask questions in `#rust` channel of these Discord servers:
-- [Starcraft 2 AI](https://discord.gg/Emm5Ztz)
-- [AI Arena](https://discord.gg/yDBzbtC)
-
+Feel free to ask questions in `#rust` channel of [Starcraft 2 AI Discord](https://discord.gg/Emm5Ztz) server
 
 # Getting started
 ## Rust
-[Install Rust](https://www.rust-lang.org/tools/install) >= 1.42.0
-
-Warning: Compilation is broken in rustc 1.45.0 - 1.46.0, you'll get following error:
-```
-thread 'rustc' has overflowed its stack
-error: could not compile `rust-sc2`.
-```
+[Install latest stable Rust](https://www.rust-lang.org/tools/install)
+(Older versions may also work, but compatibility is not guaranteed)
 
 Create your project
 
-`cargo add <name_of_project>`
+`cargo new <project_name>`
 
 Add to dependencies in Cargo.toml:
 ```toml
 [dependencies]
-rust-sc2 = "1.1.0"
+rust-sc2 = "1"
 ```
 Or if you want developer version directly from github:
 ```toml
@@ -95,33 +87,31 @@ use rust_sc2::prelude::*;
 #[derive(Default)]
 struct WorkerRush;
 impl Player for WorkerRush {
-	fn get_player_settings(&self) -> PlayerSettings {
-		PlayerSettings::new(Race::Protoss)
-	}
-	fn on_start(&mut self) -> SC2Result<()> {
-		for worker in &self.units.my.workers {
-			worker.attack(Target::Pos(self.enemy_start), false);
-		}
-		Ok(())
-	}
+    fn get_player_settings(&self) -> PlayerSettings {
+        PlayerSettings::new(Race::Protoss)
+    }
+    fn on_start(&mut self) -> SC2Result<()> {
+        for worker in &self.units.my.workers {
+            worker.attack(Target::Pos(self.enemy_start), false);
+        }
+        Ok(())
+    }
 }
 
 fn main() -> SC2Result<()> {
-	let mut bot = WorkerRush::default();
-	run_vs_computer(
-		&mut bot,
-		Computer::new(Race::Random, Difficulty::Medium, None),
-		"EternalEmpireLE",
-		Default::default(),
-	)
+    let mut bot = WorkerRush::default();
+    run_vs_computer(
+        &mut bot,
+        Computer::new(Race::Random, Difficulty::Medium, None),
+        "EternalEmpireLE",
+        Default::default(),
+    )
 }
 ```
-Note: The Linux client doesn't have the map `EternalEmpireLE` so you'll need to download it, or reference another map from the `LadderXXXXSeasonX` directories. (This might be the same case for Windows and macOS. Untested)
+Note: The Linux client doesn't have the map `EternalEmpireLE` so you'll need to download it, or reference another map from the `LadderXXXXSeasonX` directories.
 
 ## Running Example
 ### Headfull
-As of 8/2/22 this works on Arch Linux:
-
 1. `export SC2PATH="/home/<user>/Games/starcraft-ii/drive_c/Program Files (x86)/StarCraft II"`
 2. Make sure you have this snippet in your project's **Cargo.toml**:
 ```toml
@@ -165,80 +155,80 @@ struct MyBot;
 ```rust
 #[bot]
 struct MyBot {
-	/* fields here */
+    /* fields here */
 }
 ```
 Then implement `Player` trait for your bot:
 ```rust
 // You mustn't call any of these methods by hands, they're for API only
 impl Player for MyBot {
-	// Must be implemented
-	fn get_player_settings(&self) -> PlayerSettings {
-		// Race can be Terran, Zerg, Protoss or Random
-		PlayerSettings::new(Race::Random)
-	}
+    // Must be implemented
+    fn get_player_settings(&self) -> PlayerSettings {
+        // Race can be Terran, Zerg, Protoss or Random
+        PlayerSettings::new(Race::Random)
+    }
 
-	// Methods below aren't necessary to implement (Empty by default)
+    // Methods below aren't necessary to implement (Empty by default)
 
-	// Called once on first step
-	fn on_start(&mut self) -> SC2Result<()> {
-		/* your awesome code here */
-	}
+    // Called once on first step
+    fn on_start(&mut self) -> SC2Result<()> {
+        /* your awesome code here */
+    }
 
-	// Called on every game step
-	fn on_step(&mut self, iteration: usize) -> SC2Result<()> {
-		/* your awesome code here */
-	}
+    // Called on every game step
+    fn on_step(&mut self, iteration: usize) -> SC2Result<()> {
+        /* your awesome code here */
+    }
 
-	// Called once on last step
-	// "result" says if your bot won or lost game
-	fn on_end(&self, result: GameResult) -> SC2Result<()> {
-		/* your awesome code here */
-	}
+    // Called once on last step
+    // "result" says if your bot won or lost game
+    fn on_end(&self, result: GameResult) -> SC2Result<()> {
+        /* your awesome code here */
+    }
 
-	// Called on different events, see more in `examples/events.rs`
-	fn on_event(&mut self, event: Event) -> SC2Result<()> {
-		/* your awesome code here */
-	}
+    // Called on different events, see more in `examples/events.rs`
+    fn on_event(&mut self, event: Event) -> SC2Result<()> {
+        /* your awesome code here */
+    }
 }
 ```
 Also you might want to add method to construct it:
 ```rust
 impl MyBot {
-	// It's necessary to have #[bot_new] here
-	#[bot_new]
-	fn new() -> Self {
-		Self {
-			/* initializing fields */
-		}
-	}
+    // It's necessary to have #[bot_new] here
+    #[bot_new]
+    fn new() -> Self {
+        Self {
+            /* initializing fields */
+        }
+    }
 }
 ```
 If your bot implements `Default` you can simply call `MyBot::default()`, but if you want more control over initializer:
 ```rust
 impl MyBot {
-	// You don't need #[bot_new] here, because of "..Default::default()"
-	fn new() -> Self {
-		Self {
-			/* initializing fields */
-			..Default::default()
-		}
-	}
+    // You don't need #[bot_new] here, because of "..Default::default()"
+    fn new() -> Self {
+        Self {
+            /* initializing fields */
+            ..Default::default()
+        }
+    }
 }
 ```
 The rest is to run it:
 ```rust
 fn main() -> SC2Result<()> {
-	let mut bot = MyBot::new();
-	run_vs_computer(
-		&mut bot,
-		Computer::new(
-			Race::Random,
-			Difficulty::VeryEasy,
-			None,              // AI Build (random here)
-		),
-		"EternalEmpireLE", // Map name
-		LaunchOptions::default(),
-	)
+    let mut bot = MyBot::new();
+    run_vs_computer(
+        &mut bot,
+        Computer::new(
+            Race::Random,
+            Difficulty::VeryEasy,
+            None, // AI Build (random here)
+        ),
+        "EternalEmpireLE", // Map name
+        LaunchOptions::default(),
+    )
 }
 ```
