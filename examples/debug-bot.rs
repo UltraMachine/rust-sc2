@@ -1,4 +1,3 @@
-use rand::prelude::*;
 use rust_sc2::{geometry::Point3, prelude::*};
 
 mod ex_main;

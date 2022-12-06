@@ -1,4 +1,3 @@
-use rand::prelude::{thread_rng, SliceRandom};
 use rust_sc2::prelude::*;
 
 mod ex_main;

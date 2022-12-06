@@ -1,4 +1,3 @@
-use rand::prelude::*;
 use rust_sc2::prelude::*;
 use std::cmp::Ordering;
 
