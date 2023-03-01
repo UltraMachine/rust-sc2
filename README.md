@@ -12,6 +12,7 @@
                 - [Headless (no graphics)](#headless-no-graphics)
 - [Example](#example)
     - [Running Example](#running-example)
+        - [Windows](#windows)
         - [Headfull](#headfull)
         - [Headless](#headless)
     - [Runnint the advanced examples](#running-the-advanced-examples)
@@ -62,7 +63,9 @@ rust-sc2 = { path = "/path/to/rust-sc2" }
 ### Installation
 #### Windows and macOS
 
-Install SC2 through [Battle.net](https://www.blizzard.com/en-us/apps/battle.net/desktop).
+1. Install SC2 through [Battle.net](https://www.blizzard.com/en-us/apps/battle.net/desktop).
+2. Download and unzip the most recent [Map Packs](https://github.com/Blizzard/s2client-proto#linux-packages) (you'll need the End User License Agreement Password, ‘iagreetotheeula’)
+3. Create a `Maps` directory in your SC2 install directory, typically `C:\Program Files (x86)\StarCraft II\`, and place your unzipped maps there.
 
 #### Linux
 ##### Headfull (Lutris and Wine)
@@ -111,6 +114,10 @@ fn main() -> SC2Result<()> {
 Note: The Linux client doesn't have the map `EternalEmpireLE` so you'll need to download it, or reference another map from the `LadderXXXXSeasonX` directories.
 
 ## Running Example
+### Windows
+1.  Add a `SC2PATH` variable to your [environment variables](https://docs.oracle.com/en/database/oracle/machine-learning/oml4r/1.5.1/oread/creating-and-modifying-environment-variables-on-windows.html) with the path to your StarCraft II install directory, typically `C:\Program Files (x86)\StarCraft II\`.
+2. `cargo run`
+
 ### Headfull
 1. `export SC2PATH="/home/<user>/Games/starcraft-ii/drive_c/Program Files (x86)/StarCraft II"`
 2. Make sure you have this snippet in your project's **Cargo.toml**:
