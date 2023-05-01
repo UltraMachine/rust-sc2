@@ -29,7 +29,7 @@ indexmap = "^1.5.1"
 serde = { version = "^1.0.114", features = ["derive"], optional = true }
 lazy-init = "^0.5.0"
 once_cell = "^1.8.0"
-dirs = "^4.0.0"
+dirs = "^5.0.1"
 
 [target.'cfg(windows)'.dependencies]
 regex = "^1.3.9"
