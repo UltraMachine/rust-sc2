@@ -70,7 +70,7 @@ Install SC2 through [Battle.net](https://www.blizzard.com/en-us/apps/battle.net/
 1. Install Lutris from your package manager
 2. [Install Battle.net dependencies](https://github.com/lutris/docs/blob/master/Battle.Net.md). (Wine and Vulkan drivers)
 3. [Install SC2 through Lutris](https://lutris.net/games/starcraft-ii/)
- 
+
 ##### Headless (no graphics)
 
 1. Download most recent [Linux Package](https://github.com/Blizzard/s2client-proto#linux-packages) (Maps will come with the zip)
