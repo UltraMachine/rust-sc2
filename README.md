@@ -50,12 +50,13 @@ Or if you want developer version directly from github:
 [dependencies]
 rust-sc2 = { git = "https://github.com/UltraMachine/rust-sc2" }
 ```
-
 Or if you want to use a local version:
 ```toml
 [dependencies]
 rust-sc2 = { path = "/path/to/rust-sc2" }
 ```
+
+**NOTE:** *Version of this library on crates.io is outdated and lacks many features. Unfortunately, I can't update it yet, so it's highly recommended to use github version for now.*
 
 ## StarCraft II
 
