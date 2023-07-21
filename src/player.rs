@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 /// Representation of game races (your gender in SC2).
 #[variant_checkers]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FromStr)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FromStr, Default)]
 pub enum Race {
 	/// Brutal mens, who try to survive in this world.
 	Terran,
@@ -25,6 +25,7 @@ pub enum Race {
 	/// Kinda high-tech guys, who build cannons and batteries near your base "just for scouting".
 	Protoss,
 	/// Use when you didn't decide your race yet or just want to play them all.
+	#[default]
 	Random,
 }
 impl FromProto<ProtoRace> for Race {
@@ -46,11 +47,6 @@ impl IntoProto<ProtoRace> for Race {
 			Race::Protoss => ProtoRace::Protoss,
 			Race::Random => ProtoRace::Random,
 		}
-	}
-}
-impl Default for Race {
-	fn default() -> Self {
-		Race::Random
 	}
 }
 
@@ -105,9 +101,9 @@ impl IntoProto<ProtoDifficulty> for Difficulty {
 
 /// Strategy build of in-game AI.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, Copy, Clone, FromStr)]
+#[derive(Debug, Copy, Clone, FromStr, Default)]
 pub enum AIBuild {
-	RandomBuild,
+	#[default] RandomBuild,
 	Rush,
 	Timing,
 	Power,
@@ -136,11 +132,6 @@ impl IntoProto<ProtoAIBuild> for AIBuild {
 			AIBuild::Macro => ProtoAIBuild::Macro,
 			AIBuild::Air => ProtoAIBuild::Air,
 		}
-	}
-}
-impl Default for AIBuild {
-	fn default() -> Self {
-		AIBuild::RandomBuild
 	}
 }
 
