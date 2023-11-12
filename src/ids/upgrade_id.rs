@@ -325,4 +325,6 @@ pub enum UpgradeId {
 	AmplifiedShielding = 300,
 	PsionicAmplifiers = 301,
 	SecretedCoating = 302,
+	HurricaneThrusters = 303,
+	InterferenceMatrix = 304,
 }
