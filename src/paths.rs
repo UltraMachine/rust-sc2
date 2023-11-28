@@ -27,9 +27,13 @@ pub fn get_path_to_sc2() -> String {
 
 				"C:/Program Files (x86)/StarCraft II".to_string()
 			}
-			#[cfg(unix)]
+			#[cfg(target_os = "linux")]
 			{
 				format!("{}/StarCraftII", home_dir().unwrap().to_str().unwrap())
+			}
+			#[cfg(target_os = "macos")]
+			{
+				"/Applications/Starcraft II".to_string()
 			}
 		}
 	}
