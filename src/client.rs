@@ -662,6 +662,12 @@ where
 		bot.on_event(e)?;
 	}
 	bot.on_step(iteration)?;
+	if bot.game_left {
+		let mut req = Request::new();
+		req.mut_leave_game();
+		bot.api().send_request(req)?;
+		return Ok(false);
+	}
 
 	let bot_actions = bot.get_actions();
 	if !bot_actions.is_empty() {

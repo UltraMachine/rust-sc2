@@ -390,6 +390,7 @@ pub struct Bot {
 	pub(crate) process: Option<Child>,
 	pub(crate) api: Option<API>,
 	pub(crate) game_step: Rs<LockU32>,
+	pub(crate) game_left: bool,
 	#[doc(hidden)]
 	pub disable_fog: bool,
 	/// Actual race of your bot.
@@ -1746,10 +1747,9 @@ impl Bot {
 	///
 	/// [`on_end`]: crate::Player::on_end
 	/// [`debug.end_game`]: Debugger::end_game
-	pub fn leave(&self) -> SC2Result<()> {
-		let mut req = Request::new();
-		req.mut_leave_game();
-		self.api().send_request(req)
+	pub fn leave(&mut self) -> SC2Result<()> {
+		self.game_left = true;
+		Ok(())
 	}
 
 	pub(crate) fn close_client(&mut self) {
@@ -1779,6 +1779,7 @@ impl Default for Bot {
 	fn default() -> Self {
 		Self {
 			game_step: Rs::new(LockU32::new(1)),
+			game_left: false,
 			disable_fog: false,
 			race: Race::Random,
 			enemy_race: Race::Random,
