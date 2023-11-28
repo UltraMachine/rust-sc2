@@ -26,20 +26,22 @@ pub fn bot(_attr: TokenStream, item: TokenStream) -> TokenStream {
 		unit => quote! {#unit},
 	};
 
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+	
 	TokenStream::from(quote! {
 		#(#attrs)*
 		#vis struct #name#generics {
 			_bot: rust_sc2::bot::Bot,
 			#fields
 		}
-		impl std::ops::Deref for #name {
+		impl #impl_generics std::ops::Deref for #name #ty_generics #where_clause {
 			type Target = rust_sc2::bot::Bot;
 
 			fn deref(&self) -> &Self::Target {
 				&self._bot
 			}
 		}
-		impl std::ops::DerefMut for #name {
+		impl #impl_generics  std::ops::DerefMut for #name #ty_generics #where_clause {
 			fn deref_mut(&mut self) -> &mut Self::Target {
 				&mut self._bot
 			}
