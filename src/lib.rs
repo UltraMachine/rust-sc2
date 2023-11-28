@@ -513,9 +513,7 @@ implements `Default` too and will be filled automatically:
 #[derive(Default)]
 struct MyBot;
 
-fn main() {
-    let bot = MyBot::default();
-}
+let bot = MyBot::default();
 ```
 ```
 #[bot]
@@ -536,9 +534,7 @@ impl MyBot {
     }
 }
 
-fn main() {
-    let bot = MyBot::new();
-}
+let bot = MyBot::new();
 ```
 
 # Macro Inside

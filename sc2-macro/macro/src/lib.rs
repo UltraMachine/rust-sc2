@@ -26,8 +26,8 @@ pub fn bot(_attr: TokenStream, item: TokenStream) -> TokenStream {
 		unit => quote! {#unit},
 	};
 
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-	
+	let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
 	TokenStream::from(quote! {
 		#(#attrs)*
 		#vis struct #name#generics {

@@ -969,7 +969,7 @@ impl Unit {
 		if max == 0.0 {
 			return None;
 		}
-		Some(current as f32 / max as f32)
+		Some(current / max)
 	}
 	/// Returns ground range of unit's weapon without considering upgrades.
 	/// Use [`real_ground_range`](Self::real_ground_range) to get range including upgrades.

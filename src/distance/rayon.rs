@@ -214,7 +214,7 @@ where
 	T: Distance + Copy,
 {
 	fn split_off_left(&self) -> Self {
-		FilterConsumer::new(self.base.split_off_left(), &self.filter_op)
+		FilterConsumer::new(self.base.split_off_left(), self.filter_op)
 	}
 
 	fn to_reducer(&self) -> Self::Reducer {

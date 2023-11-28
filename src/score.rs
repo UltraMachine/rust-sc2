@@ -4,8 +4,9 @@ use crate::{FromProto, IntoSC2};
 use sc2_proto::score::{CategoryScoreDetails, Score as ProtoScore, Score_ScoreType, VitalScoreDetails};
 
 #[variant_checkers]
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum ScoreType {
+	#[default]
 	Curriculum,
 	Melee,
 }
@@ -15,11 +16,6 @@ impl FromProto<Score_ScoreType> for ScoreType {
 			Score_ScoreType::Curriculum => ScoreType::Curriculum,
 			Score_ScoreType::Melee => ScoreType::Melee,
 		}
-	}
-}
-impl Default for ScoreType {
-	fn default() -> Self {
-		ScoreType::Curriculum
 	}
 }
 

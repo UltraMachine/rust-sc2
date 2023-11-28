@@ -958,7 +958,7 @@ impl Bot {
 
 		let paths = expansions
 			.iter()
-			.zip(paths.into_iter())
+			.zip(paths)
 			.map(|(exp, path)| (exp.loc, path.unwrap_or(f32::INFINITY)))
 			.collect::<FxHashMap<Point2, f32>>();
 
@@ -1632,7 +1632,7 @@ impl Bot {
 
 		geysers
 			.into_iter()
-			.zip(results.into_iter())
+			.zip(results)
 			.find(|(_, res)| *res == ActionResult::Success)
 			.map(|(geyser, _)| geyser)
 	}
@@ -1653,7 +1653,7 @@ impl Bot {
 
 		expansions
 			.into_iter()
-			.zip(paths.into_iter())
+			.zip(paths)
 			.filter_map(|(exp, path)| Some((exp, path?)))
 			.min_by(|(_, path1), (_, path2)| path1.partial_cmp(path2).unwrap())
 			.map(|(exp, _)| exp)
