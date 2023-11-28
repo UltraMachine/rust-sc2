@@ -61,7 +61,16 @@ const SC2_BINARY: &str = {
 			compile_error!("Unsupported Arch");
 		}
 	}
-	#[cfg(not(any(target_os = "windows", target_os = "linux")))]
+	#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+	{
+		"SC2.app/Contents/MacOS/SC2"
+	}
+
+	#[cfg(not(any(
+		target_os = "windows",
+		target_os = "linux",
+		all(target_os = "macos", target_arch = "aarch64")
+	)))]
 	{
 		compile_error!("Unsupported OS");
 	}
@@ -733,7 +742,7 @@ fn launch_client(sc2_path: &str, port: i32, sc2_version: Option<&str>) -> Child 
 				format!("{}/Support", sc2_path)
 			}
 		}
-		#[cfg(all(target_os = "linux", not(feature = "wine_sc2")))]
+		#[cfg(any(target_os = "macos", all(target_os = "linux", not(feature = "wine_sc2"))))]
 		{
 			sc2_path
 		}
