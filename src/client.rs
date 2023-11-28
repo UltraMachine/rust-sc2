@@ -742,11 +742,7 @@ fn launch_client(sc2_path: &str, port: i32, sc2_version: Option<&str>) -> Child 
 				format!("{}/Support", sc2_path)
 			}
 		}
-		#[cfg(all(target_os = "linux", not(feature = "wine_sc2")))]
-		{
-			sc2_path
-		}
-		#[cfg(target_os = "macos")]
+		#[cfg(any(target_os = "macos", all(target_os = "linux", not(feature = "wine_sc2"))))]
 		{
 			sc2_path
 		}
