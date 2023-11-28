@@ -11,7 +11,7 @@ use crate::{
 	game_info::GameInfo,
 	game_state::Effect,
 	game_state::{Alliance, GameState},
-	geometry::Point2,
+	geometry::{Point2, Point3},
 	ids::{AbilityId, EffectId, UnitTypeId, UpgradeId},
 	player::Race,
 	ramp::{Ramp, Ramps},
@@ -712,6 +712,10 @@ impl Bot {
 					.map(|order| order.progress)
 			})
 			.unwrap_or(0.0)
+	}
+	/// Move player camera to specified position.
+	pub fn move_camera(&mut self, pos: Point3) {
+		self.actions.push(Action::CameraMove(pos));
 	}
 	/// Sends message to in-game chat.
 	pub fn chat(&mut self, message: &str) {
