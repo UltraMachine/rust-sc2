@@ -17,7 +17,7 @@ use sc2_proto::{
 
 #[derive(Default, Clone)]
 pub(crate) struct Commander {
-	pub commands: FxHashMap<(AbilityId, Target, bool), Vec<u64>>,
+	pub commands: Vec<(AbilityId, Target, bool, Vec<u64>)>,
 	pub autocast: FxHashMap<AbilityId, Vec<u64>>,
 }
 

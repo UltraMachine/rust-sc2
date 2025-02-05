@@ -10,6 +10,7 @@ struct LightningMcQueen {
 	assigned: HashMap<u64, HashSet<u64>>, // (mineral, workers)
 	free_workers: HashSet<u64>,           // tags of workers which aren't assigned to any work
 	harvesters: HashMap<u64, (u64, u64)>, // (worker, (target mineral, nearest townhall))
+	targets: HashMap<u64, Point2>,        // (mineral, target move location)
 }
 
 impl Player for LightningMcQueen {
@@ -79,14 +80,79 @@ impl Player for LightningMcQueen {
 		Ok(())
 	}
 
+	fn on_start(&mut self) -> SC2Result<()> {
+		self.assign_mineral_targets();
+
+		Ok(())
+	}
+
 	fn on_step(&mut self, _iteration: usize) -> SC2Result<()> {
 		self.assign_roles();
 		self.execute_micro();
+
+		// visualise the mineral target points
+		for (mmineral_tag, t) in self.targets.clone() {
+			if let Some(m) = self.units.mineral_fields.get(mmineral_tag).map(|m| m.position()) {
+				let start = t.to3(self.get_z_height(t) + 0.5);
+				let end = m.to3(self.get_z_height(m) + 0.5);
+
+				self.debug.draw_line(start, end, Some((255, 255, 60)));
+				self.debug.draw_sphere(start, 0.5, Some((255, 255, 60)));
+			}
+		}
+
+		// print out total minerals gathered by the 5 minute mark
+		if self.state.observation.game_loop() == 6720 {
+			println!(
+				"mined {} minerals by {}:{:02}",
+				self.minerals,
+				self.time as usize / 60,
+				self.time as usize % 60
+			);
+		}
+
 		Ok(())
 	}
 }
 
 impl LightningMcQueen {
+	const MINERAL_RADIUS: f32 = 1.35;
+
+	fn assign_mineral_targets(&mut self) {
+		for (&b, &i) in &self.base_indices {
+			let base = self.units.my.townhalls[b].position();
+
+			for m in self.expansions[i].minerals.clone() {
+				let mineral = self.units.mineral_fields[m].position();
+
+				// default target point is straight towards the townhall
+				let mut target = mineral.towards(base, Self::MINERAL_RADIUS);
+
+				// find the position of all other mineral patches within 1.5 radius of this one
+				let nearby_minerals = self
+					.units
+					.mineral_fields
+					.closer(Self::MINERAL_RADIUS * 1.5, mineral)
+					.filter(|p| p.tag() != m)
+					.iter()
+					.map(|p| p.position())
+					.collect::<Vec<_>>();
+
+				// create an offset vector that pushes the target away from each nearby minerals
+				let mut offset = Point2::new(0.0, 0.0);
+				for &patch in &nearby_minerals {
+					let push = patch.towards(target, 1.0) - patch;
+					offset += push / mineral.distance(patch);
+				}
+
+				// add our offset, and then normalise the resulting point back onto the radius
+				target = mineral.towards(target + offset, Self::MINERAL_RADIUS);
+
+				self.targets.insert(m, target);
+			}
+		}
+	}
+
 	fn assign_roles(&mut self) {
 		let mut to_harvest = vec![];
 		// iterator of (mineral tag, nearest base tag)
@@ -112,100 +178,42 @@ impl LightningMcQueen {
 			self.assigned.entry(t.0).or_default().insert(w);
 		}
 	}
+
 	fn execute_micro(&mut self) {
-		let (gather_ability, return_ability) = match self.race {
-			Race::Terran => (AbilityId::HarvestGatherSCV, AbilityId::HarvestReturnSCV),
-			Race::Zerg => (AbilityId::HarvestGatherDrone, AbilityId::HarvestReturnDrone),
-			Race::Protoss => (AbilityId::HarvestGatherProbe, AbilityId::HarvestReturnProbe),
-			_ => unreachable!(),
-		};
-		let mut mineral_moving = HashSet::new();
-
-		for u in &self.units.my.workers {
+		for u in &self.units.my.workers.clone() {
 			if let Some((mineral_tag, base_tag)) = self.harvesters.get(&u.tag()) {
-				let is_collides = || {
-					let range = (u.radius() + u.distance_per_step()) * 2.0;
-					!self.assigned[mineral_tag].iter().all(|&w| {
-						w == u.tag()
-							|| mineral_moving.contains(&w)
-							|| u.is_further(range, &self.units.my.workers[w])
-					})
-				};
-
-				match u.orders().first().map(|ord| (ord.ability, ord.target)) {
-					// moving
-					Some((AbilityId::MoveMove, Target::Pos(current_target))) => {
-						let mineral = &self.units.mineral_fields[*mineral_tag];
-						let range = mineral.radius() + u.distance_per_step();
-						// moving towards mineral
-						if current_target.is_closer(range, mineral) {
-							// execute gather ability if close enough or colliding with other workers
-							if u.is_closer(u.radius() + range, mineral) || is_collides() {
-								u.smart(Target::Tag(mineral.tag()), false);
-								mineral_moving.insert(u.tag());
-							}
-							// otherwise keep moving
-							continue;
-						} else {
-							let base = &self.units.my.townhalls[*base_tag];
-							let range = base.radius() + u.distance_per_step();
-							// moving towards base
-							if current_target.is_closer(range, base) {
-								// execute return ability if close enough or colliding with other workers
-								if u.is_closer(u.radius() + range, base) || is_collides() {
-									u.smart(Target::Tag(base.tag()), false);
-									mineral_moving.insert(u.tag());
-								}
-								// otherwise keep moving
-								continue;
-							}
-						}
-					}
-					// gathering
-					Some((ability, Target::Tag(t))) if ability == gather_ability && t == *mineral_tag => {
-						let mineral = &self.units.mineral_fields[*mineral_tag];
-						// execute move ability if far away from mineral and not colliding with other workers
-						if u.is_further(u.radius() + mineral.radius() + u.distance_per_step(), mineral)
-							&& !is_collides()
-						{
-							let base = &self.units.my.townhalls[*base_tag];
-							u.move_to(
-								Target::Pos(mineral.position().towards(base.position(), mineral.radius())),
-								false,
-							);
-						// otherwise keep gathering
-						} else {
-							mineral_moving.insert(u.tag());
-						}
-						continue;
-					}
-					// returning
-					Some((ability, Target::Tag(t))) if ability == return_ability && t == *base_tag => {
+				// only need to change orders if we don't already have 2 commands queued
+				if u.orders().len() < 2 {
+					// we're on our way back from a mineral field
+					if u.is_carrying_resource() {
 						let base = &self.units.my.townhalls[*base_tag];
-						// execute move ability if far away from base and not colliding with other workers
-						if u.is_further(u.radius() + base.radius() + u.distance_per_step(), base)
-							&& !is_collides()
-						{
-							u.move_to(
-								Target::Pos(base.position().towards(u.position(), base.radius())),
-								false,
-							);
-						// otherwise keep returning
-						} else {
-							mineral_moving.insert(u.tag());
+						let target: Point2 = base.position().towards(u.position(), base.radius() * 1.08);
+						let distance = u.position().distance_squared(target);
+						// let the built-in unit behaviour handle the first ~half of the trip
+						if distance > 0.5625 && distance < 4.0 {
+							u.move_to(Target::Pos(target), false);
+							u.smart(Target::Tag(*base_tag), true);
 						}
-						continue;
+						// deal with the rare case where collisions cause the worker to just park itself
+						else if !u.is_returning() {
+							u.smart(Target::Tag(*base_tag), false);
+						}
 					}
-					_ => {}
+					// we're on our way to a mineral field
+					else {
+						let target: Point2 = self.targets[mineral_tag];
+						let distance = u.position().distance_squared(target);
+						// again we want to mineral walk as much of the way as possible, before using the queue trick
+						if distance > 0.5625 && distance < 4.0 {
+							u.move_to(Target::Pos(target), false);
+							u.smart(Target::Tag(*mineral_tag), true);
+						}
+						// either sc2 accidentally deposited the minerals early, or it switched mineral fields on us
+						else if !u.is_gathering() || u.target_tag().map_or(false, |t| t != *mineral_tag) {
+							u.gather(*mineral_tag, false);
+						}
+					}
 				}
-
-				// execute default ability if worker is doing something it shouldn't do
-				if u.is_carrying_resource() {
-					u.return_resource(false);
-				} else {
-					u.gather(*mineral_tag, false);
-				}
-				mineral_moving.insert(u.tag());
 			}
 		}
 	}

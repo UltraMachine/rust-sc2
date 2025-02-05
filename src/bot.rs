@@ -532,8 +532,8 @@ impl Bot {
 			actions.extend(
 				commander
 					.commands
-					.drain()
-					.map(|((ability, target, queue), units)| {
+					.drain(..)
+					.map(|(ability, target, queue, units)| {
 						Action::UnitCommand(ability, target, units, queue)
 					}),
 			);
